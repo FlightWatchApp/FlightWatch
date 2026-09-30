@@ -1,0 +1,498 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Identity (SPEC-007, ADR-006) ----
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  status              UserStatus @default(PENDING_VERIFICATION)
+  timezone            String
+  passwordHash        String
+  // SPEC-007 §9: política de bloqueio ainda placeholder (5 tentativas / 15min,
+  // ver apps/api/src/auth/auth.service.ts) — produto ainda não definiu valores finais.
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  notificationChannels NotificationChannel[]
+  watches              Watch[]
+  idempotencyKeys      IdempotencyKey[]
+  sessions             Session[]
+  // SPEC-014: sempre null nesta fatia — não existe guard de autenticação
+  // opcional ainda, então a busca de descoberta nunca associa um usuário.
+  // O campo/relação já existem para não exigir migração quando isso mudar.
+  flightSearches       FlightSearch[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  // SHA-256 do token opaco — o token em si nunca é persistido (ADR-006).
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+enum NotificationChannelType {
+  EMAIL
+}
+
+enum NotificationChannelStatus {
+  ACTIVE
+  REVOKED
+}
+
+model NotificationChannel {
+  id                         String                    @id @default(uuid())
+  userId                     String
+  type                       NotificationChannelType
+  destination                String
+  status                     NotificationChannelStatus @default(ACTIVE)
+  verifiedAt                 DateTime?
+  // SPEC-010 §7: hash SHA-256 do token opaco enviado por e-mail — o token em
+  // si nunca é persistido (mesmo padrão de Session.tokenHash, ADR-006).
+  // Intencionalmente NÃO limpo ao verificar (SPEC-010 §7): um segundo clique
+  // no mesmo link precisa continuar achando o canal e ver que já está
+  // verificado (idempotente), não virar "token inválido".
+  verificationTokenHash      String?                   @unique
+  verificationTokenExpiresAt DateTime?
+  // SPEC-006 §5: entra na delivery_key. Incrementar quando `destination` mudar,
+  // para uma entrega já enfileirada não ser reaproveitada calada num destino novo.
+  version                    Int                       @default(0)
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  watches Watch[]
+
+  @@index([userId, status])
+  @@map("notification_channels")
+}
+
+// ---- Monitoring (DOMAIN.md §2-3, ADR-005) ----
+
+enum TripType {
+  ONE_WAY
+  ROUND_TRIP
+}
+
+enum SearchTargetStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model SearchTarget {
+  id              String             @id @default(uuid())
+  fingerprint     String             @unique
+  canonicalKey    String
+  status          SearchTargetStatus @default(ACTIVE)
+  originIata      String
+  destinationIata String
+  departureDate   DateTime           @db.Date
+  returnDate      DateTime?          @db.Date
+  tripType        TripType
+  cabin           String
+  adults          Int
+  currency        String
+  market          String
+
+  // Agendamento: SPEC-002 define a política real. Aqui só os campos existem;
+  // nextCheckAt é inicializado com "agora" para o target ficar imediatamente
+  // elegível assim que o scheduler existir.
+  nextCheckAt          DateTime?
+  lastCheckedAt        DateTime?
+  checkIntervalSeconds Int
+  priority             String    @default("STANDARD")
+  providerStrategy     String    @default("SIMULATED")
+
+  version   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  watches           Watch[]
+  searchExecutions  SearchExecution[]
+  priceObservations PriceObservation[]
+
+  @@index([status, nextCheckAt])
+  @@map("search_targets")
+}
+
+// ---- Pricing (SPEC-002/003/004) ----
+
+enum SearchExecutionStatus {
+  SCHEDULED
+  RUNNING
+  SUCCEEDED
+  NO_OFFERS
+  RETRYABLE_FAILURE
+  PERMANENT_FAILURE
+  RATE_LIMITED
+}
+
+model SearchExecution {
+  id               String                @id @default(uuid())
+  searchTargetId   String
+  providerStrategy String
+  status           SearchExecutionStatus @default(SCHEDULED)
+  // 0 até a primeira reivindicação (claimSearchExecutionForRunning); vira 1 na
+  // primeira tentativa, 2 na primeira retentativa, etc. — número real de
+  // tentativas, não "tentativas - 1".
+  attempt          Int                   @default(0)
+  idempotencyKey   String                @unique
+  correlationId    String
+
+  scheduledAt DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  latencyMs         Int?
+  errorCode         String?
+  offersCount       Int?
+  costUnits         Int?
+  normalizerVersion Int?
+
+  // SPEC-011: token de posse emitido no claim (RUNNING), zerado pela
+  // reconciliação de abandono — qualquer escrita terminal do worker original
+  // depois disso não casa mais o `WHERE id AND leaseToken`, então é rejeitada
+  // em vez de sobrescrever o resultado de uma execução mais nova.
+  leaseToken String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  searchTarget     SearchTarget      @relation(fields: [searchTargetId], references: [id])
+  priceObservation PriceObservation?
+
+  @@index([searchTargetId, status])
+  @@index([status, scheduledAt])
+  @@map("search_executions")
+}
+
+model PriceObservation {
+  id                     String    @id @default(uuid())
+  searchTargetId         String
+  searchExecutionId      String    @unique
+  providerStrategy       String
+  observedAt             DateTime
+  totalAmountMinor       Int
+  currency               String
+  baseAmountMinor        Int?
+  taxAmountMinor         Int?
+  // Itinerário normalizado (segments de FlightOffer) — snapshot em JSON por
+  // simplicidade do MVP; uma tabela de segments separada só se justifica se
+  // consultas precisarem filtrar por trecho individual, o que ainda não existe.
+  itinerary              Json
+  offerSignature         String
+  deeplink               String?
+  expiresAt              DateTime?
+  qualityFlags           String[]
+  observationKey         String    @unique
+  selectionPolicyVersion Int
+  normalizerVersion      Int
+
+  createdAt DateTime @default(now())
+
+  searchTarget    SearchTarget    @relation(fields: [searchTargetId], references: [id])
+  searchExecution SearchExecution @relation(fields: [searchExecutionId], references: [id])
+  alertEvents     AlertEvent[]
+
+  @@index([searchTargetId, observedAt(sort: Desc)])
+  @@map("price_observations")
+}
+
+enum WatchStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+model Watch {
+  id                    String      @id @default(uuid())
+  userId                String
+  searchTargetId        String
+  notificationChannelId String
+  status                WatchStatus @default(ACTIVE)
+  startsAt              DateTime    @default(now())
+  expiresAt             DateTime?
+  version               Int         @default(0)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  user                User                @relation(fields: [userId], references: [id])
+  searchTarget        SearchTarget        @relation(fields: [searchTargetId], references: [id])
+  notificationChannel NotificationChannel @relation(fields: [notificationChannelId], references: [id])
+  alertRules          AlertRule[]
+  idempotencyKeys     IdempotencyKey[]
+  alertEvents         AlertEvent[]
+
+  @@index([userId, status])
+  // EVAL-PERF-002 (fan-out-benchmark.ts): a paginação por cursor de
+  // selectActiveWatchesPage ordena e filtra por `id` (`WHERE searchTargetId =
+  // ? AND status = 'ACTIVE' AND id > cursor ORDER BY id`). O índice de 2
+  // colunas não cobre o `id` — sem ele no índice, cada página seguinte fica
+  // mais lenta (varredura/reordenação crescente), medido em 29s pra 100.000
+  // Watches num único SearchTarget antes desta correção. Estende (não troca
+  // de propósito à parte) o índice anterior — qualquer consulta que usava só
+  // `[searchTargetId, status]` continua coberta pelo prefixo deste.
+  @@index([searchTargetId, status, id])
+  @@map("watches")
+}
+
+enum AlertRuleType {
+  TARGET_PRICE
+  PERCENTAGE_DROP
+  ABSOLUTE_DROP
+  NEW_OBSERVED_LOW
+}
+
+enum ReferenceStrategy {
+  PREVIOUS_VALID_OBSERVATION
+  FIRST_VALID_OBSERVATION
+  LOWEST_VALID_OBSERVATION
+}
+
+model AlertRule {
+  id      String        @id @default(uuid())
+  watchId String
+  type    AlertRuleType
+
+  // Parâmetros tipados (DOMAIN.md §3.3): só o campo relevante ao "type" é preenchido.
+  targetAmountMinor Int?
+  dropPercent       Float?
+  dropAmountMinor   Int?
+
+  referenceStrategy ReferenceStrategy?
+  cooldownSeconds   Int
+  enabled           Boolean            @default(true)
+  ruleVersion       Int                @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  watch       Watch        @relation(fields: [watchId], references: [id])
+  alertEvents AlertEvent[]
+
+  @@index([watchId])
+  @@map("alert_rules")
+}
+
+// ---- Alerting (SPEC-005) ----
+
+enum AlertEventStatus {
+  PENDING
+  SUPPRESSED
+  QUEUED
+  NOTIFIED
+  FAILED
+}
+
+model AlertEvent {
+  id                   String           @id @default(uuid())
+  watchId              String
+  alertRuleId          String
+  priceObservationId   String
+  triggerType          AlertRuleType
+  ruleVersion          Int
+  referenceAmountMinor Int?
+  currentAmountMinor   Int
+  currency             String
+  deduplicationKey     String           @unique
+  status               AlertEventStatus @default(PENDING)
+  suppressionReason    String?
+  // SPEC-005 §9: valores comparados, limiar, resultado calculado, estratégia de
+  // referência — tudo que a mensagem/auditoria precisa sem recalcular com regra
+  // futura. Campos tipados acima cobrem o essencial para índice/filtro; o resto
+  // (dropPercent calculado, threshold, referenceObservationId etc.) vai aqui.
+  justification        Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  watch                  Watch                  @relation(fields: [watchId], references: [id])
+  alertRule              AlertRule              @relation(fields: [alertRuleId], references: [id])
+  priceObservation       PriceObservation       @relation(fields: [priceObservationId], references: [id])
+  notificationDeliveries NotificationDelivery[]
+
+  @@index([watchId, alertRuleId, status])
+  @@map("alert_events")
+}
+
+// ---- Notifications (SPEC-006) ----
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENDING
+  DELIVERED
+  RETRYABLE_FAILURE
+  PERMANENT_FAILURE
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(uuid())
+  alertEventId      String
+  channel           NotificationChannelType
+  destinationRef    String
+  status            NotificationDeliveryStatus @default(PENDING)
+  // Mesma semântica de SearchExecution.attempt: 0 até a primeira tentativa de
+  // envio, 1 na primeira, 2 na primeira retentativa.
+  attempt           Int                        @default(0)
+  providerMessageId String?
+  deliveryKey       String                     @unique
+  errorCode         String?
+  // SPEC-012: versão do template usada nesta entrega — persistida para que a
+  // reconciliação de SENDING obsoleto (que não tem mais o payload efêmero do
+  // job original) saiba qual template reenviar. Nullable: entregas criadas
+  // antes desta spec não têm esse dado, mas também nunca vão precisar dele
+  // (não estão presas em SENDING).
+  templateVersion   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  alertEvent AlertEvent @relation(fields: [alertEventId], references: [id])
+
+  @@index([alertEventId, status])
+  @@map("notification_deliveries")
+}
+
+// ---- Outbox transacional (ADR-003) ----
+
+enum OutboxEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model OutboxEvent {
+  id          String            @id @default(uuid())
+  eventType   String
+  payload     Json
+  status      OutboxEventStatus @default(PENDING)
+  availableAt DateTime          @default(now())
+  createdAt   DateTime          @default(now())
+  publishedAt DateTime?
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+// ---- Idempotência de criação (SPEC-001 §9) ----
+
+model IdempotencyKey {
+  id          String   @id @default(uuid())
+  userId      String
+  key         String
+  requestHash String
+  watchId     String?
+  createdAt   DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  watch Watch? @relation(fields: [watchId], references: [id])
+
+  @@unique([userId, key])
+  @@map("idempotency_keys")
+}
+
+// ---- Discovery (SPEC-014) ----
+//
+// FlightSearch/FlightSearchOffer são um conceito separado de
+// SearchTarget/SearchExecution/PriceObservation: aqueles existem para
+// monitoramento recorrente compartilhado (ADR-005); estes existem para uma
+// busca pontual de descoberta, que pode nunca virar Watch. Reaproveitam a
+// porta do provider (packages/providers), não a tabela de monitoramento.
+// Nesta fatia (síncrona, sem fila): só PENDING -> SUCCEEDED|FAILED é
+// alcançável — RUNNING/PARTIAL/EXPIRED existem no enum para não fechar a
+// porta a uma futura entrega assíncrona, mas nenhum código os produz ainda.
+
+enum FlightSearchStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  EXPIRED
+}
+
+model FlightSearch {
+  id              String             @id @default(uuid())
+  // SPEC-014: sempre null nesta fatia (ver nota em User.flightSearches).
+  userId          String?
+  originIata      String
+  destinationIata String
+  departureDate   DateTime           @db.Date
+  returnDate      DateTime?          @db.Date
+  tripType        TripType
+  cabin           String
+  adults          Int
+  currency        String
+  market          String
+  maxStops        Int?
+  maxPriceMinor   Int?
+
+  status              FlightSearchStatus @default(PENDING)
+  providerStrategy    String             @default("SIMULATED")
+  offersReturnedCount Int                @default(0)
+  offersEligibleCount Int                @default(0)
+  errorCode           String?
+  correlationId       String
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  user   User?               @relation(fields: [userId], references: [id])
+  offers FlightSearchOffer[]
+
+  @@index([userId, createdAt])
+  @@map("flight_searches")
+}
+
+model FlightSearchOffer {
+  id               String    @id @default(uuid())
+  flightSearchId   String
+  providerStrategy String
+  providerOfferId  String
+  totalAmountMinor Int
+  currency         String
+  passengerCount   Int
+  // Snapshot do itinerário (segments de FlightOffer) — mesma escolha de
+  // PriceObservation.itinerary: tabela de segments separada só se justifica
+  // se consultas precisarem filtrar por trecho individual.
+  itinerary        Json
+  offerSignature   String
+  observedAt       DateTime
+  expiresAt        DateTime?
+  deeplink         String?
+  qualityFlags     String[]
+
+  createdAt DateTime @default(now())
+
+  flightSearch FlightSearch @relation(fields: [flightSearchId], references: [id])
+
+  @@index([flightSearchId])
+  @@map("flight_search_offers")
+}

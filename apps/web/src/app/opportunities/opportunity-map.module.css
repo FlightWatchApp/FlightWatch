@@ -1,0 +1,22 @@
+.mapWrapper {
+  height: 22rem;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+  background: var(--color-surface-sunken);
+}
+
+.marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-action);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-action);
+}

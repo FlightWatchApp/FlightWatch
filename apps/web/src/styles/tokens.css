@@ -1,0 +1,137 @@
+/**
+ * Design tokens — Flight Watch.
+ *
+ * Paleta: navy/paper para confiança, azul para ação/monitoramento, verde só para
+ * oportunidade, âmbar só para atenção/dado desatualizado, vermelho só para erro ou
+ * ação destrutiva (ver ARCHITECTURE do produto). Todos os pares texto/fundo abaixo
+ * foram checados contra WCAG AA (>= 4.5:1 para texto normal).
+ */
+
+:root {
+  /* Ink & surfaces — neutros com leve tom de navy, não cinza puro */
+  --fw-ink-900: #10192b;
+  --fw-ink-700: #33415c;
+  --fw-ink-500: #5b6b85;
+  --fw-ink-300: #c4cbd8;
+  --fw-ink-200: #dee2e9;
+  --fw-ink-100: #eef0f4;
+  --fw-paper: #f8f7f3;
+  --fw-surface: #ffffff;
+
+  /* Navy — marca, header, superfícies de confiança */
+  --fw-navy-900: #0b1e3d;
+  --fw-navy-700: #14315c;
+
+  /* Sky — ação e monitoramento ativo */
+  --fw-sky-700: #17549e;
+  --fw-sky-600: #1c64d1;
+  --fw-sky-500: #2c79e8;
+  --fw-sky-100: #e4eefc;
+
+  /* Moss — só oportunidade / resultado positivo */
+  --fw-moss-700: #175e3b;
+  --fw-moss-600: #1d7a4c;
+  --fw-moss-100: #e1f3e7;
+
+  /* Amber — só atenção / dado desatualizado */
+  --fw-amber-700: #8f5d0a;
+  --fw-amber-600: #b4780f;
+  --fw-amber-100: #fbedd6;
+
+  /* Red — só erro / ação destrutiva */
+  --fw-red-700: #8a2a20;
+  --fw-red-600: #b23a2e;
+  --fw-red-100: #fbe7e3;
+
+  /* Papel semântico */
+  --color-bg: var(--fw-paper);
+  --color-surface: var(--fw-surface);
+  --color-surface-sunken: var(--fw-ink-100);
+  --color-border: var(--fw-ink-200);
+  --color-border-strong: var(--fw-ink-300);
+
+  --color-text-primary: var(--fw-ink-900);
+  --color-text-secondary: var(--fw-ink-700);
+  --color-text-muted: var(--fw-ink-500);
+  --color-text-on-dark: #ffffff;
+  --color-text-on-accent: #ffffff;
+
+  --color-brand: var(--fw-navy-900);
+  --color-brand-strong: var(--fw-navy-700);
+
+  --color-action: var(--fw-sky-600);
+  --color-action-hover: var(--fw-sky-700);
+  --color-action-soft-bg: var(--fw-sky-100);
+  --color-action-soft-text: var(--fw-sky-700);
+
+  --color-success: var(--fw-moss-600);
+  --color-success-soft-bg: var(--fw-moss-100);
+  --color-success-soft-text: var(--fw-moss-700);
+
+  --color-warning: var(--fw-amber-600);
+  --color-warning-soft-bg: var(--fw-amber-100);
+  --color-warning-soft-text: var(--fw-amber-700);
+
+  --color-danger: var(--fw-red-600);
+  --color-danger-hover: var(--fw-red-700);
+  --color-danger-soft-bg: var(--fw-red-100);
+  --color-danger-soft-text: var(--fw-red-700);
+
+  --color-focus-ring: var(--fw-sky-500);
+
+  /* Tipografia */
+  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
+  --font-body: var(--font-public-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: 3rem;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+
+  /* Espaçamento — base 4px */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+
+  /* Raio — deliberadamente contido, sem cápsulas */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Sombra — só para elementos flutuantes (modal, popover), não em cards de lista */
+  --shadow-sm: 0 1px 2px rgba(16, 25, 43, 0.08);
+  --shadow-md: 0 8px 24px rgba(16, 25, 43, 0.14);
+
+  /* Layout */
+  --container-max: 72rem;
+  --header-height: 4rem;
+
+  /* Movimento */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

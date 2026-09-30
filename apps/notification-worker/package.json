@@ -1,0 +1,30 @@
+{
+  "name": "@flight-watch/notification-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:dev": "tsx watch src/main.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@flight-watch/database": "workspace:*",
+    "@flight-watch/domain": "workspace:*",
+    "@flight-watch/notifications": "workspace:*",
+    "@flight-watch/observability": "workspace:*",
+    "@flight-watch/queue": "workspace:*",
+    "bullmq": "^5.28.1"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^10.13.2",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.4"
+  }
+}

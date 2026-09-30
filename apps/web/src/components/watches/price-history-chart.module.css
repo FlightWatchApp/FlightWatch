@@ -1,0 +1,46 @@
+.wrapper {
+  width: 100%;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+}
+
+.line {
+  stroke: var(--color-action);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dot {
+  fill: var(--color-surface);
+  stroke: var(--color-action);
+  stroke-width: 2;
+}
+
+.targetLine {
+  stroke: var(--color-warning);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.targetLabel {
+  fill: var(--color-warning-soft-text);
+  font-size: 11px;
+  font-family: var(--font-body);
+}
+
+.axisLabel {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-body);
+}
+
+.empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-6) 0;
+  text-align: center;
+}

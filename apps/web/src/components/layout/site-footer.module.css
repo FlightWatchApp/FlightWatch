@@ -1,0 +1,24 @@
+.footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding-block: var(--space-8);
+  margin-top: auto;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+}
+
+.disclaimer {
+  max-width: 46ch;
+  font-size: var(--text-sm);
+}
+
+.meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
