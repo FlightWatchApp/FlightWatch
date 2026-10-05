@@ -1,0 +1,65 @@
+.symbol {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.tile {
+  fill: var(--color-brand);
+}
+
+.arc {
+  stroke: var(--color-text-on-dark-muted);
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 0;
+}
+
+.origin {
+  fill: var(--color-text-on-dark);
+}
+
+.lens {
+  stroke: var(--color-text-on-dark);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.destination {
+  fill: var(--fw-route-300);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Variante sem bloco: herda a cor do texto; o destino continua laranja rota. */
+.plain .arc,
+.plain .lens {
+  stroke: currentColor;
+}
+
+.plain .origin {
+  fill: currentColor;
+}
+
+.plain .destination {
+  fill: var(--color-route);
+}
+
+/* MO-03: decola → a lente aparece → pousa no destino. Uma vez só, ~1,4 s no total. */
+.animated .arcTakeoff {
+  stroke-dashoffset: 1;
+  animation: var(--keyframes-draw) 360ms var(--easing-standard) 120ms forwards;
+}
+
+.animated .lens {
+  opacity: 0;
+  animation: var(--keyframes-pop) 420ms var(--easing-out) 420ms forwards;
+}
+
+.animated .arcLanding {
+  stroke-dashoffset: 1;
+  animation: var(--keyframes-draw) 520ms var(--easing-standard) 760ms forwards;
+}
+
+.animated .destination {
+  opacity: 0;
+  animation: var(--keyframes-pop) 360ms var(--easing-out) 1240ms forwards;
+}

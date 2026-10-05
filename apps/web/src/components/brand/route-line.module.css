@@ -1,0 +1,133 @@
+.route {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.end {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.endRight {
+  text-align: right;
+}
+
+.city {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.arc {
+  flex: none;
+  overflow: visible;
+}
+
+.path {
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.6;
+  stroke-dasharray: 0.035 0.03;
+  vector-effect: non-scaling-stroke;
+}
+
+.dotOrigin {
+  fill: var(--color-text-muted);
+}
+
+.dotDestination {
+  fill: var(--color-route);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Sobre fundo petróleo (card de destaque, hero escuro): mesmas variantes
+   "on-dark" já usadas em Logo/AuthShell/BrandSymbol — nunca os tokens
+   pensados pra fundo claro acima. */
+.inverse {
+  color: var(--color-text-on-dark);
+}
+
+.inverse .city {
+  color: var(--color-text-on-dark-muted);
+}
+
+.inverse .path {
+  stroke: var(--color-border-on-dark);
+}
+
+.inverse .dotOrigin {
+  fill: var(--color-text-on-dark);
+}
+
+.inverse .dotDestination {
+  fill: var(--fw-route-300);
+}
+
+.sm {
+  gap: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.sm .arc {
+  width: 2.25rem;
+  height: 0.75rem;
+}
+
+.md {
+  font-size: var(--text-lg);
+}
+
+.md .arc {
+  width: 3.5rem;
+  height: 1rem;
+}
+
+.lg {
+  font-size: clamp(var(--text-2xl), 5vw, var(--text-3xl));
+  gap: var(--space-4);
+}
+
+.lg .arc {
+  width: clamp(4.5rem, 12vw, 8rem);
+  height: 1.75rem;
+}
+
+/* MO-03: a rota se revela da origem ao destino, o destino dá um pop, 900ms. */
+.animated .dotDestination {
+  opacity: 0;
+  animation: var(--keyframes-pop) 420ms var(--easing-out) 700ms forwards;
+}
+
+.animated .path {
+  /* Máscara de alfa: revela o traço da esquerda para a direita sem mexer no
+     stroke-dasharray que já desenha o tracejado. Keyframe local (MO-02). */
+  mask: linear-gradient(90deg, black 50%, transparent 50%) 100% 0 / 200% 100% no-repeat;
+  animation: routeReveal 900ms var(--easing-out) 100ms forwards;
+}
+
+@keyframes routeReveal {
+  from {
+    mask-position: 100% 0;
+  }
+  to {
+    mask-position: 0 0;
+  }
+}
+
+/* DS-04: em telas estreitas, cidade longa ("Nova York/JFK") quebra em vez de
+   vazar da rota/cartão. */
+@media (max-width: 480px) {
+  .city {
+    white-space: normal;
+  }
+}

@@ -27,7 +27,7 @@
 
 .danger {
   color: var(--color-danger);
-  border-color: var(--fw-red-600);
+  border-color: var(--color-danger);
 }
 
 .danger:hover:not(:disabled) {

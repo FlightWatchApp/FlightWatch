@@ -8,6 +8,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@flight-watch/database';
 import { AppModule } from '../app.module.js';
+import { resetAffiliateConfigCache } from '../affiliate/affiliate-links.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -937,6 +938,34 @@ describe('currentOffer projection and POST /v1/watches/:id/purchase-click (SPEC-
 
     const body = await metrics.registry.metrics();
     expect(body).toContain('purchase_link_missing_total{provider="SIMULATED"}');
+  });
+
+  // SPEC-020: mesmo mecanismo de afiliado da superfície WATCH.
+  it('adds affiliate params and utm_campaign=watch when AFFILIATE_TRACKING_PARAMS is set', async () => {
+    const previous = process.env.AFFILIATE_TRACKING_PARAMS;
+    process.env.AFFILIATE_TRACKING_PARAMS = '{"SIMULATED":{"marker":"fw-e2e"}}';
+    resetAffiliateConfigCache();
+    try {
+      const { watchId, token } = await createWatch({ departureDate: '2027-12-07' });
+      await seedObservation(watchId, { totalAmountMinor: 77_000 });
+
+      const response = await request(app.getHttpServer())
+        .get(`/v1/watches/${watchId}`)
+        .set(...authHeader(token));
+
+      const url = new URL(response.body.currentOffer.purchaseUrl);
+      expect(url.hostname).toBe('booking.simulated-provider.flightwatch.dev');
+      expect(url.searchParams.get('marker')).toBe('fw-e2e');
+      expect(url.searchParams.get('utm_source')).toBe('flightwatch');
+      expect(url.searchParams.get('utm_campaign')).toBe('watch');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AFFILIATE_TRACKING_PARAMS;
+      } else {
+        process.env.AFFILIATE_TRACKING_PARAMS = previous;
+      }
+      resetAffiliateConfigCache();
+    }
   });
 
   // AC-007: expiresAt no passado marca EXPIRED, mas currentOffer não vira null.

@@ -45,13 +45,13 @@ export default async function VerifyEmailPage({
       <Card>
         {error ? (
           <div className={styles.result}>
-            <IconXCircle size={32} className={styles.errorIcon} />
+            <IconXCircle size={40} className={styles.errorIcon} />
             <h1>Não foi possível confirmar</h1>
             <InlineAlert tone="danger">{error}</InlineAlert>
           </div>
         ) : (
           <div className={styles.result}>
-            <IconCheckCircle size={32} className={styles.successIcon} />
+            <IconCheckCircle size={40} className={styles.successIcon} />
             <h1>E-mail confirmado</h1>
             <p className={styles.subtitle}>
               Sua conta já pode criar monitoramentos e receber alertas de preço.
@@ -59,7 +59,7 @@ export default async function VerifyEmailPage({
           </div>
         )}
         <Link href="/" className={primaryButton}>
-          Ir para meus monitoramentos
+          Ir para o início
         </Link>
       </Card>
     </div>

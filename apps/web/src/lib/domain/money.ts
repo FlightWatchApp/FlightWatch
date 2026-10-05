@@ -17,6 +17,22 @@ export function formatMoney(money: Money, locale = 'pt-BR'): string {
   return formatter.format(amount);
 }
 
+/** CP-10: rótulo de eixo do gráfico de histórico — "R$ 1.450", sem centavos. */
+export function formatMoneyRounded(money: Money, locale = 'pt-BR'): string {
+  const formatter = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: money.currency,
+    maximumFractionDigits: 0,
+  });
+  const digits =
+    new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: money.currency,
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+  const amount = money.amountMinor / 10 ** digits;
+  return formatter.format(amount);
+}
+
 export function formatPercent(percent: number, locale = 'pt-BR'): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(percent) + '%';
 }

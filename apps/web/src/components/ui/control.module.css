@@ -16,7 +16,7 @@
 }
 
 .control:hover:not(:disabled) {
-  border-color: var(--fw-ink-500);
+  border-color: var(--color-text-muted);
 }
 
 .control:disabled {

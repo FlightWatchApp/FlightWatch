@@ -9,6 +9,7 @@ import { FormField } from '@/components/ui/form-field';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
+import { airportLabel } from '@/lib/domain/airport-coordinates';
 import { parseAmountMinor } from '@/lib/domain/money';
 import type { TripType } from '@/lib/api/types';
 import { createWatchAction } from './actions';
@@ -50,7 +51,7 @@ export function NewWatchForm() {
     }
     const targetAmountMinor = parseAmountMinor(targetPrice);
     if (targetAmountMinor === null) {
-      setFormError('Informe um preço-alvo válido, maior que zero.');
+      setFormError('Informe um preço desejado válido, maior que zero.');
       return;
     }
 
@@ -67,7 +68,7 @@ export function NewWatchForm() {
           targetAmountMinor,
         });
         if (result.success) {
-          router.push('/');
+          router.push('/watches');
           router.refresh();
         } else {
           setFormError(result.error ?? 'Não foi possível criar o monitoramento.');
@@ -78,7 +79,7 @@ export function NewWatchForm() {
 
   return (
     <div className={`container ${styles.page}`}>
-      <Link href="/" className={styles.back}>
+      <Link href="/watches" className={styles.back}>
         ← Voltar
       </Link>
       <div>
@@ -103,7 +104,7 @@ export function NewWatchForm() {
                 >
                   {SUPPORTED_AIRPORTS.map((code) => (
                     <option key={code} value={code}>
-                      {code}
+                      {airportLabel(code)}
                     </option>
                   ))}
                 </Select>
@@ -120,7 +121,7 @@ export function NewWatchForm() {
                 >
                   {SUPPORTED_AIRPORTS.map((code) => (
                     <option key={code} value={code}>
-                      {code}
+                      {airportLabel(code)}
                     </option>
                   ))}
                 </Select>
@@ -191,7 +192,7 @@ export function NewWatchForm() {
               )}
             </FormField>
             <FormField
-              label="Preço-alvo"
+              label="Preço desejado"
               hint="Avisamos quando o preço atingir esse valor ou menos."
               required
             >
@@ -212,8 +213,8 @@ export function NewWatchForm() {
           {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 
           <div className={styles.actions}>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? 'Criando…' : 'Criar monitoramento'}
+            <Button type="submit" size="lg" loading={isPending}>
+              Criar monitoramento
             </Button>
           </div>
         </form>

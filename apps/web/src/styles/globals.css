@@ -77,8 +77,88 @@ button {
 }
 
 ::selection {
-  background: var(--fw-sky-100);
-  color: var(--fw-sky-700);
+  background: var(--color-action-soft-bg);
+  color: var(--color-action-soft-text);
+}
+
+/* Keyframes globais (MO-02) — nomes expostos em tokens.css como
+   var(--keyframes-*). Nunca escrever estes nomes direto num *.module.css:
+   o CSS Modules os renomeia e a animação some sem erro. */
+@keyframes fw-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fw-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fw-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fw-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fw-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes fw-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* MO-03: blocos de página, nunca em cada cartão de uma lista.
+   `--reveal-delay` escalona 2 ou 3 blocos (definido inline pelo chamador). */
+.reveal {
+  animation: var(--keyframes-reveal) var(--duration-slow) var(--easing-out) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+/* DS-03: assinatura visual das rotas — só código IATA e código técnico. */
+.iata {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -86,6 +166,7 @@ button {
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;

@@ -12,11 +12,12 @@
   background: var(--color-surface-sunken);
 }
 
+/* PG-03: marcador na cor da rota (destino, igual ao símbolo da marca). */
 .marker {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--color-action);
+  background: var(--color-route);
   border: 2px solid var(--color-surface);
-  box-shadow: 0 0 0 1px var(--color-action);
+  box-shadow: 0 0 0 1px var(--color-route);
 }

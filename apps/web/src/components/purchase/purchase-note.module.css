@@ -1,0 +1,14 @@
+.note {
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--color-text-muted);
+}
+
+.note a {
+  color: var(--color-text-secondary);
+  text-underline-offset: 2px;
+}
+
+.center {
+  text-align: center;
+}

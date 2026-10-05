@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDisplayDropPercent, formatMoney, formatPercent } from './money';
+import { computeDisplayDropPercent, formatMoney, formatMoneyRounded, formatPercent } from './money';
 
 describe('formatMoney', () => {
   it('formats BRL minor units as currency', () => {
@@ -8,6 +8,13 @@ describe('formatMoney', () => {
 
   it('formats USD minor units as currency', () => {
     expect(formatMoney({ amountMinor: 12345, currency: 'USD' }, 'en-US')).toBe('$123.45');
+  });
+});
+
+describe('formatMoneyRounded', () => {
+  // CP-10: rótulo de eixo do gráfico — "R$ 1.450", sem centavos.
+  it('formats without decimals', () => {
+    expect(formatMoneyRounded({ amountMinor: 145000, currency: 'BRL' })).toBe('R$ 1.450');
   });
 });
 

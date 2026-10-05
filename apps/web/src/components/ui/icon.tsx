@@ -230,3 +230,24 @@ export function IconLoader(props: IconProps) {
     </Svg>
   );
 }
+
+/** CP-07: selo "Menor preço já visto" (DealBadge, HISTORICAL_LOW). */
+export function IconSparkle(props: IconProps) {
+  // Forma sólida (brilho de 4 pontas), não um contorno: a base `fill:none` dos
+  // outros ícones deixa esta aqui praticamente invisível em 12-14px.
+  return (
+    <Svg fill="currentColor" stroke="none" {...props}>
+      <path d="M12 3.5 13.8 9.2 19.5 11 13.8 12.8 12 18.5 10.2 12.8 4.5 11 10.2 9.2Z" />
+    </Svg>
+  );
+}
+
+/** PG-04: botão "Inverter origem e destino" no formulário de busca. */
+export function IconSwap(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M7 7h12m0 0-4-4m4 4-4 4" />
+      <path d="M17 17H5m0 0 4 4m-4-4 4-4" />
+    </Svg>
+  );
+}

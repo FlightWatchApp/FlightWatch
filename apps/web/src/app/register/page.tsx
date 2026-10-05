@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { type FormEvent, useState, useTransition } from 'react';
+import { AuthShell } from '@/components/account/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -53,14 +54,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className={`container ${styles.page}`}>
-      <div>
-        <h1>Criar conta</h1>
-        <p className={styles.subtitle}>
-          Cadastre-se para monitorar preços de voos e receber alertas por email.
-        </p>
-      </div>
-
+    <AuthShell
+      title="Criar conta grátis"
+      subtitle="Monitore rotas e receba um e-mail quando o preço chegar ao valor que você quer pagar."
+      footer={
+        <>
+          Já tem conta? <Link href="/login">Entrar</Link>
+        </>
+      }
+    >
       <Card>
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
           <FormField label="Email" required>
@@ -107,17 +109,11 @@ export default function RegisterPage() {
 
           {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 
-          <div className={styles.actions}>
-            <Button type="submit" disabled={isPending} fullWidth>
-              {isPending ? 'Criando conta…' : 'Criar conta'}
-            </Button>
-          </div>
+          <Button type="submit" disabled={isPending} fullWidth>
+            {isPending ? 'Criando conta…' : 'Criar conta'}
+          </Button>
         </form>
       </Card>
-
-      <p className={styles.altAction}>
-        Já tem conta? <Link href="/login">Entrar</Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

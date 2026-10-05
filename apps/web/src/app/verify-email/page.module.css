@@ -15,6 +15,11 @@
   margin-bottom: var(--space-6);
 }
 
+.successIcon,
+.errorIcon {
+  animation: var(--keyframes-pop) var(--duration-slow) var(--easing-out);
+}
+
 .successIcon {
   color: var(--color-success);
 }

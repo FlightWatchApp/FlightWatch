@@ -1,0 +1,45 @@
+{
+  "_comentario": "Teto = medido em fa57198 (2026-09-30). A tarefa que melhora uma métrica baixa o teto no mesmo PR. Meta = onde a métrica precisa chegar ao fim do refactor.",
+  "frasesProibidas": {
+    "teto": 0,
+    "meta": 0,
+    "_nota": "baixado a 0 na P6 (2026-10-01): últimas 3 ocorrências de \"preço-alvo\" em watches/new/actions.ts e new-watch-form.tsx trocadas por \"preço desejado\". Ver docs/design-refactor/evals/2026-10-01-P6-novo-monitoramento.md"
+  },
+  "animacaoSemKeyframes": {
+    "teto": 0,
+    "meta": 0
+  },
+  "semMovimentoReduzido": {
+    "teto": 0,
+    "meta": 0
+  },
+  "corForaDosTokens": {
+    "teto": 0,
+    "meta": 0
+  },
+  "contrasteAbaixo": {
+    "teto": 0,
+    "meta": 0
+  },
+  "blankSemNoopener": {
+    "teto": 0,
+    "meta": 0
+  },
+  "compraSemSponsored": {
+    "teto": 0,
+    "meta": 0
+  },
+  "paginaSemAvisoComissao": {
+    "teto": 0,
+    "meta": 0
+  },
+  "semPaginaTransparencia": {
+    "teto": 0,
+    "meta": 0
+  },
+  "ui.controlsBelow44": {
+    "teto": 0,
+    "meta": 0,
+    "_nota": "baixado a 0 na P3 (2026-09-30): toggle Lista/Mapa de opportunities-client.tsx passou a ter 44px até 640px. Ver docs/design-refactor/evals/2026-09-30-P3-promocoes.md"
+  }
+}

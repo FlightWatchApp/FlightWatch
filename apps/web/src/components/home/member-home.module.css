@@ -1,0 +1,383 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-12);
+}
+
+.hero {
+  background: var(--color-brand-strong);
+  color: var(--color-text-on-dark);
+  overflow: hidden;
+  position: relative;
+}
+
+.hero::after {
+  border: 1px dashed var(--color-border-on-dark);
+  border-radius: 50%;
+  content: '';
+  height: 28rem;
+  position: absolute;
+  right: -8rem;
+  top: -13rem;
+  transform: rotate(-14deg);
+  width: 42rem;
+}
+
+.heroInner {
+  align-items: center;
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+  min-height: 30rem;
+  padding-block: var(--space-12);
+  position: relative;
+  z-index: 1;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 42rem;
+}
+
+.eyebrow,
+.sectionKicker {
+  color: var(--color-route-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hero .eyebrow {
+  color: var(--fw-route-300);
+}
+
+.hero h1 {
+  color: inherit;
+  font-size: clamp(2.5rem, 5vw, 4.4rem);
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  max-width: 12ch;
+}
+
+.heroLead {
+  color: var(--color-text-on-dark-muted);
+  font-size: var(--text-md);
+  max-width: 38rem;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.heroActions > :nth-child(2) {
+  background: transparent;
+  border-color: var(--color-border-on-dark);
+  color: var(--color-text-on-dark);
+}
+
+.heroActions > :nth-child(2):hover {
+  background: var(--color-border-on-dark);
+}
+
+.heroNote {
+  color: var(--color-text-on-dark-muted);
+  font-size: var(--text-sm);
+}
+
+.overview {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
+  justify-self: end;
+  max-width: 22rem;
+  padding: var(--space-6);
+  width: 100%;
+}
+
+.overviewHeader {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  gap: var(--space-2);
+}
+
+.overviewIcon {
+  align-items: center;
+  background: var(--color-success-soft-bg);
+  border-radius: var(--radius-full);
+  color: var(--color-success);
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.overviewMain {
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-8);
+  padding-bottom: var(--space-5);
+}
+
+.overviewMain strong {
+  color: var(--color-brand-strong);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.overviewMain span,
+.overviewStats dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.overviewStats {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr 1fr;
+  margin: var(--space-5) 0;
+}
+
+.overviewStats dd {
+  color: var(--color-text-primary);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin: var(--space-1) 0 0;
+}
+
+.overviewLink,
+.sectionLink,
+.discoveryLink,
+.accountLink {
+  color: var(--color-action);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.overviewLink {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.overviewLink:hover,
+.sectionLink:hover,
+.discoveryLink:hover,
+.accountLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-block: var(--space-10);
+}
+
+.sectionHead {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: var(--text-xl);
+  letter-spacing: -0.03em;
+}
+
+.sectionLead {
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+  max-width: 48rem;
+}
+
+.sectionLink {
+  white-space: nowrap;
+}
+
+.dealGrid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+}
+
+.emptyDeals {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  padding: var(--space-6);
+}
+
+.discoveryGrid,
+.accountGrid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.discoveryCard,
+.accountCard,
+.howCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+
+.discoveryActive {
+  background: var(--color-route-soft);
+  border-color: transparent;
+}
+
+.discoveryIcon,
+.accountIcon {
+  align-items: center;
+  background: var(--color-action-soft-bg);
+  border-radius: var(--radius-md);
+  color: var(--color-brand-strong);
+  display: inline-flex;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.discoveryLabel {
+  color: var(--color-route-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.discoveryCard h3,
+.accountCard h2,
+.howCard h2 {
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
+}
+
+.discoveryCard > p:not(.discoveryLabel),
+.accountCard > p,
+.howCard > p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  max-width: 38rem;
+}
+
+.discoveryLink,
+.discoveryMuted {
+  font-size: var(--text-sm);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.discoveryMuted {
+  color: var(--color-text-muted);
+}
+
+.accountCard {
+  background: var(--color-surface-sunken);
+  border-color: transparent;
+}
+
+.accountEmail {
+  color: var(--color-text-primary) !important;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.verification {
+  align-items: center;
+  color: var(--color-success);
+  display: flex;
+  font-size: var(--text-sm);
+  gap: var(--space-2);
+}
+
+.accountLink {
+  font-size: var(--text-sm);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.howList {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.howList > div {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.howList strong {
+  align-items: center;
+  background: var(--color-action-soft-bg);
+  border-radius: var(--radius-full);
+  color: var(--color-brand-strong);
+  display: inline-flex;
+  flex: 0 0 1.6rem;
+  font-size: var(--text-sm);
+  height: 1.6rem;
+  justify-content: center;
+}
+
+.howList p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  padding-top: 0.15rem;
+}
+
+@media (max-width: 900px) {
+  .heroInner {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .overview {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .heroInner {
+    gap: var(--space-8);
+    padding-block: var(--space-10);
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 14vw, 3.5rem);
+  }
+
+  .heroActions > * {
+    flex: 1 1 100%;
+  }
+
+  .section {
+    padding-block: var(--space-8);
+  }
+
+  .discoveryGrid,
+  .accountGrid {
+    grid-template-columns: 1fr;
+  }
+}

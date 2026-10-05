@@ -25,13 +25,13 @@ function toResult(error: unknown): WatchLifecycleActionResult {
 }
 
 /**
- * Achado de review: as ações só invalidavam `/`, mas os mesmos botões também
- * aparecem em `/watches/:id` (SPEC-009) — quem pausava/encerrava na tela de
- * detalhe continuava vendo o status antigo até navegar ou atualizar manual.
- * Revalida as duas rotas onde o Watch pode estar renderizado.
+ * Os mesmos botões aparecem na lista de `/watches` e em `/watches/:id` — as
+ * duas rotas são invalidadas para que a mudança de status apareça imediatamente
+ * onde o monitoramento estiver sendo exibido.
  */
 function revalidateWatchRoutes(watchId: string): void {
   revalidatePath('/');
+  revalidatePath('/watches');
   revalidatePath(`/watches/${watchId}`);
 }
 

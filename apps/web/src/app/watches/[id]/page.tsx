@@ -1,15 +1,19 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { RouteLine } from '@/components/brand/route-line';
+import { PurchaseButton } from '@/components/purchase/purchase-button';
+import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { Card } from '@/components/ui/card';
-import { IconArrowDownRight, IconClock, IconRoute } from '@/components/ui/icon';
+import { Freshness } from '@/components/ui/freshness';
+import { IconClock, IconSparkle } from '@/components/ui/icon';
 import { StatusTag } from '@/components/ui/status-tag';
 import { PriceHistoryChart } from '@/components/watches/price-history-chart';
-import { PurchaseLinkButton } from '@/components/watches/purchase-link-button';
 import { WatchLifecycleActions } from '@/components/watches/watch-lifecycle-actions';
 import { ApiError } from '@/lib/api/client';
 import { getWatch } from '@/lib/api/watches';
-import { formatDate, formatRelativeTime } from '@/lib/domain/freshness';
+import { formatDate, formatRelativeTime, isStale } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
+import { isAtLowestObservedPrice, isTargetReached } from '@/lib/domain/watch-price';
 import { WATCH_STATUS_PRESENTATION } from '@/lib/domain/watch-status';
 import styles from './page.module.css';
 
@@ -31,6 +35,13 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
 
   const status = WATCH_STATUS_PRESENTATION[watch.status];
   const hasLifecycleActions = watch.status === 'ACTIVE' || watch.status === 'PAUSED';
+  const inactive = watch.status !== 'ACTIVE';
+  const stale = watch.lastCheck ? isStale(watch.lastCheck.at) : true;
+  const targetReached = isTargetReached(watch);
+  const atLowest = isAtLowestObservedPrice(watch);
+  // PG-06: a linha "Última verificação" só aparece quando não repetiria o
+  // Freshness da oferta atual — sem oferta, inativo ou dado velho.
+  const showLastCheck = !watch.currentOffer || inactive || stale;
   const tripLabel =
     watch.tripType === 'ROUND_TRIP' && watch.returnDate
       ? `${formatDate(watch.departureDate)} → ${formatDate(watch.returnDate)}`
@@ -38,17 +49,21 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className={`container ${styles.page}`}>
-      <Link href="/" className={styles.back}>
+      <Link href="/watches" className={styles.back}>
         ← Voltar
       </Link>
 
       <div className={styles.header}>
         <div>
-          <span className={styles.route}>
-            {watch.origin}
-            <IconRoute size={18} className={styles.routeIcon} />
-            {watch.destination}
-          </span>
+          <h1>
+            <RouteLine
+              origin={watch.origin}
+              destination={watch.destination}
+              size="lg"
+              showCities
+              animated
+            />
+          </h1>
           <p className={styles.subtitle}>{tripLabel}</p>
         </div>
         <StatusTag tone={status.tone} label={status.label} />
@@ -57,53 +72,80 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
       <Card>
         <div className={styles.priceRow}>
           <div>
-            <p className={styles.priceLabel}>Preço atual</p>
-            <p className={styles.price}>
+            <p className={styles.priceLabel}>Último preço observado</p>
+            <p className={`${styles.price} tabular-nums`}>
               {watch.currentPrice ? formatMoney(watch.currentPrice) : '—'}
             </p>
           </div>
+        </div>
+
+        {(targetReached || atLowest) && (
+          <div className={styles.highlights}>
+            {targetReached && (
+              <span className={styles.highlightStrong}>Preço desejado atingido</span>
+            )}
+            {atLowest && (
+              <span className={styles.highlight}>
+                <IconSparkle size={12} />
+                Menor preço já observado
+              </span>
+            )}
+          </div>
+        )}
+
+        <dl className={styles.dl}>
           <div>
-            <p className={styles.priceLabel}>Menor já visto</p>
-            <p className={styles.priceSecondary}>
-              {watch.lowestPrice ? (
-                <>
-                  <IconArrowDownRight size={16} className={styles.lowestIcon} />
-                  {formatMoney(watch.lowestPrice)}
-                </>
-              ) : (
-                '—'
-              )}
-            </p>
+            <dt>Menor preço observado</dt>
+            <dd className="tabular-nums">
+              {watch.lowestPrice ? formatMoney(watch.lowestPrice) : '—'}
+            </dd>
           </div>
           {watch.targetAmountMinor !== null && (
             <div>
-              <p className={styles.priceLabel}>Meta</p>
-              <p className={styles.priceSecondary}>
+              <dt>Preço desejado</dt>
+              <dd className="tabular-nums">
                 {formatMoney({ amountMinor: watch.targetAmountMinor, currency: watch.currency })}
-              </p>
+              </dd>
             </div>
           )}
-        </div>
+        </dl>
 
-        <p className={styles.lastCheck}>
-          <IconClock size={14} />
-          {watch.lastCheck
-            ? `Última consulta ${formatRelativeTime(watch.lastCheck.at)}`
-            : 'Ainda sem verificação concluída'}
-        </p>
+        {watch.currentOffer && (
+          <Freshness
+            observedAt={watch.currentOffer.observedAt}
+            expiresAt={watch.currentOffer.expiresAt}
+          />
+        )}
+        {showLastCheck && (
+          <p className={styles.lastCheck}>
+            <IconClock size={14} />
+            {watch.lastCheck
+              ? `Última verificação ${formatRelativeTime(watch.lastCheck.at)}`
+              : 'Aguardando a primeira verificação'}
+          </p>
+        )}
 
         {(watch.currentOffer || hasLifecycleActions) && (
           <div className={styles.actionsRow}>
-            {watch.currentOffer && (
-              <PurchaseLinkButton watchId={watch.id} currentOffer={watch.currentOffer} />
+            {watch.currentOffer && !inactive && (
+              <PurchaseButton
+                href={watch.currentOffer.purchaseUrl}
+                status={watch.currentOffer.status}
+                size="lg"
+                fullWidth
+                watchId={watch.id}
+                context={`${watch.origin} para ${watch.destination}`}
+              />
             )}
             <WatchLifecycleActions watchId={watch.id} status={watch.status} />
           </div>
         )}
+        {watch.currentOffer && !inactive && <PurchaseNote />}
       </Card>
 
       <Card>
         <h2 className={styles.chartTitle}>Histórico de preço</h2>
+        <p className={styles.chartSubtitle}>O eixo não começa em zero.</p>
         <PriceHistoryChart
           points={watch.priceHistory}
           targetAmountMinor={watch.targetAmountMinor}

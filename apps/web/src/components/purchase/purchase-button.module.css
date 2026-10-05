@@ -1,0 +1,10 @@
+/* Mesmo padrão de `.bandCta`/`.cta` (home/landing, layout/site-header): claro
+   sobre fundo petróleo, nunca `--color-action` cheio aqui. */
+.inverseCurrent {
+  background: var(--color-surface);
+  color: var(--color-brand-strong);
+}
+
+.inverseCurrent:hover:not(:disabled) {
+  background: var(--color-action-soft-bg);
+}

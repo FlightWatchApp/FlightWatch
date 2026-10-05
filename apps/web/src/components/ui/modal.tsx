@@ -11,13 +11,14 @@ export interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  size?: 'default' | 'wide';
 }
 
 /**
  * Usa <dialog> nativo: o navegador cuida de trap de foco, fechar com Esc e da
  * camada de topo — evita reimplementar isso à mão de forma incompleta.
  */
-export function Modal({ open, title, onClose, children }: ModalProps) {
+export function Modal({ open, title, onClose, children, size = 'default' }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -41,7 +42,7 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- clique no backdrop é um atalho de mouse adicional; Esc (onCancel) e o botão "Fechar" já cobrem o fechamento por teclado.
     <dialog
       ref={dialogRef}
-      className={styles.dialog}
+      className={`${styles.dialog} ${size === 'wide' ? styles.wide : ''}`}
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={handleBackdropClick}

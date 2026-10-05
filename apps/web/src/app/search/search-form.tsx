@@ -3,13 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { IconSearch } from '@/components/ui/icon';
+import { IconSearch, IconSwap } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
 import type { TripType } from '@/lib/api/types';
+import { airportLabel } from '@/lib/domain/airport-coordinates';
 import { searchFlightsAction } from './actions';
 import styles from './page.module.css';
 
@@ -61,7 +62,7 @@ export function SearchForm() {
           maxPriceMinor: null,
         });
         if (result.success && result.id) {
-          router.push(`/search/${result.id}`);
+          router.push(`/search?searchId=${result.id}#search-results`);
         } else {
           setFormError(result.error ?? 'Não foi possível buscar. Tente novamente.');
         }
@@ -69,46 +70,58 @@ export function SearchForm() {
     });
   }
 
-  return (
-    <Card>
-      <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <div className={styles.row}>
-          <FormField label="Origem" required>
-            {(field) => (
-              <Select
-                id={field.id}
-                aria-describedby={field.describedBy}
-                invalid={field.invalid}
-                value={origin}
-                onChange={(event) => setOrigin(event.target.value)}
-              >
-                {SUPPORTED_AIRPORTS.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-          <FormField label="Destino" required>
-            {(field) => (
-              <Select
-                id={field.id}
-                aria-describedby={field.describedBy}
-                invalid={field.invalid}
-                value={destination}
-                onChange={(event) => setDestination(event.target.value)}
-              >
-                {SUPPORTED_AIRPORTS.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-        </div>
+  function swapRoute(): void {
+    setOrigin(destination);
+    setDestination(origin);
+  }
 
+  return (
+    <form className={styles.form} onSubmit={handleSubmit} noValidate>
+      <div className={styles.routeRow}>
+        <FormField label="Origem" required>
+          {(field) => (
+            <Select
+              id={field.id}
+              aria-describedby={field.describedBy}
+              invalid={field.invalid}
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value)}
+            >
+              {SUPPORTED_AIRPORTS.map((code) => (
+                <option key={code} value={code}>
+                  {airportLabel(code)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <IconButton
+          type="button"
+          className={styles.swap}
+          icon={<IconSwap />}
+          aria-label="Inverter origem e destino"
+          onClick={swapRoute}
+        />
+        <FormField label="Destino" required>
+          {(field) => (
+            <Select
+              id={field.id}
+              aria-describedby={field.describedBy}
+              invalid={field.invalid}
+              value={destination}
+              onChange={(event) => setDestination(event.target.value)}
+            >
+              {SUPPORTED_AIRPORTS.map((code) => (
+                <option key={code} value={code}>
+                  {airportLabel(code)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      </div>
+
+      <div className={styles.detailsRow}>
         <FormField label="Tipo de viagem" required>
           {(field) => (
             <Select
@@ -123,36 +136,32 @@ export function SearchForm() {
             </Select>
           )}
         </FormField>
-
-        <div className={styles.row}>
-          <FormField label="Data de ida" required>
+        <FormField label="Data de ida" required>
+          {(field) => (
+            <TextInput
+              id={field.id}
+              aria-describedby={field.describedBy}
+              invalid={field.invalid}
+              type="date"
+              value={departureDate}
+              onChange={(event) => setDepartureDate(event.target.value)}
+            />
+          )}
+        </FormField>
+        {tripType === 'ROUND_TRIP' && (
+          <FormField label="Data de volta" required>
             {(field) => (
               <TextInput
                 id={field.id}
                 aria-describedby={field.describedBy}
                 invalid={field.invalid}
                 type="date"
-                value={departureDate}
-                onChange={(event) => setDepartureDate(event.target.value)}
+                value={returnDate}
+                onChange={(event) => setReturnDate(event.target.value)}
               />
             )}
           </FormField>
-          {tripType === 'ROUND_TRIP' && (
-            <FormField label="Data de volta" required>
-              {(field) => (
-                <TextInput
-                  id={field.id}
-                  aria-describedby={field.describedBy}
-                  invalid={field.invalid}
-                  type="date"
-                  value={returnDate}
-                  onChange={(event) => setReturnDate(event.target.value)}
-                />
-              )}
-            </FormField>
-          )}
-        </div>
-
+        )}
         <FormField label="Moeda" required>
           {(field) => (
             <Select
@@ -170,15 +179,20 @@ export function SearchForm() {
             </Select>
           )}
         </FormField>
+      </div>
 
-        {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
+      {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 
-        <div className={styles.actions}>
-          <Button type="submit" disabled={isPending} leadingIcon={<IconSearch size={16} />}>
-            {isPending ? 'Buscando…' : 'Buscar'}
-          </Button>
-        </div>
-      </form>
-    </Card>
+      <Button
+        type="submit"
+        size="lg"
+        loading={isPending}
+        disabled={isPending}
+        leadingIcon={<IconSearch size={18} />}
+        className={styles.submit}
+      >
+        {isPending ? 'Buscando passagens…' : 'Buscar passagens'}
+      </Button>
+    </form>
   );
 }
