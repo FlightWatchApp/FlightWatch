@@ -5,18 +5,25 @@ on:
   push:
     branches: [main]
 
+# Um push novo na mesma branch cancela a execução anterior, ainda em andamento.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gates:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
+      # Versão do pnpm vem de `packageManager` no package.json.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Enable pnpm
-        run: corepack enable
+          node-version-file: .nvmrc
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -30,5 +37,13 @@ jobs:
       - name: G2 - Typecheck
         run: pnpm typecheck
 
-      - name: G3 - Unit tests
+      # Testes de integração e e2e (database, queue, api, workers) sobem
+      # PostgreSQL/Redis reais via Testcontainers, usando o Docker do runner.
+      - name: G3/G4 - Unit and integration tests
         run: pnpm test
+
+      - name: Design system checks
+        run: pnpm check:design
+
+      - name: G9 - Build
+        run: pnpm build
