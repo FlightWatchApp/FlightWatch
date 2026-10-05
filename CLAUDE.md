@@ -263,85 +263,63 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 
 ```text
 /
+├── AGENTS.md                     # regras para agentes (Codex, Cursor, Claude…)
 ├── CLAUDE.md
-├── AGENTS.md
 ├── README.md
-├── package.json
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
-├── turbo.json
+├── package.json · pnpm-lock.yaml · pnpm-workspace.yaml · turbo.json · .nvmrc
 ├── apps/
-│   ├── web/
-│   │   ├── app/ ou src/app/
+│   ├── web/src/
+│   │   ├── app/                  # App Router (rotas e server actions)
 │   │   ├── components/
-│   │   ├── features/
 │   │   ├── lib/
 │   │   └── styles/
-│   ├── api/
-│   │   └── src/
-│   │       ├── modules/
-│   │       ├── observability/
-│   │       ├── prisma/
-│   │       └── main.ts
-│   ├── scheduler/
-│   │   └── src/
-│   ├── price-worker/
-│   │   └── src/
-│   ├── alert-worker/
-│   │   └── src/
-│   └── notification-worker/
-│       └── src/
+│   ├── api/src/
+│   │   ├── auth/ watches/ searches/ opportunities/ affiliate/
+│   │   ├── observability/
+│   │   ├── prisma/
+│   │   └── main.ts
+│   ├── scheduler/src/
+│   ├── price-worker/src/
+│   ├── alert-worker/src/
+│   └── notification-worker/src/
 ├── packages/
-│   ├── domain/
-│   ├── contracts/
-│   ├── database/
-│   ├── queue/
-│   ├── providers/
-│   ├── notifications/
-│   ├── observability/
-│   ├── config/
-│   ├── testing/
-│   └── ui/                       # confirmar existência
-├── flight-watch-foundation-v0.1/
-│   ├── PRODUCT.md
-│   ├── DOMAIN.md
-│   ├── ARCHITECTURE.md
-│   ├── EVALS.md
-│   ├── QUALITY-GATES.md
-│   └── docs/
-│       ├── adr/
-│       ├── specs/
-│       └── runbooks/
-├── docs/
-│   ├── DESIGN-SYSTEM.md
-│   ├── runbooks/
-│   └── decisions/
-├── evals/
-│   ├── fixtures/
-│   ├── scenarios/
-│   └── runner/
-└── tests/
-    ├── integration/
-    ├── e2e/
-    └── performance/
+│   ├── domain/ contracts/ database/ queue/
+│   ├── providers/ notifications/ observability/
+│   └── (config/ testing/ ui/ — PROPOSTO, ainda não existem)
+├── docs/                         # índice em docs/README.md
+│   ├── PRODUCT.md DOMAIN.md ARCHITECTURE.md
+│   ├── EVALS.md QUALITY-GATES.md
+│   ├── BRAND.md DESIGN-SYSTEM.md
+│   ├── adr/
+│   ├── specs/
+│   ├── evals/
+│   ├── roadmap/                  # próximas fases + rascunhos/ de spec
+│   ├── design-refactor/          # refactor web v2 (decisões, tasks, evals)
+│   ├── reviews/
+│   └── (runbooks/ — PROPOSTO, ainda não existe)
+├── scripts/design/               # pnpm check:design
+└── .local/                       # rascunho pessoal, ignorado pelo git
 ```
+
+Testes vivem junto do código (`*.test.ts`, `*.spec.ts`, `*.integration.test.ts`);
+não há `tests/` nem `evals/` na raiz.
 
 ### 5.1 Estrutura do conteúdo e documentação
 
-| Conteúdo                | Local                      | Atualização                           |
-| ----------------------- | -------------------------- | ------------------------------------- |
-| visão e escopo          | `PRODUCT.md`               | mudança de produto                    |
-| domínio e invariantes   | `DOMAIN.md`                | nova regra, entidade ou estado        |
-| arquitetura consolidada | `ARCHITECTURE.md`          | mudança transversal                   |
-| decisão arquitetural    | `docs/adr/ADR-NNN-*.md`    | decisão relevante e suas alternativas |
-| feature                 | `docs/specs/SPEC-NNN-*.md` | antes do código                       |
-| evals                   | `EVALS.md` e `evals/`      | comportamento crítico/regressão       |
-| quality gates           | `QUALITY-GATES.md`         | mudança no processo de aceite         |
-| design system           | `docs/DESIGN-SYSTEM.md`    | decisão visual significativa          |
-| incidente/operação      | `docs/runbooks/`           | novo modo de falha                    |
-| instruções do Claude    | `CLAUDE.md`                | convenção transversal/mudança do mapa |
+| Conteúdo                | Local                           | Atualização                           |
+| ----------------------- | ------------------------------- | ------------------------------------- |
+| visão e escopo          | `docs/PRODUCT.md`               | mudança de produto                    |
+| domínio e invariantes   | `docs/DOMAIN.md`                | nova regra, entidade ou estado        |
+| arquitetura consolidada | `docs/ARCHITECTURE.md`          | mudança transversal                   |
+| decisão arquitetural    | `docs/adr/ADR-NNN-*.md`         | decisão relevante e suas alternativas |
+| feature                 | `docs/specs/SPEC-NNN-*.md`      | antes do código                       |
+| evals                   | `docs/EVALS.md` e `docs/evals/` | comportamento crítico/regressão       |
+| quality gates           | `docs/QUALITY-GATES.md`         | mudança no processo de aceite         |
+| design system           | `docs/DESIGN-SYSTEM.md`         | decisão visual significativa          |
+| incidente/operação      | `docs/runbooks/`                | novo modo de falha                    |
+| instruções do Claude    | `CLAUDE.md`                     | convenção transversal/mudança do mapa |
 
-Não criar cópias conflitantes. Se a fundação estiver em subdiretório, registrar no README a localização canônica.
+Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascunhos/` até entrarem no processo; aí passam a `docs/specs/`.
 
 ---
 

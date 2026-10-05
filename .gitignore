@@ -63,11 +63,10 @@ redis-data/
 Thumbs.db
 Desktop.ini
 
-# Arquivos de trabalho e pacotes locais
-*.zip
-/undefined/
+# Rascunho pessoal: qualquer coisa que não deva ir para o repositório
+/.local/
 
-# Artefatos temporários de planejamento, tarefas e avaliações do refactor
-/docs/design-refactor/
-/flight-watch-dashboard/
-/README (1).md
+# Pacotes de trabalho e capturas de tela geradas pelos evals de navegador
+# (os relatórios .md dos evals são versionados; as imagens são reproduzíveis)
+*.zip
+docs/design-refactor/**/*.png

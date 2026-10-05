@@ -3,8 +3,8 @@
 Status: draft para aprovação
 Owner: Monitoring
 Dependências: SPEC-001, SPEC-004, SPEC-005, SPEC-014, SPEC-018,
-`flight-watch-next-phases/specs/SPEC-015-opportunities.md`,
-`flight-watch-next-phases/04-domain-and-platform-evolution.md`
+`docs/roadmap/rascunhos/SPEC-015-opportunities.md`,
+`docs/roadmap/04-domain-and-platform-evolution.md`
 
 ## Objetivo
 
@@ -88,7 +88,7 @@ scheduler grava já "atualiza" o feed automaticamente, de graça. Ver
 único lugar em todo o código: `WatchesService.doCreateWatch`. SPEC-014
 (busca de descoberta) deliberadamente não toca `SearchTarget` — busca
 pontual e monitoramento recorrente são conceitos separados por design
-(`flight-watch-next-phases/04-domain-and-platform-evolution.md`). Isso
+(`docs/roadmap/04-domain-and-platform-evolution.md`). Isso
 significa: `GET /v1/opportunities` é alimentado por rotas que **alguém já
 monitora** — não existe (e não deveria existir agora) um crawler de fundo
 varrendo rotas populares. Um ambiente sem nenhum Watch real tem o feed

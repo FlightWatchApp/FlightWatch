@@ -3,8 +3,8 @@
 Status: draft para aprovação
 Owner: Monitoring
 Dependências: SPEC-014, SPEC-015,
-`flight-watch-next-phases/specs/SPEC-016-opportunity-map.md`,
-`flight-watch-next-phases/03-visual-and-ux-direction.md`
+`docs/roadmap/rascunhos/SPEC-016-opportunity-map.md`,
+`docs/roadmap/03-visual-and-ux-direction.md`
 
 ## Objetivo
 
@@ -58,7 +58,7 @@ provisória, não como um catálogo de `Destination` real. As coordenadas em
 si são fatos públicos (localização de aeroportos grandes conhecidos), não
 dado de terceiro licenciado — diferente do que um catálogo real de
 `Destination` precisaria (geodados versionados e licenciados,
-`flight-watch-next-phases/04-domain-and-platform-evolution.md`).
+`docs/roadmap/04-domain-and-platform-evolution.md`).
 
 ### Um marcador por destino, não por oportunidade
 

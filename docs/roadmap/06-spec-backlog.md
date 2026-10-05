@@ -1,16 +1,16 @@
 # Backlog de próximas specs
 
 > Numeração alinhada com a sequência canônica de
-> `flight-watch-foundation-v0.1/docs/specs/` — SPEC-014 é o próximo número
+> `docs/specs/` — SPEC-014 é o próximo número
 > livre depois da Fase 0 (Reliability Hardening: SPEC-011/012/013). Os
 > rascunhos completos ficam em `specs/`; quando uma spec é aprovada e entra em
-> implementação, ela migra para `flight-watch-foundation-v0.1/docs/specs/` e
+> implementação, ela migra para `docs/specs/` e
 > este backlog passa a apontar para lá em vez de manter duas fontes.
 
 ## SPEC-014 — Busca de passagens e oferta normalizada
 
 **Status: implementada (fatia síncrona)** — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-014-flight-discovery.md`.
+`docs/specs/SPEC-014-flight-discovery.md`.
 
 A fatia implementada cobre busca **síncrona** (sem fila/polling — só o
 `SimulatedFlightProvider` existe, e é in-process/instantâneo), destino IATA
@@ -37,7 +37,7 @@ critérios de aceitação reais da fatia implementada):
 ## SPEC-015 — Promoções e feed de oportunidades
 
 **Status: implementada** — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-015-opportunities.md`.
+`docs/specs/SPEC-015-opportunities.md`.
 
 `Deal` é computado em leitura (nunca persistido), com dois tipos shipados
 (`HISTORICAL_LOW`, `PERCENTAGE_BELOW_REFERENCE`); `FLASH_WINDOW` e
@@ -58,7 +58,7 @@ Critérios mínimos originais (para referência):
 ## SPEC-016 — Exploração no mapa
 
 **Status: implementada (fatia sem catálogo de Destination)** — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-016-opportunity-map.md`.
+`docs/specs/SPEC-016-opportunity-map.md`.
 
 Toggle Lista/Mapa em `/opportunities`, OpenStreetMap + Leaflet (aprovado
 pelo usuário, sem custo/API key), com uma tabela fixa provisória de
@@ -96,7 +96,7 @@ Critérios mínimos:
 ## SPEC-018 — Compra a partir do monitoramento
 
 **Status: implementada** — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-018-watch-purchase-link.md`.
+`docs/specs/SPEC-018-watch-purchase-link.md`.
 
 Define como o último preço observado de um Watch leva o usuário ao canal de
 compra correspondente. Não dependia de SPEC-014 existir tecnicamente — o dado
@@ -121,7 +121,7 @@ Critérios mínimos:
 ## SPEC-020 — Link de compra com rastreio de afiliado
 
 **Status: implementada** — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-020-affiliate-purchase-links.md`
+`docs/specs/SPEC-020-affiliate-purchase-links.md`
 ("Evidência de implementação").
 
 Acrescenta parâmetros de rastreio de afiliado ao `purchaseUrl` já produzido
@@ -135,7 +135,7 @@ elegibilidade de nada que a pessoa vê; exige aviso de comissão e
 
 **Status: implementada** (AC-006, rubrica visual assinada pelo owner,
 pendente — ver Z2 em `docs/design-refactor/08-backlog.md`) — ver
-`flight-watch-foundation-v0.1/docs/specs/SPEC-021-web-experience-v2.md`
+`docs/specs/SPEC-021-web-experience-v2.md`
 ("Evidência de implementação").
 
 Nova identidade visual, promoções em destaque na home/painel/página dedicada e

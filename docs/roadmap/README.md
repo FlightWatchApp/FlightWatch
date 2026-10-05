@@ -23,12 +23,13 @@ densidade de informação controlada.
    técnica para ofertas, promoções, pacotes e Watches.
 6. `05-roadmap.md` — execução por fases, com entregas pequenas e verificáveis.
 7. `06-spec-backlog.md` — índice das próximas specs e dependências.
-8. `specs/` — rascunhos prontos para virar implementação. A numeração começa
+8. `rascunhos/` — rascunhos de spec, incluindo o escopo completo das fatias já
+   implementadas e a SPEC-017 (adiada). A numeração começa
    em SPEC-014: a Fase 0 (Reliability Hardening) ocupou SPEC-011/012/013 na
    sequência canônica antes desta pasta ser desenvolvida — os rascunhos foram
    renumerados de 011-015 para 014-018 para não colidir. Quando uma spec daqui
    entra em implementação, ela migra para
-   `flight-watch-foundation-v0.1/docs/specs/`; `06-spec-backlog.md` registra
+   `docs/specs/`; `06-spec-backlog.md` registra
    o status de cada uma.
 
 ## Decisão central

@@ -6,9 +6,9 @@ Estas instruções se aplicam a agentes e pessoas que utilizem agentes neste rep
 
 Antes de alterar código:
 
-1. ler a spec aplicável por inteiro;
-2. ler `DOMAIN.md`;
-3. ler ADRs relacionados;
+1. ler a spec aplicável por inteiro (`docs/specs/`);
+2. ler `docs/DOMAIN.md`;
+3. ler ADRs relacionados (`docs/adr/`);
 4. localizar implementação e testes existentes;
 5. declarar lacunas ou conflitos antes de escolher comportamento.
 
@@ -132,7 +132,7 @@ Toda entrega deve registrar:
 - riscos, decisões e pendências;
 - migração, rollout e rollback, quando aplicável.
 
-<!-- Colar ao final de flight-watch-foundation-v0.1/AGENTS.md. Não substitui nenhuma seção acima. -->
+<!-- Adendo do refactor web v2; não substitui nenhuma seção acima. -->
 
 ## 13. Refactor web v2 (`docs/design-refactor/`)
 

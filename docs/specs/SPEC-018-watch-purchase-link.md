@@ -2,20 +2,20 @@
 
 Status: draft para aprovação
 Owner: Monitoring
-Dependências: SPEC-004, SPEC-009, `flight-watch-next-phases/04-domain-and-platform-evolution.md`
+Dependências: SPEC-004, SPEC-009, `docs/roadmap/04-domain-and-platform-evolution.md`
 
 ## Objetivo
 
 Permitir que o usuário abra o canal de compra da passagem que está sendo
 monitorada diretamente pelo card do Watch, preservando o preço observado que
-originou o link. Fecha o gap identificado em `flight-watch-next-phases/`: o
+originou o link. Fecha o gap identificado em `docs/roadmap/`: o
 dado (`PriceObservation.deeplink`/`expiresAt`) já existe no schema desde
 SPEC-004, mas nunca foi projetado até a API nem até a interface — hoje
 `SimulatedFlightProvider` nem chega a preencher esses dois campos, então a
 lacuna é de ponta a ponta (provider simulado → repositório → contrato →
 frontend).
 
-Esta é a primeira fatia da "Fase 1" de `flight-watch-next-phases/05-roadmap.md`
+Esta é a primeira fatia da "Fase 1" de `docs/roadmap/05-roadmap.md`
 a ser implementada — adiantada em relação à busca completa (SPEC-014) porque
 não depende tecnicamente dela: o dado de origem já existe, o gap é só de
 projeção, contrato e frontend.
@@ -63,7 +63,7 @@ para projetar nem testar. `defaultScenario` passa a gerar:
   (`https://booking.simulated-provider.flightwatch.dev/checkout/<hash>`) —
   nunca um domínio real de companhia/OTA;
 - `expiresAt`: `observedAt` + 1 hora, mesma ordem de grandeza usada como
-  exemplo em `flight-watch-next-phases/02-...md`.
+  exemplo em `docs/roadmap/02-...md`.
 
 ### Projeção `currentOffer`
 

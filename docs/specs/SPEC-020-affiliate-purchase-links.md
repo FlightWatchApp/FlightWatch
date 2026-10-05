@@ -6,7 +6,7 @@ Aprovada pelo owner em 2026-09-30 (decisão D-02 de
 Owner: Monitoring / Discovery
 Dependências: SPEC-014, SPEC-015, SPEC-018
 
-> Numeração: `flight-watch-next-phases/06-spec-backlog.md` reserva SPEC-019
+> Numeração: `docs/roadmap/06-spec-backlog.md` reserva SPEC-019
 > para "Catálogo, preferências e recomendações explicáveis". Esta spec usa o
 > próximo número livre para não colidir com aquele backlog.
 

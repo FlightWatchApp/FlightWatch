@@ -24,8 +24,8 @@ Decisões estruturantes: `Watch` (intenção individual) separado de `SearchTarg
 (consulta compartilhada entre usuários), outbox transacional, consumidores
 idempotentes, `PriceObservation` imutável e dinheiro sempre em inteiro na menor
 unidade da moeda. Detalhes em
-[`ARCHITECTURE.md`](./flight-watch-foundation-v0.1/ARCHITECTURE.md) e nos
-[ADRs](./flight-watch-foundation-v0.1/docs/adr/).
+[`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) e nos
+[ADRs](./docs/adr/).
 
 ## Estrutura do repositório
 
@@ -45,10 +45,10 @@ packages/
   providers/            porta de provedor de voos, adapter simulado, resiliência
   notifications/        porta de e-mail, templates e adapter simulado
   observability/        logger JSON, métricas Prometheus e servidor interno
-flight-watch-foundation-v0.1/   produto, domínio, arquitetura, ADRs e specs
-flight-watch-next-phases/       visão e backlog das próximas fases
-docs/                           marca, design system e reviews
-scripts/design/                 checagens automáticas do design system
+docs/                   produto, domínio, arquitetura, ADRs, specs e roadmap
+                        (índice em docs/README.md)
+scripts/design/         checagens automáticas do design system
+AGENTS.md / CLAUDE.md   regras para agentes de IA neste repositório
 ```
 
 ## Requisitos
@@ -110,13 +110,13 @@ pnpm build          # G9
 ```
 
 A definição completa de cada gate está em
-[`QUALITY-GATES.md`](./flight-watch-foundation-v0.1/QUALITY-GATES.md).
+[`QUALITY-GATES.md`](./docs/QUALITY-GATES.md).
 
 ## Como contribuir
 
 1. Crie uma branch a partir de `main` (`feat/…`, `fix/…`, `chore/…`, `docs/…`).
 2. Mudança de comportamento começa pela spec em
-   [`docs/specs/`](./flight-watch-foundation-v0.1/docs/specs/) e por um teste
+   [`docs/specs/`](./docs/specs/) e por um teste
    que falha.
 3. Commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
    com mensagem em português.
@@ -125,4 +125,4 @@ A definição completa de cada gate está em
 Ordem de leitura para entender o projeto: `PRODUCT.md` → `DOMAIN.md` →
 `ARCHITECTURE.md` → ADRs → `QUALITY-GATES.md` → spec da feature. Agentes de IA
 seguem também [`CLAUDE.md`](./CLAUDE.md) e
-[`AGENTS.md`](./flight-watch-foundation-v0.1/AGENTS.md).
+[`AGENTS.md`](./AGENTS.md).

@@ -3,8 +3,8 @@
 Status: draft para aprovação
 Owner: Monitoring
 Dependências: SPEC-001, SPEC-003, SPEC-004, SPEC-007, SPEC-008, SPEC-009, SPEC-018,
-`flight-watch-next-phases/specs/SPEC-014-flight-discovery.md`,
-`flight-watch-next-phases/04-domain-and-platform-evolution.md`
+`docs/roadmap/rascunhos/SPEC-014-flight-discovery.md`,
+`docs/roadmap/04-domain-and-platform-evolution.md`
 
 ## Objetivo
 
@@ -12,12 +12,12 @@ Permitir que uma pessoa pesquise opções de passagem e veja ofertas reais
 **sem precisar criar um Watch antes** — hoje só é possível monitorar uma
 rota criando o monitoramento diretamente, sem nunca ver o preço primeiro.
 Esse é o gap central identificado na análise de referência do
-FlightConnections (`flight-watch-next-phases/01-reference-analysis-flightconnections.md`)
+FlightConnections (`docs/roadmap/01-reference-analysis-flightconnections.md`)
 que motivou a "Fase 1" do roadmap.
 
 Esta é a primeira fatia de SPEC-014 a ser implementada: busca **síncrona**,
 usando exclusivamente o `SimulatedFlightProvider`, com um destino IATA
-concreto (não `ANYWHERE`). O rascunho original (`flight-watch-next-phases/specs/SPEC-014-flight-discovery.md`)
+concreto (não `ANYWHERE`). O rascunho original (`docs/roadmap/rascunhos/SPEC-014-flight-discovery.md`)
 desenha uma entrega maior — busca assíncrona com polling, `ANYWHERE`,
 `Deal`/`PackageOffer`/`Destination`. Ver "Fora do escopo" para o raciocínio
 completo do corte.
@@ -26,7 +26,7 @@ completo do corte.
 
 - **destino `ANYWHERE`**: depende de um catálogo de `Destination` (geodados
   licenciados e versionados) que ainda não existe —
-  `flight-watch-next-phases/05-roadmap.md` já registra "não começar pelo
+  `docs/roadmap/05-roadmap.md` já registra "não começar pelo
   mapa". `destination` continua exigindo um IATA de 3 letras da mesma
   allowlist de `apps/api/src/watches/supported-catalog.ts`; enviar
   `"ANYWHERE"` cai no mesmo erro de formato de qualquer IATA inválido, sem

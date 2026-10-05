@@ -5,7 +5,7 @@
  * — terceira cópia da mesma lista fixa, documentada como provisória). Não é
  * um catálogo de `Destination` real (geodados licenciados/versionados) —
  * isso continua fora de escopo até uma decisão de produto/ADR
- * (`flight-watch-next-phases/04-domain-and-platform-evolution.md`).
+ * (`docs/roadmap/04-domain-and-platform-evolution.md`).
  * Coordenadas são fatos públicos conhecidos (localização de aeroportos
  * grandes), não dado de terceiro licenciado.
  */
