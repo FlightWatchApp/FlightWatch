@@ -69,7 +69,11 @@ export function MemberHome({
             <p className={styles.heroNote}>Conectado como {userEmail}</p>
           </div>
 
-          <aside className={`${styles.overview} reveal`} style={delay(80)} aria-label="Resumo atual">
+          <aside
+            className={`${styles.overview} reveal`}
+            style={delay(80)}
+            aria-label="Resumo atual"
+          >
             <div className={styles.overviewHeader}>
               <span className={styles.overviewIcon}>
                 <IconCheckCircle size={18} />
