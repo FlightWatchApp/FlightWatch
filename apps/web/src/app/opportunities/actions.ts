@@ -4,11 +4,14 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { createWatch } from '@/lib/api/watches';
+import { getWatch } from '@/lib/api/watches';
+import type { WatchDetail } from '@/lib/api/types';
 import type { OpportunityItem } from '@/lib/api/types';
 
 export interface MonitorOpportunityActionResult {
   success: boolean;
   watchId?: string;
+  watch?: WatchDetail;
   error?: string;
 }
 
@@ -54,7 +57,11 @@ export async function monitorOpportunityAction(
       targetAmountMinor,
       notificationChannelId: user.notificationChannelId,
     });
-    return { success: true, watchId: watch.id };
+    try {
+      return { success: true, watchId: watch.id, watch: await getWatch(watch.id) };
+    } catch {
+      return { success: true, watchId: watch.id };
+    }
   } catch (error) {
     if (error instanceof ApiError) {
       return {

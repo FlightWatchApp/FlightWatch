@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listOpportunitiesResponseSchema } from '@flight-watch/contracts';
 import type { PrismaClient } from '@flight-watch/database';
 import { AppModule } from '../app.module.js';
+import { resetAffiliateConfigCache } from '../affiliate/affiliate-links.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -162,6 +163,73 @@ describe('GET /v1/opportunities (e2e, Postgres real via Testcontainers)', () => 
       (o: { searchTargetId: string }) => o.searchTargetId === target.id,
     );
     expect(item?.offer.purchaseUrl).toBeNull();
+  });
+
+  // SPEC-020: parâmetros de afiliado entram só depois da allowlist de SPEC-018.
+  it('adds affiliate params and utm_campaign=opportunity when AFFILIATE_TRACKING_PARAMS is set', async () => {
+    const previous = process.env.AFFILIATE_TRACKING_PARAMS;
+    process.env.AFFILIATE_TRACKING_PARAMS = '{"SIMULATED":{"marker":"fw-e2e"}}';
+    resetAffiliateConfigCache();
+    try {
+      const allowed = await createSearchTarget({ departureDate: new Date('2027-06-05') });
+      await seedObservation(allowed.id, 100_000, new Date('2027-01-01'));
+      await seedObservation(allowed.id, 60_000, new Date('2027-01-02'));
+      const blocked = await createSearchTarget({ departureDate: new Date('2027-06-06') });
+      await seedObservation(blocked.id, 100_000, new Date('2027-01-01'));
+      await seedObservation(blocked.id, 60_000, new Date('2027-01-02'), {
+        deeplink: 'https://evil.example.com/checkout',
+      });
+
+      const response = await request(app.getHttpServer()).get('/v1/opportunities');
+
+      const item = response.body.opportunities.find(
+        (o: { searchTargetId: string }) => o.searchTargetId === allowed.id,
+      );
+      const url = new URL(item.offer.purchaseUrl);
+      expect(url.hostname).toBe('booking.simulated-provider.flightwatch.dev');
+      expect(url.searchParams.get('marker')).toBe('fw-e2e');
+      expect(url.searchParams.get('utm_source')).toBe('flightwatch');
+      expect(url.searchParams.get('utm_campaign')).toBe('opportunity');
+
+      const blockedItem = response.body.opportunities.find(
+        (o: { searchTargetId: string }) => o.searchTargetId === blocked.id,
+      );
+      expect(blockedItem?.offer.purchaseUrl).toBeNull();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AFFILIATE_TRACKING_PARAMS;
+      } else {
+        process.env.AFFILIATE_TRACKING_PARAMS = previous;
+      }
+      resetAffiliateConfigCache();
+    }
+  });
+
+  it('keeps purchaseUrl identical to SPEC-018 when AFFILIATE_TRACKING_PARAMS is unset', async () => {
+    const previous = process.env.AFFILIATE_TRACKING_PARAMS;
+    delete process.env.AFFILIATE_TRACKING_PARAMS;
+    resetAffiliateConfigCache();
+    try {
+      const target = await createSearchTarget({ departureDate: new Date('2027-06-07') });
+      await seedObservation(target.id, 100_000, new Date('2027-01-01'));
+      await seedObservation(target.id, 60_000, new Date('2027-01-02'));
+
+      const response = await request(app.getHttpServer()).get('/v1/opportunities');
+
+      const item = response.body.opportunities.find(
+        (o: { searchTargetId: string }) => o.searchTargetId === target.id,
+      );
+      expect(item.offer.purchaseUrl).toBe(
+        'https://booking.simulated-provider.flightwatch.dev/checkout/x',
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AFFILIATE_TRACKING_PARAMS;
+      } else {
+        process.env.AFFILIATE_TRACKING_PARAMS = previous;
+      }
+      resetAffiliateConfigCache();
+    }
   });
 
   it('excludes a target with only one observation from the feed', async () => {

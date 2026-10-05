@@ -131,3 +131,58 @@ Toda entrega deve registrar:
 - gates não executados e motivo;
 - riscos, decisões e pendências;
 - migração, rollout e rollback, quando aplicável.
+
+<!-- Colar ao final de flight-watch-foundation-v0.1/AGENTS.md. Não substitui nenhuma seção acima. -->
+
+## 13. Refactor web v2 (`docs/design-refactor/`)
+
+O web passa pela experiência v2 aprovada em 2026-09-30: promoções em destaque,
+compra por link de afiliado com aviso de comissão, identidade visual nova e
+animações com significado. Autorizado por SPEC-020 e SPEC-021; detalhado em
+`docs/design-refactor/`.
+
+### Leitura obrigatória por tipo de tarefa
+
+| A tarefa toca…                             | Ler antes                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| qualquer parte do refactor                 | `docs/design-refactor/00-contexto.md`, `PROGRESS.md`, a ficha em `tasks/` |
+| link de compra, afiliado, `/transparencia` | SPEC-020                                                                  |
+| `apps/web/src/styles`, fontes, animação    | `01-spec-design-system.md`                                                |
+| componente em `apps/web/src/components`    | `02-spec-componentes.md`                                                  |
+| página em `apps/web/src/app`               | `03-spec-paginas.md`                                                      |
+| fechamento de tarefa                       | `04-evals.md`, `05-quality-gates.md`, `06-tdd-loop.md`                    |
+
+Não carregar os demais sem necessidade.
+
+### Regras do web (além das seções 1 a 12)
+
+1. Cor só por token de `apps/web/src/styles/tokens.css`.
+2. Em `*.module.css`, animação é `var(--keyframes-*)` ou `@keyframes` do próprio
+   módulo; nunca o nome global escrito direto (o CSS Modules o renomeia e a
+   animação some sem erro).
+3. Data e hora exibidas no cliente usam fuso fixo (`DISPLAY_TIME_ZONE`); data de
+   viagem usa UTC. Formatar no fuso local quebra a hidratação.
+4. Link de compra só pelo `PurchaseButton` (`rel="noopener noreferrer
+sponsored"`), sempre com `PurchaseNote` na página.
+5. Todo preço com idade (`Freshness`); sem oferta é "—", nunca zero.
+6. Linguagem: "último preço observado", "menor preço observado pelo sistema",
+   "preço desejado". Proibido: "menor preço do mercado", "garantido", "tempo
+   real", "melhor momento para comprar", "desconto", "preço-alvo".
+7. Nenhum texto abaixo de 12 px; alvos ≥ 24 px, controles ≥ 44 px no celular;
+   sem rolagem horizontal em 320 px.
+8. Movimento curto, uma vez, com significado; movimento reduzido termina tudo
+   no estado final.
+
+### Contrato da sessão
+
+- Começar lendo `docs/design-refactor/PROGRESS.md`; terminar atualizando.
+- Uma tarefa por vez, na ordem de `08-backlog.md`, uma branch e um PR por
+  tarefa.
+- Loop Ler → Red → Green → Refactor → Eval → Review → Registrar
+  (`06-tdd-loop.md`).
+- `pnpm check:design` é catraca: baixar o teto que melhorou; nunca subir sem
+  decisão.
+- Decisão pendente em `09-decisoes.md` bloqueia a tarefa que depende dela:
+  perguntar, não decidir.
+- A implementação de referência (`ref/redesign`) é consulta, não atalho: nada de
+  merge ou cherry-pick dela inteira.

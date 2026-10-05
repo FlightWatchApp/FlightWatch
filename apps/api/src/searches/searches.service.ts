@@ -33,6 +33,7 @@ import {
   persistPriceObservationSuccess,
 } from '@flight-watch/database';
 import { logEvent } from '@flight-watch/observability';
+import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import { ProviderError, type FlightProvider } from '@flight-watch/providers';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
@@ -423,7 +424,11 @@ function toFlightSearchOfferView(
     connectionsCount: offerConnectionsCount(asFlightOffer),
     observedAt: row.observedAt.toISOString(),
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
-    purchaseUrl: resolvePurchaseUrl(row.deeplink, row.providerStrategy),
+    purchaseUrl: withAffiliateTracking(
+      resolvePurchaseUrl(row.deeplink, row.providerStrategy),
+      row.providerStrategy,
+      'SEARCH',
+    ),
     availabilityStatus: resolveCurrentOfferStatus(row.expiresAt),
     qualityFlags: row.qualityFlags,
   };

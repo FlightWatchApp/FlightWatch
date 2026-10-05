@@ -15,6 +15,7 @@ import {
   type LatestObservationForOpportunity,
   type OpportunityCandidateSearchTarget,
 } from '@flight-watch/database';
+import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import type {
   ListOpportunitiesQuery,
   ListOpportunitiesResponse,
@@ -188,7 +189,11 @@ export class OpportunitiesService {
       offer: {
         amountMinor: latest.totalAmountMinor,
         currency: latest.currency,
-        purchaseUrl: resolvePurchaseUrl(latest.deeplink, latest.providerStrategy),
+        purchaseUrl: withAffiliateTracking(
+          resolvePurchaseUrl(latest.deeplink, latest.providerStrategy),
+          latest.providerStrategy,
+          'OPPORTUNITY',
+        ),
         provider: latest.providerStrategy,
         observedAt: latest.observedAt.toISOString(),
         expiresAt: latest.expiresAt ? latest.expiresAt.toISOString() : null,

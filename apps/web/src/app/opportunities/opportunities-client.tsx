@@ -3,9 +3,9 @@
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { DealCard } from '@/components/deals/deal-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { OpportunityItem } from '@/lib/api/types';
-import { OpportunityCard } from './opportunity-card';
 import styles from './page.module.css';
 
 // SPEC-016: Leaflet toca `window`/`document` na importação — precisa de
@@ -73,7 +73,11 @@ export function OpportunitiesClient({ opportunities }: OpportunitiesClientProps)
         </button>
       </div>
 
-      {showMap && <OpportunityMap opportunities={opportunities} onSelect={handleSelect} />}
+      {showMap && (
+        <div className="reveal">
+          <OpportunityMap opportunities={opportunities} onSelect={handleSelect} />
+        </div>
+      )}
 
       <div className={styles.list}>
         {opportunities.map((opportunity) => (
@@ -83,7 +87,7 @@ export function OpportunitiesClient({ opportunities }: OpportunitiesClientProps)
               cardRefs.current[opportunity.searchTargetId] = element;
             }}
           >
-            <OpportunityCard
+            <DealCard
               opportunity={opportunity}
               selected={opportunity.searchTargetId === selectedId}
             />

@@ -1,88 +1,113 @@
 /**
- * Design tokens — Flight Watch.
+ * Design tokens — Flight Watch (identidade visual v2, SPEC-021, DS-01..DS-05).
  *
- * Paleta: navy/paper para confiança, azul para ação/monitoramento, verde só para
- * oportunidade, âmbar só para atenção/dado desatualizado, vermelho só para erro ou
- * ação destrutiva (ver ARCHITECTURE do produto). Todos os pares texto/fundo abaixo
- * foram checados contra WCAG AA (>= 4.5:1 para texto normal).
+ * Paleta petróleo/papel: observador sóbrio e honesto, não uma agência
+ * gritando "promoção imperdível". Laranja rota marca só o destino — nunca
+ * fundo grande nem texto corrido. Verde só preço favorável, âmbar só
+ * atenção/dado antigo, vermelho só erro/ação destrutiva.
+ *
+ * Cor só entra aqui (DS-01): nenhum hex/rgb solto em `.module.css` ou
+ * `.tsx` fora deste arquivo, exceto `themeColor` no `viewport` de
+ * `app/layout.tsx` (o Next exige literal ali). Componentes usam os
+ * semânticos `--color-*`; primitivo `--fw-*` só como acento sobre fundo
+ * escuro (`--fw-route-300`). Todos os pares abaixo passam WCAG AA
+ * (`scripts/design/check-contrast.mjs`).
  */
 
 :root {
-  /* Ink & surfaces — neutros com leve tom de navy, não cinza puro */
-  --fw-ink-900: #10192b;
-  --fw-ink-700: #33415c;
-  --fw-ink-500: #5b6b85;
-  --fw-ink-300: #c4cbd8;
-  --fw-ink-200: #dee2e9;
-  --fw-ink-100: #eef0f4;
-  --fw-paper: #f8f7f3;
+  /* Ink & papel — DS-01, docs/BRAND.md §Cores */
+  --fw-ink-900: #14212b; /* Tinta */
+  --fw-ink-700: #39444b; /* texto secundário, 9,0:1 sobre o papel */
+  --fw-ink-500: #5c656a; /* muted, 5,4:1 sobre o papel */
+  --fw-ink-300: #7d8489; /* borda forte, 3,8:1 sobre branco */
+  --fw-paper: #f5f3ee;
   --fw-surface: #ffffff;
+  --fw-surface-sunken: #f1f2f2;
 
-  /* Navy — marca, header, superfícies de confiança */
-  --fw-navy-900: #0b1e3d;
-  --fw-navy-700: #14315c;
+  /* Petróleo — marca, ação, links (docs/BRAND.md) */
+  --fw-petrol-700: #0f4c5c;
+  --fw-petrol-900: #0a3844; /* petróleo profundo: fundos escuros, hover */
+  --fw-petrol-on-dark-muted: #adbdc1;
+  --fw-action-soft-bg: #e7edef;
 
-  /* Sky — ação e monitoramento ativo */
-  --fw-sky-700: #17549e;
-  --fw-sky-600: #1c64d1;
-  --fw-sky-500: #2c79e8;
-  --fw-sky-100: #e4eefc;
+  /* Laranja rota — destino, selo de promoção. Só acento, nunca fundo grande. */
+  --fw-route-500: #c4622d; /* gráfico e traço, 3,7:1 — não usar como texto */
+  --fw-route-700: #9c4516; /* texto na cor da rota, 5,8:1 sobre o papel */
+  --fw-route-300: #e8834f; /* destino sobre fundo petróleo */
+  --fw-route-soft: #f8ece6;
 
-  /* Moss — só oportunidade / resultado positivo */
-  --fw-moss-700: #175e3b;
-  --fw-moss-600: #1d7a4c;
-  --fw-moss-100: #e1f3e7;
+  /* Verde — só preço favorável */
+  --fw-green-700: #1d6b45;
+  --fw-green-soft-bg: #e8f0ec;
 
-  /* Amber — só atenção / dado desatualizado */
-  --fw-amber-700: #8f5d0a;
-  --fw-amber-600: #b4780f;
-  --fw-amber-100: #fbedd6;
+  /* Âmbar — só atenção / dado desatualizado */
+  --fw-amber-700: #7f5200;
+  --fw-amber-soft-bg: #f2eee6;
 
-  /* Red — só erro / ação destrutiva */
-  --fw-red-700: #8a2a20;
-  --fw-red-600: #b23a2e;
-  --fw-red-100: #fbe7e3;
+  /* Vermelho — só erro / ação destrutiva */
+  --fw-red-700: #a8261d;
+  --fw-red-soft-bg: #f6e9e8;
 
   /* Papel semântico */
   --color-bg: var(--fw-paper);
   --color-surface: var(--fw-surface);
-  --color-surface-sunken: var(--fw-ink-100);
-  --color-border: var(--fw-ink-200);
+  --color-surface-sunken: var(--fw-surface-sunken);
+  --color-border: #e4e1da;
   --color-border-strong: var(--fw-ink-300);
+  --color-border-on-dark: rgb(255 255 255 / 16%);
+  --color-overlay: rgb(20 33 43 / 55%);
 
   --color-text-primary: var(--fw-ink-900);
   --color-text-secondary: var(--fw-ink-700);
   --color-text-muted: var(--fw-ink-500);
   --color-text-on-dark: #ffffff;
+  --color-text-on-dark-muted: var(--fw-petrol-on-dark-muted);
   --color-text-on-accent: #ffffff;
 
-  --color-brand: var(--fw-navy-900);
-  --color-brand-strong: var(--fw-navy-700);
+  --color-brand: var(--fw-petrol-700);
+  --color-brand-strong: var(--fw-petrol-900);
 
-  --color-action: var(--fw-sky-600);
-  --color-action-hover: var(--fw-sky-700);
-  --color-action-soft-bg: var(--fw-sky-100);
-  --color-action-soft-text: var(--fw-sky-700);
+  --color-action: var(--fw-petrol-700);
+  --color-action-hover: var(--fw-petrol-900);
+  --color-action-soft-bg: var(--fw-action-soft-bg);
+  --color-action-soft-text: var(--fw-petrol-900);
 
-  --color-success: var(--fw-moss-600);
-  --color-success-soft-bg: var(--fw-moss-100);
-  --color-success-soft-text: var(--fw-moss-700);
+  /* Rota (DS-01): --color-route só em gráfico/traço (3:1); texto corrido usa
+     --color-route-text, mais escuro (4,5:1). Nunca fundo grande. */
+  --color-route: var(--fw-route-500);
+  --color-route-text: var(--fw-route-700);
+  --color-route-soft: var(--fw-route-soft);
+  --color-route-glow: rgb(196 98 45 / 25%);
 
-  --color-warning: var(--fw-amber-600);
-  --color-warning-soft-bg: var(--fw-amber-100);
+  --color-success: var(--fw-green-700);
+  --color-success-soft-bg: var(--fw-green-soft-bg);
+  --color-success-soft-text: var(--fw-green-700);
+  --color-success-border: var(--fw-green-700);
+
+  --color-warning: var(--fw-amber-700);
+  --color-warning-soft-bg: var(--fw-amber-soft-bg);
   --color-warning-soft-text: var(--fw-amber-700);
+  --color-warning-border: var(--fw-amber-700);
 
-  --color-danger: var(--fw-red-600);
+  --color-danger: var(--fw-red-700);
   --color-danger-hover: var(--fw-red-700);
-  --color-danger-soft-bg: var(--fw-red-100);
+  --color-danger-soft-bg: var(--fw-red-soft-bg);
   --color-danger-soft-text: var(--fw-red-700);
+  --color-danger-border: var(--fw-red-700);
 
-  --color-focus-ring: var(--fw-sky-500);
+  --color-focus-ring: var(--fw-petrol-700);
 
-  /* Tipografia */
-  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
-  --font-body: var(--font-public-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  /* Tipografia — DS-03: Instrument Sans para tudo, JetBrains Mono só para
+     código IATA/técnico (classe global `.iata`). Fraunces, Public Sans e
+     IBM Plex Mono saem do projeto; `--font-display`/`--font-body`/`--font-mono`
+     continuam definidos (nomes semânticos usados nos módulos existentes),
+     repontados para as fontes novas. */
+  --font-instrument:
+    var(--font-instrument-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-jetbrains: var(--font-jetbrains-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-display: var(--font-instrument);
+  --font-body: var(--font-instrument);
+  --font-mono: var(--font-jetbrains);
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -92,12 +117,13 @@
   --text-xl: 1.75rem;
   --text-2xl: 2.25rem;
   --text-3xl: 3rem;
+  --text-4xl: 3.75rem;
 
   --leading-tight: 1.15;
   --leading-snug: 1.35;
   --leading-normal: 1.55;
 
-  /* Espaçamento — base 4px */
+  /* Espaçamento — base 4px (DS-04) */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -109,29 +135,47 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --space-20: 5rem;
+  --space-24: 6rem;
 
-  /* Raio — deliberadamente contido, sem cápsulas */
+  /* Raio — DS-05: 6 controles pequenos, 10 botões/campos, 16 cartões, pílula selos */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+  --radius-full: 999px;
 
-  /* Sombra — só para elementos flutuantes (modal, popover), não em cards de lista */
-  --shadow-sm: 0 1px 2px rgba(16, 25, 43, 0.08);
-  --shadow-md: 0 8px 24px rgba(16, 25, 43, 0.14);
+  /* Sombra por camada — DS-05 */
+  --shadow-sm: 0 1px 2px rgb(20 33 43 / 8%);
+  --shadow-md: 0 8px 24px rgb(20 33 43 / 14%);
+  --shadow-lg: 0 16px 40px rgb(20 33 43 / 20%);
 
   /* Layout */
-  --container-max: 72rem;
+  --container-max: 76rem;
   --header-height: 4rem;
 
-  /* Movimento */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
+  /* Movimento — MO-01 */
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 480ms;
+  --duration-draw: 1400ms;
   --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Keyframes globais referenciados por token (MO-02): nunca escrever o nome
+     global direto num *.module.css — use var(--keyframes-*) ou um
+     @keyframes local. Definições em styles/globals.css. */
+  --keyframes-reveal: fw-reveal;
+  --keyframes-fade-in: fw-fade-in;
+  --keyframes-draw: fw-draw;
+  --keyframes-pop: fw-pop;
+  --keyframes-live: fw-live;
+  --keyframes-spin: fw-spin;
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0ms;
     --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-draw: 0ms;
   }
 }

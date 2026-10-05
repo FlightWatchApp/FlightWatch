@@ -18,9 +18,20 @@
     color var(--duration-fast) var(--easing-standard);
 }
 
+/* MO-01: no clique, o botão desce 1 px — a única reação além de cor/borda/sombra. */
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.lg {
+  min-height: 3.25rem;
+  padding-inline: var(--space-6);
+  font-size: var(--text-md);
 }
 
 .md {
@@ -28,10 +39,17 @@
   padding-inline: var(--space-5);
 }
 
+/* DS-04/CP-15: 40 px no desktop, 44 px até 640 px (alvo de toque no celular). */
 .sm {
-  min-height: 2.25rem;
+  min-height: 2.5rem;
   padding-inline: var(--space-4);
   font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  .sm {
+    min-height: 2.75rem;
+  }
 }
 
 .primary {
@@ -65,7 +83,7 @@
 
 .destructive {
   background: var(--color-surface);
-  border-color: var(--fw-red-600);
+  border-color: var(--color-danger);
   color: var(--color-danger);
 }
 
@@ -75,4 +93,15 @@
 
 .fullWidth {
   width: 100%;
+}
+
+/* MO-01: spinner é uma das únicas animações em loop permitidas. */
+.spinner {
+  width: 1em;
+  height: 1em;
+  border-radius: var(--radius-full);
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+  animation: var(--keyframes-spin) 700ms linear infinite;
 }

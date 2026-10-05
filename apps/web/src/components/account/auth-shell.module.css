@@ -1,0 +1,92 @@
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 34rem;
+}
+
+@media (min-width: 960px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.brandPanel {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .brandPanel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-6);
+    padding: var(--space-12);
+    padding-left: clamp(var(--space-20), 10vw, 10rem);
+    color: var(--color-text-on-dark);
+    background:
+      radial-gradient(ellipse 70% 60% at 20% 15%, var(--color-route-glow), transparent 70%),
+      var(--color-brand-strong);
+  }
+}
+
+.brandTagline {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  max-width: 20rem;
+}
+
+.benefits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 22rem;
+}
+
+.benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-text-on-dark-muted);
+}
+
+.benefits li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--fw-route-300);
+}
+
+.formPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  background: var(--color-bg);
+}
+
+.formInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 26rem;
+}
+
+.subtitle {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.footer {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-6);
+}

@@ -1,64 +1,67 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { EmailVerificationBanner } from '@/components/account/email-verification-banner';
-import buttonStyles from '@/components/ui/button.module.css';
-import { EmptyState } from '@/components/ui/empty-state';
-import { IconPlus, IconSearch } from '@/components/ui/icon';
-import { WatchCard } from '@/components/watches/watch-card';
+import { Landing } from '@/components/home/landing';
+import { MemberHome } from '@/components/home/member-home';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
+import { listOpportunities } from '@/lib/api/opportunities';
+import type { OpportunityItem } from '@/lib/api/types';
 import { listWatches } from '@/lib/api/watches';
-import styles from './page.module.css';
 
-const primaryButton = [buttonStyles.button, buttonStyles.primary, buttonStyles.md].join(' ');
-
-export default async function HomePage() {
-  let watches;
-  let user;
+/** PG-01/PG-02: promoções são um complemento da home — se o feed falhar, a página continua. */
+async function safeOpportunities(): Promise<OpportunityItem[]> {
   try {
-    [watches, user] = await Promise.all([listWatches(), getCurrentUser()]);
+    return await listOpportunities({ sort: 'best_value' });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Visitante: landing com promoções ao vivo (PG-01). Com sessão: início
+ * institucional do app; os monitoramentos ficam em `/watches`.
+ */
+export default async function HomePage() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return <Landing opportunities={await safeOpportunities()} />;
+  }
+
+  let watches;
+  try {
+    watches = await listWatches();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect('/login');
     }
     throw error;
   }
+  const opportunities = await safeOpportunities();
+
+  const active = watches.filter((watch) => watch.status === 'ACTIVE' || watch.status === 'PAUSED');
+  const reachedTarget = watches.filter(
+    (watch) =>
+      watch.status === 'ACTIVE' &&
+      watch.targetAmountMinor !== null &&
+      watch.currentPrice !== null &&
+      watch.currentPrice.amountMinor <= watch.targetAmountMinor,
+  ).length;
 
   return (
-    <div className={`container ${styles.page}`}>
-      {user && !user.notificationChannelVerified && <EmailVerificationBanner />}
-
-      <div className={styles.header}>
-        <div>
-          <h1>Seus monitoramentos</h1>
-          <p className={styles.subtitle}>Acompanhe o preço das viagens que você está observando.</p>
+    <>
+      {!user.notificationChannelVerified && (
+        <div className="container">
+          <EmailVerificationBanner />
         </div>
-        <Link href="/watches/new" className={primaryButton}>
-          <IconPlus size={18} />
-          Novo monitoramento
-        </Link>
-      </div>
-
-      {watches.length === 0 ? (
-        <EmptyState
-          icon={<IconSearch size={28} />}
-          title="Nenhum monitoramento ainda"
-          description="Crie um monitoramento para receber um alerta quando o preço da sua viagem cair."
-          action={
-            <Link href="/watches/new" className={primaryButton}>
-              Criar meu primeiro monitoramento
-            </Link>
-          }
-        />
-      ) : (
-        <ul className={styles.list}>
-          {watches.map((watch) => (
-            <li key={watch.id}>
-              <WatchCard watch={watch} />
-            </li>
-          ))}
-        </ul>
       )}
-    </div>
+      <MemberHome
+        userEmail={user.email}
+        notificationChannelVerified={user.notificationChannelVerified}
+        opportunities={opportunities}
+        monitoredCount={active.length}
+        targetReachedCount={reachedTarget}
+        currentOfferCount={active.filter((watch) => watch.currentOffer !== null).length}
+      />
+    </>
   );
 }

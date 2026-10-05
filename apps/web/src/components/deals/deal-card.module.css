@@ -1,0 +1,105 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.selected {
+  box-shadow: 0 0 0 2px var(--color-action);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.routeRow {
+  margin-top: var(--space-4);
+}
+
+.priceBlock {
+  margin-top: var(--space-4);
+}
+
+.priceLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.price {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.saving {
+  margin-top: var(--space-1);
+  color: var(--color-success-soft-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.explanation {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.actions > a,
+.actions > button {
+  width: 100%;
+}
+
+.purchaseUnavailable {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.modalIntro {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 520px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

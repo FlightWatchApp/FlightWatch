@@ -19,6 +19,7 @@ import {
   resolvePurchaseUrl,
 } from '@flight-watch/domain';
 import type { Prisma, WatchStatus } from '@flight-watch/database';
+import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import {
   SearchTargetFingerprintConflictError,
   findOrCreateSearchTarget,
@@ -180,9 +181,10 @@ function toCurrentOffer(
   if (!latestObservation) {
     return null;
   }
-  const purchaseUrl = resolvePurchaseUrl(
-    latestObservation.deeplink,
+  const purchaseUrl = withAffiliateTracking(
+    resolvePurchaseUrl(latestObservation.deeplink, latestObservation.providerStrategy),
     latestObservation.providerStrategy,
+    'WATCH',
   );
   if (!purchaseUrl) {
     return null;

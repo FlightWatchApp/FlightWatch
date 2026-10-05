@@ -1,16 +1,76 @@
+# Dependências e gerenciadores de pacote
 node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.pnp.*
+
+# Saídas de build e caches do monorepo
 dist/
 build/
-coverage/
-.turbo/
-*.tsbuildinfo
-.env
-.env.local
-.env.*.local
-*.log
-.DS_Store
-Thumbs.db
+out/
 .next/
+.turbo/
 .vercel/
-.pnpm-store/
+.cache/
+*.tsbuildinfo
+
+# Testes, cobertura e relatórios locais
+coverage/
+test-results/
+playwright-report/
+vitest.config.*.timestamp-*
+
+# Variáveis de ambiente e segredos locais
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+!.env.*.template
+
+# Logs e arquivos temporários
+*.log
+*.log.*
+logs/
+*.tmp
+*.temp
+*.pid
+
+# Bancos locais e dados gerados por Docker/Prisma
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+docker-data/
+postgres-data/
+redis-data/
+
+# Chaves, certificados e credenciais
 *.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# IDEs e sistema operacional
+.idea/
+.vscode/
+!.vscode/extensions.json
+.DS_Store
+.DS_Store?
+Thumbs.db
+Desktop.ini
+
+# Arquivos de trabalho e pacotes locais
+*.zip
+/undefined/
+
+# Artefatos temporários de planejamento, tarefas e avaliações do refactor
+/docs/design-refactor/
+/flight-watch-dashboard/
+/OBSERVABILITY-CODE-REVIEW.md
+/OBSERVABILITY-CODE-REVIEW-ROUND-2.md
+/WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md
+/README (1).md

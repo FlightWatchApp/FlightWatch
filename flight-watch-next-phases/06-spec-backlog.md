@@ -118,6 +118,30 @@ Critérios mínimos:
 - recomendação não altera regras de alerta sem consentimento;
 - opt-out e exclusão são simples.
 
+## SPEC-020 — Link de compra com rastreio de afiliado
+
+**Status: implementada** — ver
+`flight-watch-foundation-v0.1/docs/specs/SPEC-020-affiliate-purchase-links.md`
+("Evidência de implementação").
+
+Acrescenta parâmetros de rastreio de afiliado ao `purchaseUrl` já produzido
+pela allowlist de SPEC-018, nas três superfícies de compra (`WATCH`, `SEARCH`
+via SPEC-014, `OPPORTUNITY` via SPEC-015). Não muda preço, ordem ou
+elegibilidade de nada que a pessoa vê; exige aviso de comissão e
+`/transparencia` na interface. Conduzida pelo backlog de tarefas A1–A3 em
+`docs/design-refactor/08-backlog.md`.
+
+## SPEC-021 — Experiência web v2: identidade visual, promoções em destaque e transparência
+
+**Status: implementada** (AC-006, rubrica visual assinada pelo owner,
+pendente — ver Z2 em `docs/design-refactor/08-backlog.md`) — ver
+`flight-watch-foundation-v0.1/docs/specs/SPEC-021-web-experience-v2.md`
+("Evidência de implementação").
+
+Nova identidade visual, promoções em destaque na home/painel/página dedicada e
+animações com significado, sem mudar nenhum contrato de API nem o critério de
+promoção de SPEC-015. Detalhada em `docs/design-refactor/01`–`03`-spec-*.md`e conduzida pelo backlog de tarefas V1–V5/P1–P7/Z1–Z2 em`docs/design-refactor/08-backlog.md`.
+
 ## Ordem de escrita
 
 1. ~~finalizar SPEC-010 e confirmar que o canal de alerta é utilizável~~ — feito;

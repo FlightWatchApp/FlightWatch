@@ -35,16 +35,19 @@ export default async function OpportunitiesPage({
   return (
     <div className={`container ${styles.page}`}>
       <div>
-        <h1>Promoções</h1>
+        <p className={styles.eyebrow}>Promoções identificadas pelo sistema</p>
+        <h1>Passagens abaixo do padrão agora</h1>
         <p className={styles.subtitle}>
-          Rotas que outras pessoas já monitoram e que estão com um preço fora do padrão agora.
+          Rotas em que o preço observado está no menor valor já visto ou bem abaixo da média que o
+          sistema calculou a partir do histórico.
         </p>
       </div>
 
       {opportunities.length > 0 && (
         <div className={styles.toolbar}>
           <span className={styles.toolbarCount}>
-            {opportunities.length} {opportunities.length === 1 ? 'oportunidade' : 'oportunidades'}
+            {opportunities.length}{' '}
+            {opportunities.length === 1 ? 'promoção encontrada' : 'promoções encontradas'}
           </span>
           <div className={styles.sortLinks}>
             {SORT_OPTIONS.map((option) => (
@@ -55,6 +58,7 @@ export default async function OpportunitiesPage({
                     ? `/opportunities${viewQuery ? `?${viewQuery.slice(1)}` : ''}`
                     : `/opportunities?sort=${option.value}${viewQuery}`
                 }
+                aria-current={activeSort === option.value ? 'true' : undefined}
                 className={`${styles.sortLink} ${activeSort === option.value ? styles.sortLinkActive : ''}`}
               >
                 {option.label}
@@ -67,8 +71,8 @@ export default async function OpportunitiesPage({
       {opportunities.length === 0 && (
         <EmptyState
           icon={<IconArrowDownRight size={32} />}
-          title="Nenhuma oportunidade agora"
-          description="Ainda não há dado suficiente sobre nenhuma rota monitorada para destacar um preço fora do padrão. Volte mais tarde, ou comece um monitoramento em /search."
+          title="Nenhuma promoção agora"
+          description="Ainda não há histórico suficiente sobre nenhuma rota monitorada para destacar um preço fora do padrão. Volte mais tarde, ou comece um monitoramento em /search."
         />
       )}
 

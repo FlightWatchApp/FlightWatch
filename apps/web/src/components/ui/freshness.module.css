@@ -1,0 +1,29 @@
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.expired {
+  color: var(--color-warning);
+}
+
+/* Sem variante "expirado" própria pro fundo escuro: `--color-warning` (âmbar)
+   não tem par pensado pra petróleo, e o texto já diz "preço expirado" —
+   cor não é o único sinal (regra de acessibilidade já estabelecida). */
+.inverse,
+.inverse.expired {
+  color: var(--color-text-on-dark-muted);
+}
+
+/* MO-01: loop permitido só para o ponto "ao vivo" de uma oferta válida. */
+.liveDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  flex-shrink: 0;
+  animation: var(--keyframes-live) 1.8s ease-in-out infinite;
+}
