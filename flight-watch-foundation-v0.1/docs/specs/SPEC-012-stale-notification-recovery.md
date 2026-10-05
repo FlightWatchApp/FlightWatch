@@ -7,7 +7,7 @@ Dependências: SPEC-006
 
 ## 1. Objetivo
 
-Garantir que uma `NotificationDelivery` nunca fique presa em `SENDING` para sempre — fechando o HIGH finding de `OBSERVABILITY-CODE-REVIEW-ROUND-2.md`: "Entrega SENDING pode ficar órfã após crash". Hoje, se o processo cai entre o provedor aceitar o e-mail e `markNotificationDeliveryResult` gravar o resultado, nenhum código nunca mais examina aquela linha — o `AlertEvent` fica `QUEUED` indefinidamente e o usuário nunca é avisado, sem nenhum erro visível.
+Garantir que uma `NotificationDelivery` nunca fique presa em `SENDING` para sempre — fechando o HIGH finding de `docs/reviews/OBSERVABILITY-CODE-REVIEW-ROUND-2.md`: "Entrega SENDING pode ficar órfã após crash". Hoje, se o processo cai entre o provedor aceitar o e-mail e `markNotificationDeliveryResult` gravar o resultado, nenhum código nunca mais examina aquela linha — o `AlertEvent` fica `QUEUED` indefinidamente e o usuário nunca é avisado, sem nenhum erro visível.
 
 ## 2. Fora do escopo
 

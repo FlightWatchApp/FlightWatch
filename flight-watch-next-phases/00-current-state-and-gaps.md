@@ -82,7 +82,7 @@ dependem de uma identidade verificável.
 
 ## Gaps de qualidade que devem entrar no plano
 
-Os findings da revisão `WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md` continuam
+Os findings da revisão `docs/reviews/WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md` continuam
 relevantes antes de ampliar o tráfego:
 
 1. implementar logs de lifecycle/detail e correlação HTTP;

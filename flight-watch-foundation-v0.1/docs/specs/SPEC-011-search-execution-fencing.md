@@ -7,7 +7,7 @@ Dependências: SPEC-002, SPEC-003, SPEC-004
 
 ## 1. Objetivo
 
-Impedir que uma `SearchExecution` reconciliada como abandonada (`reconcileAbandonedSearchExecutions`, SPEC-002 §5/§8) ainda receba uma escrita terminal do worker original que ela supostamente abandonou — fechando o HIGH finding de `OBSERVABILITY-CODE-REVIEW-ROUND-2.md`: "Reconciliação de execução não possui fencing/lease ownership".
+Impedir que uma `SearchExecution` reconciliada como abandonada (`reconcileAbandonedSearchExecutions`, SPEC-002 §5/§8) ainda receba uma escrita terminal do worker original que ela supostamente abandonou — fechando o HIGH finding de `docs/reviews/OBSERVABILITY-CODE-REVIEW-ROUND-2.md`: "Reconciliação de execução não possui fencing/lease ownership".
 
 ## 2. Fora do escopo
 

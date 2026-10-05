@@ -268,7 +268,7 @@ com `pnpm --filter @flight-watch/database bench`).
 #### EVAL-PERF-004 — Listagem de Watches (N+1)
 
 **Dado:** um usuário com N Watches (`GET /v1/watches`, `listWatchesForUser`,
-achado F-004 de `WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md` — 3 consultas extras
+achado F-004 de `docs/reviews/WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md` — 3 consultas extras
 por Watch, sem paginação).
 **Quando:** N = 1, 20 (limite atual de `MAX_ACTIVE_WATCHES_PER_USER`), 100 e
 500 (acima do limite, para enxergar a curva antes que o produto precise
