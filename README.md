@@ -1,32 +1,128 @@
 # Flight Watch
 
-Implementação do sistema descrito em [`flight-watch-foundation-v0.1/`](./flight-watch-foundation-v0.1/). Leia aquele pacote antes de contribuir — `README.md` → `PRODUCT.md` → `DOMAIN.md` → `ARCHITECTURE.md` → `docs/adr/` → `EVALS.md` → `QUALITY-GATES.md` → `AGENTS.md` → `docs/specs/`.
+Plataforma de monitoramento de preços de passagens aéreas. A pessoa cadastra uma
+viagem e uma regra de alerta; o sistema consulta provedores autorizados, guarda o
+histórico de preços observados e avisa quando a regra é atendida. Também oferece
+busca de voos, um feed público de oportunidades e um mapa de promoções.
 
-Agentes de IA trabalhando neste repositório seguem as regras de [`flight-watch-foundation-v0.1/AGENTS.md`](./flight-watch-foundation-v0.1/AGENTS.md).
+> **Status:** pré-lançamento. O fluxo completo roda de ponta a ponta, mas com
+> **provedor de voos e envio de e-mail simulados**. Integração com provedor real
+> e e-mail transacional estão no roteiro de lançamento.
 
-## Estrutura
+## Arquitetura em uma tela
+
+Monólito modular em TypeScript, com processos que escalam separadamente:
 
 ```text
-apps/           processos implantáveis (web, api, scheduler, price-worker, notification-worker)
-packages/       código compartilhado (domain, contracts, database, queue, providers, notifications, ...)
-evals/          cenários de avaliação determinística (EVALS.md)
-tests/          integração, e2e e performance cross-app
+web (Next.js) ──► api (NestJS + Fastify) ──► PostgreSQL (fonte de verdade + outbox)
+                                         └─► Redis/BullMQ (filas, locks, rate limit)
+                                                   │
+         scheduler ──► price-worker ──► alert-worker ──► notification-worker
 ```
 
-`apps/*` e a maioria de `packages/*` ainda não existem — são criados spec a spec, conforme a fase correspondente é implementada. `packages/domain` é o primeiro a existir: contém as regras puras do domínio, sem dependência de framework, banco ou fila (DR-017 do DOMAIN.md).
+Decisões estruturantes: `Watch` (intenção individual) separado de `SearchTarget`
+(consulta compartilhada entre usuários), outbox transacional, consumidores
+idempotentes, `PriceObservation` imutável e dinheiro sempre em inteiro na menor
+unidade da moeda. Detalhes em
+[`ARCHITECTURE.md`](./flight-watch-foundation-v0.1/ARCHITECTURE.md) e nos
+[ADRs](./flight-watch-foundation-v0.1/docs/adr/).
+
+## Estrutura do repositório
+
+```text
+apps/
+  web/                  Next.js (App Router) — interface e BFF de sessão
+  api/                  NestJS + Fastify — HTTP público, auth, watches, busca
+  scheduler/            seleciona SearchTargets elegíveis e enfileira checagens
+  price-worker/         consulta o provedor, normaliza e grava observações
+  alert-worker/         avalia regras de alerta (fan-out paginado)
+  notification-worker/  renderiza e entrega notificações
+packages/
+  domain/               regras puras, sem framework, banco ou fila
+  contracts/            schemas Zod, DTOs e envelopes de jobs/eventos
+  database/             Prisma, repositórios, migrações e outbox
+  queue/                filas BullMQ e publicador da outbox
+  providers/            porta de provedor de voos, adapter simulado, resiliência
+  notifications/        porta de e-mail, templates e adapter simulado
+  observability/        logger JSON, métricas Prometheus e servidor interno
+flight-watch-foundation-v0.1/   produto, domínio, arquitetura, ADRs e specs
+flight-watch-next-phases/       visão e backlog das próximas fases
+docs/                           marca, design system e reviews
+scripts/design/                 checagens automáticas do design system
+```
 
 ## Requisitos
 
-- Node.js >= 20
-- pnpm (via `corepack enable`, ou `npx pnpm` se corepack não estiver disponível)
-- Docker (Postgres + Redis locais)
+- Node.js 24 (LTS) — versão em [`.nvmrc`](./.nvmrc)
+- pnpm 10 — habilite com `corepack enable` (a versão vem de `packageManager`)
+- Docker — PostgreSQL e Redis locais e testes com Testcontainers
 
-## Começando
+## Rodando localmente
 
 ```bash
 pnpm install
-docker compose up -d      # Postgres + Redis locais
-pnpm test                 # roda os testes de todos os pacotes existentes
-pnpm lint
-pnpm typecheck
+docker compose up -d                       # PostgreSQL 16 + Redis 7
+
+cp packages/database/.env.example packages/database/.env
+pnpm --filter @flight-watch/database prisma:deploy   # aplica as migrações
+pnpm --filter @flight-watch/database prisma:seed     # conta de dev (opcional)
+pnpm build
 ```
+
+Cada processo lê `DATABASE_URL` do ambiente (Redis usa `redis://localhost:6379`
+por padrão). Com a variável exportada, suba os processos em terminais separados:
+
+```bash
+export DATABASE_URL="postgresql://flight_watch:flight_watch@localhost:5432/flight_watch"
+
+pnpm --filter @flight-watch/api start:dev
+pnpm --filter @flight-watch/scheduler start:dev
+pnpm --filter @flight-watch/price-worker start:dev
+pnpm --filter @flight-watch/alert-worker start:dev
+pnpm --filter @flight-watch/notification-worker start:dev
+pnpm --filter @flight-watch/web dev
+```
+
+| Processo            | Porta HTTP | Métricas (somente 127.0.0.1) |
+| ------------------- | ---------: | ---------------------------: |
+| web                 |       3100 |                            — |
+| api                 |       3000 |                         9100 |
+| scheduler           |          — |                         9101 |
+| price-worker        |          — |                         9102 |
+| alert-worker        |          — |                         9103 |
+| notification-worker |          — |                         9104 |
+
+A conta criada pelo seed é só para desenvolvimento; credenciais em
+[`packages/database/prisma/seed.ts`](./packages/database/prisma/seed.ts).
+
+## Quality gates
+
+Os mesmos comandos rodam na CI ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml))
+e bloqueiam o merge:
+
+```bash
+pnpm format:check   # G1
+pnpm lint           # G1
+pnpm typecheck      # G2
+pnpm test           # G3/G4 — inclui integração com PostgreSQL/Redis reais
+pnpm check:design   # design system: contraste, tokens, aviso de comissão
+pnpm build          # G9
+```
+
+A definição completa de cada gate está em
+[`QUALITY-GATES.md`](./flight-watch-foundation-v0.1/QUALITY-GATES.md).
+
+## Como contribuir
+
+1. Crie uma branch a partir de `main` (`feat/…`, `fix/…`, `chore/…`, `docs/…`).
+2. Mudança de comportamento começa pela spec em
+   [`docs/specs/`](./flight-watch-foundation-v0.1/docs/specs/) e por um teste
+   que falha.
+3. Commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
+   com mensagem em português.
+4. Abra um PR para `main` com os gates verdes e preencha o template.
+
+Ordem de leitura para entender o projeto: `PRODUCT.md` → `DOMAIN.md` →
+`ARCHITECTURE.md` → ADRs → `QUALITY-GATES.md` → spec da feature. Agentes de IA
+seguem também [`CLAUDE.md`](./CLAUDE.md) e
+[`AGENTS.md`](./flight-watch-foundation-v0.1/AGENTS.md).
