@@ -11,6 +11,7 @@ import { isUniqueConstraintViolation } from '@flight-watch/database';
 import type { EmailSender } from '@flight-watch/notifications';
 import { renderVerificationEmail } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
+import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { EMAIL_SENDER } from './email-sender.token.js';
@@ -23,11 +24,6 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // SPEC-010 §7: prazo do token de confirmação de e-mail.
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
-// SPEC-010 §3: a base do link aponta pro apps/web (onde a página /verify-email
-// existe), não pro apps/api — diferente do WEB_BASE_URL de
-// apps/notification-worker/src/main.ts, cujo default (porta 3000, a do
-// próprio apps/api) parece um bug pré-existente fora do escopo desta spec.
-const WEB_BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3100';
 
 // Mitigação de enumeração por tempo de resposta (SPEC-007 §6): verificado
 // mesmo quando o email não existe, pra login com email inexistente não ser
@@ -53,6 +49,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
+    @Inject(API_CONFIG) private readonly config: ApiConfig,
   ) {}
 
   /** SPEC-007 §13: `auth_register_total{result}`. */
@@ -119,7 +116,8 @@ export class AuthService {
   }
 
   private async sendVerificationEmail(email: string, token: string): Promise<void> {
-    const verificationUrl = `${WEB_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    // SPEC-010 §3: o link aponta para o apps/web, onde a página /verify-email existe.
+    const verificationUrl = `${this.config.WEB_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
     const rendered = renderVerificationEmail({ verificationUrl });
     await this.emailSender.send({
       to: email,

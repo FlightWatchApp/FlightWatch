@@ -2,13 +2,11 @@ import 'reflect-metadata';
 import type { Server } from 'node:http';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { ConfigError, apiConfig, loadConfig } from '@flight-watch/config';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
 import { AppModule } from './app.module.js';
 import { registerCorrelationHook } from './observability/correlation.js';
 import { MetricsService } from './observability/metrics.service.js';
-
-const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9100);
-const METRICS_HOST = process.env.METRICS_HOST ?? '127.0.0.1';
 
 async function closeMetricsServer(server: Server | undefined): Promise<void> {
   if (!server?.listening) {
@@ -20,6 +18,9 @@ async function closeMetricsServer(server: Server | undefined): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  // SPEC-024: valida antes do Nest subir — configuração inválida (ou adapter
+  // simulado em produção) impede o startup sem abrir conexão nenhuma.
+  const config = loadConfig(apiConfig, process.env);
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
   let metricsServer: Server | undefined;
 
@@ -32,13 +33,18 @@ async function bootstrap(): Promise<void> {
   try {
     metricsServer = await startMetricsServer({
       registry: metrics.registry,
-      port: METRICS_PORT,
-      host: METRICS_HOST,
+      port: config.METRICS_PORT,
+      host: config.METRICS_HOST,
       isHealthy: () => true,
     });
 
-    const port = Number(process.env.PORT ?? 3000);
-    await app.listen(port, '0.0.0.0');
+    logEvent({
+      event: 'api_starting',
+      appEnv: config.APP_ENV,
+      port: config.PORT,
+      metricsPort: config.METRICS_PORT,
+    });
+    await app.listen(config.PORT, '0.0.0.0');
   } catch (error) {
     await closeMetricsServer(metricsServer);
     await app.close();
@@ -61,6 +67,8 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap().catch((error: unknown) => {
-  logEvent({ event: 'api_startup_failed', error });
+  logEvent(
+    error instanceof ConfigError ? error.toLogEvent() : { event: 'api_startup_failed', error },
+  );
   process.exit(1);
 });

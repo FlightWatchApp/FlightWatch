@@ -1,3 +1,4 @@
+import { ConfigError, loadConfig, schedulerConfig } from '@flight-watch/config';
 import { createPrismaClient } from '@flight-watch/database';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
 import {
@@ -13,20 +14,18 @@ import {
 import { createSchedulerMetrics } from './metrics.js';
 import { runSchedulerTick } from './tick.js';
 
-const TICK_INTERVAL_MS = Number(process.env.SCHEDULER_TICK_INTERVAL_MS ?? 5000);
-const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9101);
-const METRICS_HOST = process.env.METRICS_HOST ?? '127.0.0.1';
-
 async function main(): Promise<void> {
+  // SPEC-024: configuração validada uma vez; inválida impede o startup.
+  const config = loadConfig(schedulerConfig, process.env);
   const metrics = createSchedulerMetrics();
   const metricsServer = await startMetricsServer({
     registry: metrics.registry,
-    port: METRICS_PORT,
-    host: METRICS_HOST,
+    port: config.METRICS_PORT,
+    host: config.METRICS_HOST,
     isHealthy: () => true,
   });
-  const prisma = createPrismaClient();
-  const connection = createRedisConnection();
+  const prisma = createPrismaClient(config.DATABASE_URL);
+  const connection = createRedisConnection(config.REDIS_URL);
   const priceCheckQueue = createPriceCheckQueue(connection);
   const priceObservedQueue = createPriceObservedQueue(connection);
   const notificationQueue = createNotificationQueue(connection);
@@ -43,8 +42,9 @@ async function main(): Promise<void> {
 
   logEvent({
     event: 'scheduler_starting',
-    tickIntervalMs: TICK_INTERVAL_MS,
-    metricsPort: METRICS_PORT,
+    appEnv: config.APP_ENV,
+    tickIntervalMs: config.SCHEDULER_TICK_INTERVAL_MS,
+    metricsPort: config.METRICS_PORT,
   });
 
   async function tick(): Promise<void> {
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const interval = setInterval(() => void tick(), TICK_INTERVAL_MS);
+  const interval = setInterval(() => void tick(), config.SCHEDULER_TICK_INTERVAL_MS);
   void tick();
 
   async function shutdown(): Promise<void> {
@@ -111,6 +111,10 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  logEvent({ event: 'scheduler_startup_failed', error });
+  logEvent(
+    error instanceof ConfigError
+      ? error.toLogEvent()
+      : { event: 'scheduler_startup_failed', error },
+  );
   process.exit(1);
 });

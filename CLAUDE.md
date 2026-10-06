@@ -284,8 +284,8 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 │   └── notification-worker/src/
 ├── packages/
 │   ├── domain/ contracts/ database/ queue/
-│   ├── providers/ notifications/ observability/
-│   └── (config/ testing/ ui/ — PROPOSTO, ainda não existem)
+│   ├── providers/ notifications/ observability/ config/
+│   └── (testing/ ui/ — PROPOSTO, ainda não existem)
 ├── docs/                         # índice em docs/README.md
 │   ├── PRODUCT.md DOMAIN.md ARCHITECTURE.md
 │   ├── EVALS.md QUALITY-GATES.md
@@ -642,17 +642,30 @@ WatchCreated
 
 ### 10.2 Variáveis verificadas
 
-| Variável               | Serviço     |     Default | Sensível | Uso                                                                                                                                                     |
-| ---------------------- | ----------- | ----------: | -------: | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                 | API         |      `3000` |      não | porta HTTP pública                                                                                                                                      |
-| `METRICS_HOST`         | API/workers | `127.0.0.1` |      não | bind interno de métricas                                                                                                                                |
-| `METRICS_PORT`         | API/workers |      `9100` |      não | porta dedicada de métricas; garantir portas distintas por processo local                                                                                |
-| `RATE_LIMIT_WINDOW_MS` | API         |     `60000` |      não | janela do throttler (SPEC-014), hoje só em `POST /v1/searches/flights`                                                                                  |
-| `RATE_LIMIT_MAX`       | API         |        `10` |      não | limite de requisições por IP na janela acima (SPEC-014); storage em memória, por processo — não escala sob múltiplas réplicas sem storage compartilhado |
+`VERIFICADO` (SPEC-024): a fonte de verdade é `packages/config/src/processes.ts`,
+e toda chave documentada em `.env.example` (raiz) é lida por um schema — um
+teste falha se os dois divergirem. Não repetir a lista aqui.
+
+Regras transversais:
+
+- cada processo chama `loadConfig(<processo>Config, process.env)` uma vez no
+  startup; configuração inválida registra `config_invalid` (chaves, nunca
+  valores) e encerra com código 1;
+- `APP_ENV` (`development`, `test`, `staging`, `production`) é obrigatória com
+  `NODE_ENV=production`; padrões locais de `DATABASE_URL`, `REDIS_URL` e
+  `WEB_BASE_URL` valem só em `development`/`test`;
+- com `APP_ENV=production`, `FLIGHT_PROVIDER`/`EMAIL_PROVIDER` `simulated`
+  impedem o startup (kill switch até existir adapter real);
+- adapter novo entra no enum de `processes.ts` e na factory do pacote
+  (`createFlightProvider`, `createEmailSender`);
+- `RATE_LIMIT_*` usa storage em memória, por processo — não escala sob
+  múltiplas réplicas sem storage compartilhado;
+- fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
+  e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`).
 
 ### 10.3 Baseline a reconciliar com o código
 
-As chaves abaixo são `PROPOSTO` até serem confirmadas no schema/configuração real. Não criar todas automaticamente; manter somente as necessárias.
+As chaves abaixo são `PROPOSTO` até serem confirmadas no schema/configuração real. Não criar todas automaticamente; manter somente as necessárias. Quando uma chave daqui já existe em `.env.example`, vale a versão de lá (ex.: `FLIGHT_PROVIDER=simulated`, não `mock`; o tick é `SCHEDULER_TICK_INTERVAL_MS`).
 
 #### Runtime e logs
 

@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Worker } from 'bullmq';
+import { ConfigError, loadConfig, notificationWorkerConfig } from '@flight-watch/config';
 import {
   createPrismaClient,
   reconcileStaleSendingNotificationDeliveries,
 } from '@flight-watch/database';
-import { InMemoryEmailSender } from '@flight-watch/notifications';
+import { createEmailSender } from '@flight-watch/notifications';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
 import {
   QUEUE_NAMES,
@@ -13,52 +14,53 @@ import {
   type NotificationRequestedJob,
 } from '@flight-watch/queue';
 import { createNotificationWorkerMetrics } from './metrics.js';
-import { STALE_SENDING_THRESHOLD_MS, processNotificationJob } from './process-job.js';
+import { processNotificationJob } from './process-job.js';
 
-const CONCURRENCY = Number(process.env.NOTIFICATION_WORKER_CONCURRENCY ?? 5);
-const APP_BASE_URL = process.env.APP_BASE_URL ?? 'http://localhost:3000';
-const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9104);
-const METRICS_HOST = process.env.METRICS_HOST ?? '127.0.0.1';
-// SPEC-012 §4: cadência do laço de reconciliação — independente do intervalo
-// de staleness em si (STALE_SENDING_THRESHOLD_MS).
-const STALE_SENDING_SWEEP_INTERVAL_MS = Number(
-  process.env.NOTIFICATION_STALE_SENDING_SWEEP_INTERVAL_MS ?? 60_000,
-);
 // SPEC-006: mesmo valor de ALERT_EMAIL_TEMPLATE_VERSION — usado só quando uma
 // entrega presa em SENDING foi criada antes de `templateVersion` existir
 // (migração aditiva, coluna nullable).
 const DEFAULT_TEMPLATE_VERSION = 1;
 
-function buildUnsubscribeUrl(watchId: string): string {
-  return `${APP_BASE_URL}/watches/${watchId}/preferences`;
-}
-
 async function main(): Promise<void> {
+  // SPEC-024: configuração validada uma vez; inválida impede o startup.
+  const config = loadConfig(notificationWorkerConfig, process.env);
+  const staleSendingThresholdMs = config.NOTIFICATION_STALE_SENDING_THRESHOLD_MS;
+
+  // Rota ainda inexistente no apps/web — corrigida junto do e-mail real
+  // (bloqueador 2 do lançamento), que também traz o descadastro em um clique.
+  function buildUnsubscribeUrl(watchId: string): string {
+    return `${config.WEB_BASE_URL}/watches/${watchId}/preferences`;
+  }
+
   const metrics = createNotificationWorkerMetrics();
   const metricsServer = await startMetricsServer({
     registry: metrics.registry,
-    port: METRICS_PORT,
-    host: METRICS_HOST,
+    port: config.METRICS_PORT,
+    host: config.METRICS_HOST,
     isHealthy: () => true,
   });
-  const prisma = createPrismaClient();
-  const connection = createRedisConnection();
+  const prisma = createPrismaClient(config.DATABASE_URL);
+  const connection = createRedisConnection(config.REDIS_URL);
   const notificationQueue = createNotificationQueue(connection);
-  // Canal real (SMTP/SES/Resend/etc.) entra aqui atrás da mesma porta EmailSender
-  // quando existir — SPEC-006 não define o fornecedor ainda (§2: e-mail é só a
-  // baseline técnica), nada mais neste arquivo muda quando isso for decidido.
-  const emailSender = new InMemoryEmailSender();
+  // Canal real (SMTP/SES/Resend/etc.) entra atrás da mesma porta EmailSender,
+  // escolhido por EMAIL_PROVIDER — nada mais neste arquivo muda.
+  const emailSender = createEmailSender(config.EMAIL_PROVIDER);
 
   const worker = new Worker(
     QUEUE_NAMES.NOTIFICATION,
-    (job) => processNotificationJob({ prisma, emailSender, buildUnsubscribeUrl, metrics }, job),
-    { connection, concurrency: CONCURRENCY },
+    (job) =>
+      processNotificationJob(
+        { prisma, emailSender, buildUnsubscribeUrl, metrics, staleSendingThresholdMs },
+        job,
+      ),
+    { connection, concurrency: config.NOTIFICATION_WORKER_CONCURRENCY },
   );
 
   logEvent({
     event: 'notification_worker_starting',
-    concurrency: CONCURRENCY,
-    metricsPort: METRICS_PORT,
+    appEnv: config.APP_ENV,
+    concurrency: config.NOTIFICATION_WORKER_CONCURRENCY,
+    metricsPort: config.METRICS_PORT,
   });
 
   worker.on('failed', (job, err) => {
@@ -82,7 +84,7 @@ async function main(): Promise<void> {
   async function sweepStaleSendingDeliveries(): Promise<void> {
     try {
       const stale = await prisma.$transaction((tx) =>
-        reconcileStaleSendingNotificationDeliveries(tx, STALE_SENDING_THRESHOLD_MS),
+        reconcileStaleSendingNotificationDeliveries(tx, staleSendingThresholdMs),
       );
       for (const delivery of stale) {
         const job: NotificationRequestedJob = {
@@ -108,7 +110,7 @@ async function main(): Promise<void> {
 
   const staleSweepInterval = setInterval(
     () => void sweepStaleSendingDeliveries(),
-    STALE_SENDING_SWEEP_INTERVAL_MS,
+    config.NOTIFICATION_STALE_SENDING_SWEEP_INTERVAL_MS,
   );
   void sweepStaleSendingDeliveries();
 
@@ -128,6 +130,10 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  logEvent({ event: 'notification_worker_startup_failed', error });
+  logEvent(
+    error instanceof ConfigError
+      ? error.toLogEvent()
+      : { event: 'notification_worker_startup_failed', error },
+  );
   process.exit(1);
 });

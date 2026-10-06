@@ -69,12 +69,10 @@ pnpm --filter @flight-watch/database prisma:seed     # conta de dev (opcional)
 pnpm build
 ```
 
-Cada processo lê `DATABASE_URL` do ambiente (Redis usa `redis://localhost:6379`
-por padrão). Com a variável exportada, suba os processos em terminais separados:
+Em desenvolvimento nenhuma variável é obrigatória: banco, Redis e URL do web já
+apontam para o `docker compose` local. Suba os processos em terminais separados:
 
 ```bash
-export DATABASE_URL="postgresql://flight_watch:flight_watch@localhost:5432/flight_watch"
-
 pnpm --filter @flight-watch/api start:dev
 pnpm --filter @flight-watch/scheduler start:dev
 pnpm --filter @flight-watch/price-worker start:dev
@@ -94,6 +92,14 @@ pnpm --filter @flight-watch/web dev
 
 A conta criada pelo seed é só para desenvolvimento; credenciais em
 [`packages/database/prisma/seed.ts`](./packages/database/prisma/seed.ts).
+
+### Configuração
+
+Todas as variáveis estão documentadas em [`.env.example`](./.env.example) e são
+validadas no startup por [`packages/config`](./packages/config/src/processes.ts)
+(SPEC-024): valor inválido impede o processo de subir, com uma mensagem por
+chave. Em produção (`APP_ENV=production`), provedor de voos ou e-mail
+`simulated` também impede o startup.
 
 ## Quality gates
 

@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@flight-watch/config": "workspace:*",
     "@flight-watch/database": "workspace:*",
     "@flight-watch/domain": "workspace:*",
     "@flight-watch/observability": "workspace:*",
