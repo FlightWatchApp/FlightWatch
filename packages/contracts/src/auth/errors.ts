@@ -12,6 +12,9 @@ export const AUTH_ERROR_CODES = {
   // SPEC-010 §9.
   INVALID_VERIFICATION_TOKEN: { status: 400, code: 'INVALID_VERIFICATION_TOKEN' },
   VERIFICATION_TOKEN_EXPIRED: { status: 400, code: 'VERIFICATION_TOKEN_EXPIRED' },
+  // SPEC-026.
+  INVALID_RESET_TOKEN: { status: 400, code: 'INVALID_RESET_TOKEN' },
+  RESET_TOKEN_EXPIRED: { status: 400, code: 'RESET_TOKEN_EXPIRED' },
   // SPEC-025: excedeu AUTH_RATE_LIMIT_MAX por IP do cliente.
   RATE_LIMITED: { status: 429, code: 'RATE_LIMITED' },
 } as const;

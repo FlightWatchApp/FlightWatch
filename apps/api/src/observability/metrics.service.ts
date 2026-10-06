@@ -70,6 +70,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-026 §"Observabilidade". */
+  readonly authPasswordResetTotal = new Counter({
+    name: 'auth_password_reset_total',
+    help: 'Recuperação de senha por etapa e resultado — request: sent/ignored; confirm: success/invalid_reset_token/reset_token_expired (SPEC-026).',
+    labelNames: ['step', 'result'],
+    registers: [this.registry],
+  });
+
   /** SPEC-018 §"Observabilidade". */
   readonly watchPurchaseLinkClickTotal = new Counter({
     name: 'watch_purchase_link_click_total',

@@ -9,7 +9,7 @@ import {
 import type { NotificationChannel, Prisma, PrismaClient, User } from '@flight-watch/database';
 import { isUniqueConstraintViolation } from '@flight-watch/database';
 import type { EmailSender } from '@flight-watch/notifications';
-import { renderVerificationEmail } from '@flight-watch/notifications';
+import { renderPasswordResetEmail, renderVerificationEmail } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -24,6 +24,8 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // SPEC-010 §7: prazo do token de confirmação de e-mail.
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+// SPEC-026: prazo do link de redefinição de senha.
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 // Mitigação de enumeração por tempo de resposta (SPEC-007 §6): verificado
 // mesmo quando o email não existe, pra login com email inexistente não ser
@@ -195,6 +197,102 @@ export class AuthService {
       logEvent({ event: 'verification_email_send_failed', error });
     });
     return 'sent';
+  }
+
+  /**
+   * SPEC-026: resolve igual exista a conta ou não (sem enumeração). O envio do
+   * e-mail não é aguardado, para o tempo de resposta não revelar a conta.
+   */
+  async requestPasswordReset(email: string, correlationId: string): Promise<void> {
+    const user = await this.prisma.client.user.findUnique({ where: { email } });
+    if (!user || user.status !== 'ACTIVE') {
+      this.metrics.authPasswordResetTotal.inc({ step: 'request', result: 'ignored' });
+      logEvent({ event: 'auth_password_reset_request', result: 'ignored', correlationId });
+      return;
+    }
+
+    const token = generateOpaqueToken();
+    await this.prisma.client.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: hashOpaqueToken(token),
+        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+      },
+    });
+    void this.sendPasswordResetEmail(user.email, token).catch((error: unknown) => {
+      logEvent({ event: 'password_reset_email_send_failed', error, correlationId });
+    });
+
+    this.metrics.authPasswordResetTotal.inc({ step: 'request', result: 'sent' });
+    logEvent({ event: 'auth_password_reset_request', result: 'sent', correlationId });
+  }
+
+  private async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    const resetUrl = `${this.config.WEB_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    const rendered = renderPasswordResetEmail({
+      resetUrl,
+      expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MS / 60_000,
+    });
+    await this.emailSender.send({
+      to: email,
+      subject: rendered.subject,
+      textBody: rendered.textBody,
+      idempotencyKey: `password-reset-${hashOpaqueToken(token)}`,
+    });
+  }
+
+  /** SPEC-026: `auth_password_reset_total{step="confirm",result}`. */
+  async confirmPasswordReset(
+    token: string,
+    password: string,
+    correlationId: string,
+  ): Promise<void> {
+    try {
+      await this.doConfirmPasswordReset(token, password);
+      this.metrics.authPasswordResetTotal.inc({ step: 'confirm', result: 'success' });
+      logEvent({ event: 'auth_password_reset_confirm', result: 'success', correlationId });
+    } catch (error) {
+      const result = error instanceof AuthError ? error.errorCode.toLowerCase() : 'internal_error';
+      this.metrics.authPasswordResetTotal.inc({ step: 'confirm', result });
+      logEvent({ event: 'auth_password_reset_confirm', result, correlationId });
+      throw error;
+    }
+  }
+
+  private async doConfirmPasswordReset(token: string, password: string): Promise<void> {
+    const tokenHash = hashOpaqueToken(token);
+    const user = await this.prisma.client.user.findUnique({
+      where: { passwordResetTokenHash: tokenHash },
+    });
+    // Conta que deixou de estar ACTIVE responde como token inválido: não
+    // revela o estado da conta a quem só tem o link.
+    if (!user || user.status !== 'ACTIVE') {
+      throw new AuthError('INVALID_RESET_TOKEN', 'invalid password reset token');
+    }
+    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
+      throw new AuthError('RESET_TOKEN_EXPIRED', 'password reset token expired');
+    }
+
+    const passwordHash = await hashPassword(password);
+    await this.prisma.client.$transaction(async (tx) => {
+      // Condiciona ao hash ainda gravado: dois confirms concorrentes com o
+      // mesmo token — só um vence (uso único).
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, passwordResetTokenHash: tokenHash },
+        data: {
+          passwordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+      if (updated.count === 0) {
+        throw new AuthError('INVALID_RESET_TOKEN', 'invalid password reset token');
+      }
+      // Quem tinha acesso indevido à conta perde a sessão.
+      await tx.session.deleteMany({ where: { userId: user.id } });
+    });
   }
 
   /** SPEC-007 §13: `auth_login_total{result}` — success/invalid_credentials/locked/account_not_active. */

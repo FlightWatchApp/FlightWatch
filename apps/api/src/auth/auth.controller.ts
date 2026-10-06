@@ -3,6 +3,8 @@ import type {
   AuthenticatedUser,
   LoginRequest,
   LoginResponse,
+  PasswordResetConfirm,
+  PasswordResetRequest,
   RegisterRequest,
   RegisterResponse,
   VerifyEmailRequest,
@@ -15,6 +17,10 @@ import { CurrentSessionToken } from './current-session-token.decorator.js';
 import { CurrentUser } from './current-user.decorator.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
 import { LoginValidationPipe } from './login.pipe.js';
+import {
+  PasswordResetConfirmValidationPipe,
+  PasswordResetRequestValidationPipe,
+} from './password-reset.pipe.js';
 import { RegisterValidationPipe } from './register.pipe.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import { VerifyEmailValidationPipe } from './verify-email.pipe.js';
@@ -76,5 +82,27 @@ export class AuthController {
     @CurrentCorrelationId() correlationId: string,
   ): Promise<void> {
     await this.authService.resendVerification(userId, correlationId);
+  }
+
+  // SPEC-026: sem guard — quem esqueceu a senha não tem sessão. Sempre 202.
+  @Post('password-reset/request')
+  @HttpCode(202)
+  @AuthRateLimited()
+  async requestPasswordReset(
+    @Body(PasswordResetRequestValidationPipe) body: PasswordResetRequest,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.requestPasswordReset(body.email, correlationId);
+  }
+
+  // SPEC-026: o token do e-mail é a credencial; encerra todas as sessões.
+  @Post('password-reset/confirm')
+  @HttpCode(204)
+  @AuthRateLimited()
+  async confirmPasswordReset(
+    @Body(PasswordResetConfirmValidationPipe) body: PasswordResetConfirm,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.confirmPasswordReset(body.token, body.password, correlationId);
   }
 }
