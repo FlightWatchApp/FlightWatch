@@ -8,6 +8,7 @@ import type {
   VerifyEmailRequest,
   VerifyEmailResponse,
 } from '@flight-watch/contracts';
+import { AuthRateLimited } from './auth-throttler.guard.js';
 import { AuthService } from './auth.service.js';
 import { AuthErrorFilter } from './auth-error.filter.js';
 import { CurrentSessionToken } from './current-session-token.decorator.js';
@@ -25,12 +26,14 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(201)
+  @AuthRateLimited()
   async register(@Body(RegisterValidationPipe) body: RegisterRequest): Promise<RegisterResponse> {
     return this.authService.register(body);
   }
 
   @Post('login')
   @HttpCode(200)
+  @AuthRateLimited()
   async login(@Body(LoginValidationPipe) body: LoginRequest): Promise<LoginResponse> {
     return this.authService.login(body);
   }
@@ -53,6 +56,7 @@ export class AuthController {
   // sessão válida no dispositivo/navegador em que abriu o e-mail.
   @Post('verify-email')
   @HttpCode(200)
+  @AuthRateLimited()
   async verifyEmail(
     @Body(VerifyEmailValidationPipe) body: VerifyEmailRequest,
     @CurrentCorrelationId() correlationId: string,
@@ -66,6 +70,7 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(204)
   @UseGuards(SessionAuthGuard)
+  @AuthRateLimited()
   async resendVerification(
     @CurrentUser() userId: string,
     @CurrentCorrelationId() correlationId: string,

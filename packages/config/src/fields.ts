@@ -91,6 +91,26 @@ export function enumField<const T extends readonly [string, ...string[]]>(
     });
 }
 
+/** Segredo compartilhado: só o tamanho mínimo é validado (e nunca ecoado). */
+export function secretField(minLength: number) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined) {
+        return required<string>(ctx, undefined);
+      }
+      if (raw.length < minLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `deve ter pelo menos ${minLength} caracteres`,
+        });
+        return z.NEVER;
+      }
+      return raw;
+    });
+}
+
 /** Host de bind: IPv4, IPv6 sem colchetes ou nome DNS. */
 export function hostField(defaultHost: string) {
   return z

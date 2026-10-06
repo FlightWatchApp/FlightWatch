@@ -271,6 +271,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@flight-watch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@flight-watch/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

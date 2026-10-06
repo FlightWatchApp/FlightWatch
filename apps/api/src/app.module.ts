@@ -5,11 +5,13 @@ import { ObservabilityModule } from './observability/observability.module.js';
 import { OpportunitiesModule } from './opportunities/opportunities.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SearchesModule } from './searches/searches.module.js';
+import { ThrottlingModule } from './throttling/throttling.module.js';
 import { WatchesModule } from './watches/watches.module.js';
 
 @Module({
   imports: [
     ConfigModule,
+    ThrottlingModule,
     PrismaModule,
     ObservabilityModule,
     AuthModule,

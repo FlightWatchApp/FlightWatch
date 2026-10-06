@@ -126,6 +126,19 @@ export function loadConfig<Shape extends z.ZodRawShape>(
     issues.push(...issuesOf(parsed.error));
   }
 
+  // SPEC-025: padrão local copiado para staging/produção (senha do compose,
+  // segredo de desenvolvimento) é erro, mesmo informado explicitamente.
+  if (appEnv && !LOCAL_APP_ENVS.includes(appEnv)) {
+    for (const [key, localValue] of Object.entries(definition.localDefaults ?? {})) {
+      if (env[key] !== undefined && env[key] === localValue) {
+        issues.push({
+          key,
+          message: 'não pode usar o valor de desenvolvimento fora de development/test',
+        });
+      }
+    }
+  }
+
   if (appEnv === 'production' && parsed.success) {
     const values = parsed.data as Record<string, unknown>;
     for (const key of ADAPTER_KEYS) {

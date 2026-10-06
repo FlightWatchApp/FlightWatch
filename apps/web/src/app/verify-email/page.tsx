@@ -17,6 +17,7 @@ const primaryButton = [
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_VERIFICATION_TOKEN: 'Este link de confirmação não é válido. Peça um novo na sua conta.',
   VERIFICATION_TOKEN_EXPIRED: 'Este link de confirmação expirou. Peça um novo na sua conta.',
+  RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
 };
 
 export default async function VerifyEmailPage({

@@ -658,8 +658,13 @@ Regras transversais:
   impedem o startup (kill switch até existir adapter real);
 - adapter novo entra no enum de `processes.ts` e na factory do pacote
   (`createFlightProvider`, `createEmailSender`);
-- `RATE_LIMIT_*` usa storage em memória, por processo — não escala sob
-  múltiplas réplicas sem storage compartilhado;
+- nenhum padrão local (senha do compose, segredo de dev) é aceito fora de
+  `development`/`test`, nem se informado explicitamente (SPEC-025);
+- rate limit por IP do **cliente**: a API só vê o IP do web (BFF), então o web
+  repassa `x-fw-client-ip` autenticado por `INTERNAL_API_SECRET` (SPEC-025).
+  Throttlers `default` (busca) e `auth` (rotas públicas de autenticação), com
+  storage em memória, por processo — não escala sob múltiplas réplicas sem
+  storage compartilhado;
 - fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
   e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`).
 

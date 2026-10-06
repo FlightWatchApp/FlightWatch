@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from './load.js';
 import {
+  LOCAL_INTERNAL_API_SECRET,
   alertWorkerConfig,
   apiConfig,
   notificationWorkerConfig,
@@ -14,6 +15,7 @@ const PRODUCTION_BASE = {
   DATABASE_URL: 'postgresql://app:s3cr3t-db-password@db.internal:5432/flight_watch',
   REDIS_URL: 'redis://cache.internal:6379',
   WEB_BASE_URL: 'https://flightwatch.example',
+  INTERNAL_API_SECRET: 'production-internal-secret-0123456789abcdef',
 };
 
 function configErrorOf(fn: () => unknown): ConfigError {
@@ -154,6 +156,9 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       EMAIL_PROVIDER: 'simulated',
       RATE_LIMIT_WINDOW_MS: 60_000,
       RATE_LIMIT_MAX: 10,
+      AUTH_RATE_LIMIT_WINDOW_MS: 600_000,
+      AUTH_RATE_LIMIT_MAX: 20,
+      INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
     });
   });
 
@@ -233,5 +238,42 @@ describe('SPEC-024 AC-6 — o erro nunca expõe o valor recebido', () => {
       service: 'api',
       issues: [{ key: 'PORT', message: expect.any(String) }],
     });
+  });
+});
+
+describe('SPEC-025 AC-6 — segredo interno entre web e API', () => {
+  const STAGING = { ...PRODUCTION_BASE, APP_ENV: 'staging' };
+
+  it('é obrigatório fora de development/test', () => {
+    const { INTERNAL_API_SECRET: _secret, ...env } = STAGING;
+    expect(_secret).toBeDefined();
+    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual([
+      'INTERNAL_API_SECRET',
+    ]);
+  });
+
+  it('exige no mínimo 32 caracteres', () => {
+    const error = configErrorOf(() =>
+      loadConfig(apiConfig, { ...STAGING, INTERNAL_API_SECRET: 'curto-demais' }),
+    );
+    expect(keysOf(error)).toEqual(['INTERNAL_API_SECRET']);
+    expect(error.message).not.toContain('curto-demais');
+  });
+
+  it('rejeita o valor de desenvolvimento fora de development/test', () => {
+    const error = configErrorOf(() =>
+      loadConfig(apiConfig, { ...STAGING, INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET }),
+    );
+    expect(keysOf(error)).toEqual(['INTERNAL_API_SECRET']);
+  });
+
+  it('rejeita qualquer padrão local fora de development/test (ex.: banco do compose)', () => {
+    const error = configErrorOf(() =>
+      loadConfig(schedulerConfig, {
+        ...STAGING,
+        DATABASE_URL: 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch',
+      }),
+    );
+    expect(keysOf(error)).toEqual(['DATABASE_URL']);
   });
 });

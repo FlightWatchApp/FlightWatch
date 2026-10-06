@@ -8,8 +8,10 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { CreateFlightSearchRequest, FlightSearchResponse } from '@flight-watch/contracts';
 import { CurrentCorrelationId } from '../observability/correlation.js';
+import { AUTH_THROTTLER } from '../throttling/throttling.module.js';
 import { CreateFlightSearchValidationPipe } from './create-flight-search.pipe.js';
 import { FlightSearchIdValidationPipe } from './flight-search-id.pipe.js';
 import { SearchErrorFilter } from './search-error.filter.js';
@@ -26,6 +28,7 @@ export class SearchesController {
   @Post()
   @HttpCode(201)
   @UseGuards(SearchThrottlerGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true })
   async search(
     @Body(CreateFlightSearchValidationPipe) body: CreateFlightSearchRequest,
     @CurrentCorrelationId() correlationId: string,

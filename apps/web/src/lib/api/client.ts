@@ -1,4 +1,6 @@
+import { headers as requestHeaders } from 'next/headers';
 import { readSessionToken } from '@/lib/auth/session';
+import { clientIpFrom, internalApiHeaders, resolveInternalApiSecret } from './internal-headers';
 
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 
@@ -26,11 +28,18 @@ interface ErrorBody {
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await readSessionToken();
+  const incoming = await requestHeaders();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      // SPEC-025: IP do cliente para o rate limit da API, autenticado pelo
+      // segredo interno.
+      ...internalApiHeaders({
+        clientIp: clientIpFrom(incoming.get('x-forwarded-for'), incoming.get('x-real-ip')),
+        secret: resolveInternalApiSecret(process.env),
+      }),
       ...init.headers,
     },
     cache: 'no-store',

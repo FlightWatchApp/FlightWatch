@@ -16,6 +16,9 @@ export default defineConfig({
     // disparar 429 sem precisar de muitas requisições; alto o bastante pra
     // não colidir com o uso normal de POST /v1/searches/flights no resto da
     // suíte (nenhum outro spec chama essa rota).
-    env: { RATE_LIMIT_MAX: '15' },
+    // SPEC-025: as suítes de auth criam muitas contas do mesmo IP; o limite de
+    // auth fica alto aqui e rate-limit.e2e.spec.ts monta um app próprio com
+    // limites baixos.
+    env: { RATE_LIMIT_MAX: '15', AUTH_RATE_LIMIT_MAX: '1000' },
   },
 });

@@ -1,4 +1,12 @@
-import { durationMsField, enumField, hostField, intField, portField, urlField } from './fields.js';
+import {
+  durationMsField,
+  enumField,
+  hostField,
+  intField,
+  portField,
+  secretField,
+  urlField,
+} from './fields.js';
 
 /**
  * SPEC-024 — o que cada processo lê. Os padrões repetem os valores que viviam
@@ -12,6 +20,11 @@ export const EMAIL_PROVIDERS = ['simulated'] as const;
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
 const LOCAL_REDIS_URL = 'redis://localhost:6379';
 const LOCAL_WEB_BASE_URL = 'http://localhost:3100';
+/**
+ * SPEC-025: segredo BFF → API em desenvolvimento. Exportado para o apps/web
+ * usar o mesmo valor localmente; rejeitado fora de development/test.
+ */
+export const LOCAL_INTERNAL_API_SECRET = 'local-development-internal-api-secret';
 
 const concurrency = () => intField({ min: 1, max: 100, default: 5 });
 
@@ -36,8 +49,16 @@ export const apiConfig = {
     ...emailProvider,
     RATE_LIMIT_WINDOW_MS: durationMsField(60_000),
     RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 10 }),
+    // SPEC-025: rotas de autenticação, por rota e por IP do cliente.
+    AUTH_RATE_LIMIT_WINDOW_MS: durationMsField(10 * 60 * 1000),
+    AUTH_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 20 }),
+    INTERNAL_API_SECRET: secretField(32),
   },
-  localDefaults: { DATABASE_URL: LOCAL_DATABASE_URL, WEB_BASE_URL: LOCAL_WEB_BASE_URL },
+  localDefaults: {
+    DATABASE_URL: LOCAL_DATABASE_URL,
+    WEB_BASE_URL: LOCAL_WEB_BASE_URL,
+    INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
+  },
 };
 
 export const schedulerConfig = {
