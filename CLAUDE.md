@@ -267,6 +267,7 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 ├── CLAUDE.md
 ├── README.md
 ├── package.json · pnpm-lock.yaml · pnpm-workspace.yaml · turbo.json · .nvmrc
+├── Dockerfile · docker-compose.yml   # um target por processo; perfil `stack` (SPEC-028)
 ├── apps/
 │   ├── web/src/
 │   │   ├── app/                  # App Router (rotas e server actions)

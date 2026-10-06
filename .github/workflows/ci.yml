@@ -47,3 +47,17 @@ jobs:
 
       - name: G9 - Build
         run: pnpm build
+
+  # SPEC-028: garante que o Dockerfile continua construindo. Sem push — a
+  # publicação da imagem entra com a escolha da plataforma.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build api image
+        run: docker build --target api -t flight-watch-api:ci .
+
+      - name: Build web image
+        run: docker build --target web -t flight-watch-web:ci .

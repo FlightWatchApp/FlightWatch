@@ -93,6 +93,19 @@ pnpm --filter @flight-watch/web dev
 A conta criada pelo seed é só para desenvolvimento; credenciais em
 [`packages/database/prisma/seed.ts`](./packages/database/prisma/seed.ts).
 
+### Stack completa com Docker
+
+Para testar como em staging (imagens de produção, `APP_ENV=staging`):
+
+```bash
+docker compose --profile stack up --build   # web em http://127.0.0.1:3100
+```
+
+O [`Dockerfile`](./Dockerfile) tem um target por processo (`api`, `scheduler`,
+`price-worker`, `alert-worker`, `notification-worker`, `web`) e um `migrate`,
+que aplica as migrações e sai — rode-o antes de subir uma versão nova
+(SPEC-028).
+
 ### Configuração
 
 Todas as variáveis estão documentadas em [`.env.example`](./.env.example) e são
