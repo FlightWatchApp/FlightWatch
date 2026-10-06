@@ -249,6 +249,9 @@ importers:
       '@flight-watch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@flight-watch/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       '@flight-watch/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -349,6 +352,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@flight-watch/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
@@ -423,6 +429,9 @@ importers:
       '@flight-watch/domain':
         specifier: workspace:*
         version: link:../domain
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.9.0

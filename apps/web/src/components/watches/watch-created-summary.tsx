@@ -33,7 +33,13 @@ export function WatchCreatedSummary({ watch, onClose }: WatchCreatedSummaryProps
       </div>
 
       <div className={styles.route}>
-        <RouteLine origin={watch.origin} destination={watch.destination} size="lg" showCities />
+        <RouteLine
+          origin={watch.origin}
+          destination={watch.destination}
+          originName={watch.originName}
+          destinationName={watch.destinationName}
+          size="lg"
+        />
         <p className={styles.trip}>
           <IconClock size={14} /> {tripLabel}
         </p>

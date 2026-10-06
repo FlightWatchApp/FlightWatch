@@ -21,6 +21,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@flight-watch/domain": "workspace:*",
     "@prisma/client": "^5.22.0"
   },
   "devDependencies": {

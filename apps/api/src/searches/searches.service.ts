@@ -38,7 +38,8 @@ import { ProviderError, type FlightProvider } from '@flight-watch/providers';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { WatchesService } from '../watches/watches.service.js';
-import { isSupportedSearch } from '../watches/supported-catalog.js';
+import { PlacesService } from '../places/places.service.js';
+import { isSupportedCurrencyAndMarket } from '../watches/supported-catalog.js';
 import { FLIGHT_PROVIDER } from './flight-provider.token.js';
 
 // SPEC-014: mesma normalização/seleção que o pipeline de monitoramento usa
@@ -53,25 +54,51 @@ export class SearchesService {
     private readonly metrics: MetricsService,
     private readonly watchesService: WatchesService,
     @Inject(FLIGHT_PROVIDER) private readonly provider: FlightProvider,
+    private readonly places: PlacesService,
   ) {}
 
-  /** SPEC-014 §"Comportamento de domínio e invariantes". */
+  /**
+   * SPEC-014 §"Comportamento de domínio e invariantes". SPEC-029: origem e
+   * destino viram cidade do catálogo antes de qualquer outra regra.
+   */
   async searchFlights(
+    userId: string | null,
+    rawRequest: CreateFlightSearchRequest,
+    correlationId: string,
+  ): Promise<FlightSearchResponse> {
+    const [origin, destination] = await Promise.all([
+      this.places.resolveCity(rawRequest.origin),
+      this.places.resolveCity(rawRequest.destination),
+    ]);
+    if (
+      !origin ||
+      !destination ||
+      origin === destination ||
+      !isSupportedCurrencyAndMarket(rawRequest)
+    ) {
+      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
+    }
+    const base = await this.runSearch(
+      userId,
+      { ...rawRequest, origin, destination },
+      correlationId,
+    );
+    return this.withNames(base);
+  }
+
+  private async withNames(base: FlightSearchResponseBase): Promise<FlightSearchResponse> {
+    const [named] = await this.places.withRouteNames([base]);
+    if (!named) {
+      throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
+    }
+    return named;
+  }
+
+  private async runSearch(
     userId: string | null,
     request: CreateFlightSearchRequest,
     correlationId: string,
-  ): Promise<FlightSearchResponse> {
-    if (
-      !isSupportedSearch({
-        origin: request.origin,
-        destination: request.destination,
-        currency: request.currency,
-        market: request.market,
-      })
-    ) {
-      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported yet');
-    }
-
+  ): Promise<FlightSearchResponseBase> {
     const flightSearch = await createPendingFlightSearch(this.prisma.client, {
       userId,
       originIata: request.origin,
@@ -204,6 +231,10 @@ export class SearchesService {
 
   /** SPEC-014 §"Contrato de API": `GET /v1/searches/flights/:id`. */
   async getFlightSearch(id: string): Promise<FlightSearchResponse> {
+    return this.withNames(await this.findFlightSearch(id));
+  }
+
+  private async findFlightSearch(id: string): Promise<FlightSearchResponseBase> {
     const flightSearch = await getFlightSearchWithOffers(this.prisma.client, id);
     if (!flightSearch) {
       throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
@@ -434,9 +465,12 @@ function toFlightSearchOfferView(
   };
 }
 
+/** Sem `originName`/`destinationName`: o serviço completa em lote (SPEC-029). */
+type FlightSearchResponseBase = Omit<FlightSearchResponse, 'originName' | 'destinationName'>;
+
 function toFlightSearchResponse(
   flightSearch: FlightSearch & { offers: FlightSearchOffer[] },
-): FlightSearchResponse {
+): FlightSearchResponseBase {
   return {
     id: flightSearch.id,
     status: flightSearch.status,

@@ -2,7 +2,6 @@
 
 import L from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
-import { AIRPORT_COORDINATES } from '@/lib/domain/airport-coordinates';
 import { formatMoney } from '@/lib/domain/money';
 import type { OpportunityItem } from '@/lib/api/types';
 import styles from './opportunity-map.module.css';
@@ -32,12 +31,13 @@ const BRAZIL_CENTER: [number, number] = [-14, -51];
  * ficar mal feito; "o mapa nunca deve exigir que o usuário decifre uma
  * visualização para encontrar o botão de compra" (UX doc). Um marcador por
  * destino distinto (não por oportunidade individual) — várias oportunidades
- * podem compartilhar destino.
+ * podem compartilhar destino. SPEC-029: coordenadas e nome vêm da API, do
+ * catálogo — destino sem coordenada fica só na lista.
  */
 export default function OpportunityMap({ opportunities, onSelect }: OpportunityMapProps) {
   const byDestination = new Map<string, OpportunityItem[]>();
   for (const opportunity of opportunities) {
-    if (!AIRPORT_COORDINATES[opportunity.destination]) {
+    if (!opportunity.destinationCoordinates) {
       continue;
     }
     const existing = byDestination.get(opportunity.destination) ?? [];
@@ -58,8 +58,10 @@ export default function OpportunityMap({ opportunities, onSelect }: OpportunityM
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {[...byDestination.entries()].map(([code, items]) => {
-          const coordinate = AIRPORT_COORDINATES[code];
-          if (!coordinate) return null;
+          const first = items[0];
+          const coordinate = first?.destinationCoordinates;
+          if (!first || !coordinate) return null;
+          const label = first.destinationName ? `${first.destinationName} (${code})` : code;
           const cheapest = items.reduce((min, item) =>
             item.offer.amountMinor < min.offer.amountMinor ? item : min,
           );
@@ -71,7 +73,7 @@ export default function OpportunityMap({ opportunities, onSelect }: OpportunityM
               eventHandlers={{ click: () => onSelect(cheapest.searchTargetId) }}
             >
               <Popup>
-                <strong>{coordinate.label}</strong>
+                <strong>{label}</strong>
                 <br />A partir de{' '}
                 {formatMoney({
                   amountMinor: cheapest.offer.amountMinor,

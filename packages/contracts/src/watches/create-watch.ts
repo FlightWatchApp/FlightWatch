@@ -106,6 +106,9 @@ export const createWatchResponseSchema = z.object({
   search: z.object({
     origin: z.string(),
     destination: z.string(),
+    // SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro.
+    originName: z.string().nullable(),
+    destinationName: z.string().nullable(),
     departureDate: z.string(),
     returnDate: z.string().nullable(),
     tripType: z.enum(['ONE_WAY', 'ROUND_TRIP']),

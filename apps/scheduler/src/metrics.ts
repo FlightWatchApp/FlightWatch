@@ -10,6 +10,10 @@ export interface SchedulerMetrics {
   /** SPEC-002 §11: "leases expiradas e reconciliadas" — `reason` é abandoned_lease/retry_exhausted/watch_expired. */
   reconciliationsTotal: Counter<'reason'>;
   targetsDelayed: Gauge<'priority'>;
+  /** SPEC-029: `result` é success/failed/skipped_fresh. */
+  placesSyncTotal: Counter<'result'>;
+  /** SPEC-029: contagens do último ciclo de sincronização do catálogo. */
+  placesSyncRecords: Gauge<'kind' | 'outcome'>;
   refreshDelayedTargetsGauge: (prisma: PrismaClient) => Promise<void>;
 }
 
@@ -50,6 +54,20 @@ export function createSchedulerMetrics(): SchedulerMetrics {
     registers: [registry],
   });
 
+  const placesSyncTotal = new Counter({
+    name: 'places_sync_total',
+    help: 'Ciclos de sincronização do catálogo de lugares, por resultado (SPEC-029).',
+    labelNames: ['result'],
+    registers: [registry],
+  });
+
+  const placesSyncRecords = new Gauge({
+    name: 'places_sync_records',
+    help: 'Registros do último ciclo de sincronização do catálogo, por tipo e desfecho (SPEC-029).',
+    labelNames: ['kind', 'outcome'],
+    registers: [registry],
+  });
+
   async function refreshDelayedTargetsGauge(prisma: PrismaClient): Promise<void> {
     const rows = await countDelayedSearchTargetsByPriority(prisma);
     targetsDelayed.reset();
@@ -69,6 +87,8 @@ export function createSchedulerMetrics(): SchedulerMetrics {
     tickErrorsTotal,
     reconciliationsTotal,
     targetsDelayed,
+    placesSyncTotal,
+    placesSyncRecords,
     refreshDelayedTargetsGauge,
   };
 }

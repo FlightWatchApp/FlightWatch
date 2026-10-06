@@ -7,7 +7,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listOpportunitiesResponseSchema } from '@flight-watch/contracts';
-import type { PrismaClient } from '@flight-watch/database';
+import { type PrismaClient, TEST_PLACES, syncPlacesCatalog } from '@flight-watch/database';
 import { AppModule } from '../app.module.js';
 import { resetAffiliateConfigCache } from '../affiliate/affiliate-links.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
@@ -36,6 +36,8 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
 
   prisma = app.get(PrismaService).client;
+  // SPEC-029: rotas são validadas no catálogo de lugares.
+  await syncPlacesCatalog(prisma, TEST_PLACES, new Date());
 }, 120_000);
 
 afterAll(async () => {

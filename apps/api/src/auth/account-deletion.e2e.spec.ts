@@ -6,7 +6,7 @@ import { Test } from '@nestjs/testing';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { PrismaClient } from '@flight-watch/database';
+import { type PrismaClient, TEST_PLACES, syncPlacesCatalog } from '@flight-watch/database';
 import { AppModule } from '../app.module.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -34,6 +34,8 @@ beforeAll(async () => {
   registerCorrelationHook(app);
   await app.getHttpAdapter().getInstance().ready();
   prisma = app.get(PrismaService).client;
+  // SPEC-029: rotas são validadas no catálogo de lugares.
+  await syncPlacesCatalog(prisma, TEST_PLACES, new Date());
 }, 120_000);
 
 afterAll(async () => {

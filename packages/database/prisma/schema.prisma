@@ -500,3 +500,36 @@ model FlightSearchOffer {
   @@index([flightSearchId])
   @@map("flight_search_offers")
 }
+
+// ---- Catálogo de lugares (SPEC-029, ADR-008) ----
+
+enum PlaceKind {
+  CITY
+  AIRPORT
+}
+
+// Cidades e aeroportos sincronizados da Travelpayouts. Chave (code, kind):
+// código de cidade e de aeroporto coincidem com frequência (BSB é os dois).
+model Place {
+  code        String
+  kind        PlaceKind
+  name        String
+  // Para cidade, o próprio código.
+  cityCode    String
+  countryCode String
+  countryName String
+  timeZone    String?
+  latitude    Float?
+  longitude   Float?
+  // Cidade com aeroporto comercial / aeroporto com voo comercial. Lugar que
+  // sumiu da fonte vira false em vez de ser apagado.
+  searchable  Boolean
+  // Texto normalizado (sem acento, minúsculo) para o autocomplete.
+  searchText  String
+  syncedAt    DateTime
+
+  @@id([code, kind])
+  @@index([kind, searchable])
+  @@index([cityCode])
+  @@map("places")
+}

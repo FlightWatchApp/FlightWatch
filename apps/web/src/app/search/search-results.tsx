@@ -59,8 +59,9 @@ export function SearchResults({ search, embedded = false }: SearchResultsProps) 
             <RouteLine
               origin={search.origin}
               destination={search.destination}
+              originName={search.originName}
+              destinationName={search.destinationName}
               size="lg"
-              showCities
             />
           </h2>
           <p className={styles.subtitle}>

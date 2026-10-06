@@ -110,7 +110,12 @@ export function DealCard({ opportunity, selected = false, compact = false }: Dea
         </div>
 
         <div className={styles.routeRow}>
-          <RouteLine origin={opportunity.origin} destination={opportunity.destination} showCities />
+          <RouteLine
+            origin={opportunity.origin}
+            destination={opportunity.destination}
+            originName={opportunity.originName}
+            destinationName={opportunity.destinationName}
+          />
         </div>
 
         <div className={styles.meta}>

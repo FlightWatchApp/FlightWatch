@@ -117,8 +117,9 @@ O Claude não deve aumentar este arquivo com detalhes efêmeros. Detalhes extens
 
 ### 1.3 Bloqueios e decisões pendentes
 
-- `BLOQUEADO`: integração real depende de esclarecimento/aceite contratual da Duffel sobre metasearch e polling recorrente.
-- `BLOQUEADO`: nenhum provedor real deve entrar em produção antes da validação jurídica/comercial.
+- `APROVADO` (ADR-008): fonte de preços da Fase 1 é a Travelpayouts Data API (cache, um preço por dia, por cidade); a Duffel foi descartada para este modelo. Busca em tempo real (Fase 2) exige 50 mil MAU.
+- `APROVADO` (owner, 2026-10-06): escopo **integral** — qualquer cidade com voo comercial, nacional e internacional.
+- `BLOQUEADO`: produção com provider real depende do marker de afiliado e da revisão dos termos de uso da Travelpayouts pelo owner.
 - `PROPOSTO`: canal inicial comercial de notificação. E-mail existe no fluxo simulado; WhatsApp não está aprovado como canal inicial.
 - `PROPOSTO`: monetização e limites de plano.
 - `PROPOSTO`: intervalos finais de polling e orçamento por classe.
@@ -403,6 +404,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - `AcquireScheduleLease`;
 - `ReconcileAbandonedLeases`;
 - `ExpireWatches`;
+- `SyncPlacesCatalog` (SPEC-029: catálogo de cidades/aeroportos, no startup se vazio ou com 7+ dias e a cada 24 h; `places:sync` força).
 - `EnforceProviderBudget`.
 
 **Job produzido:** `PriceCheckRequested.v1`.
@@ -552,23 +554,24 @@ Cada package deve exportar uma superfície pública pequena. Não importar arqui
 
 ## 8. Models e invariantes centrais
 
-| Model                              | Papel                                              | Invariantes essenciais                                                         |
-| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `User`                             | proprietário                                       | somente ativo usa canal verificado                                             |
-| `NotificationChannel`              | destino autorizado                                 | pertence ao usuário; verificado; revogável                                     |
-| `Watch`                            | intenção individual                                | terminal não retorna a ativo                                                   |
-| `AlertRule`                        | condição versionada                                | fórmula/referência explícitas                                                  |
-| `SearchTarget`                     | busca compartilhada                                | fingerprint único por schema                                                   |
-| `SearchExecution`                  | tentativa lógica                                   | chave idempotente; status tipado                                               |
-| `FlightOffer`                      | oferta normalizada                                 | total, moeda, passageiros e itinerário válidos                                 |
-| `PriceObservation`                 | fotografia imutável                                | nunca atualizar preço/itinerário                                               |
-| `AlertEvent`                       | regra atendida                                     | deduplication key única                                                        |
-| `NotificationDelivery`             | tentativa de entrega                               | delivery key única por canal/template                                          |
-| `Provider`                         | integração                                         | estado, capacidade e estratégia                                                |
-| `ProviderQuota`                    | orçamento/cota                                     | não permitir consumo invisível                                                 |
-| `OutboxEvent`                      | publicação eventual                                | criado no mesmo commit do domínio                                              |
-| `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas              |
-| `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019) |
+| Model                              | Papel                                              | Invariantes essenciais                                                              |
+| ---------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `User`                             | proprietário                                       | somente ativo usa canal verificado                                                  |
+| `NotificationChannel`              | destino autorizado                                 | pertence ao usuário; verificado; revogável                                          |
+| `Watch`                            | intenção individual                                | terminal não retorna a ativo                                                        |
+| `AlertRule`                        | condição versionada                                | fórmula/referência explícitas                                                       |
+| `SearchTarget`                     | busca compartilhada                                | fingerprint único por schema                                                        |
+| `SearchExecution`                  | tentativa lógica                                   | chave idempotente; status tipado                                                    |
+| `FlightOffer`                      | oferta normalizada                                 | total, moeda, passageiros e itinerário válidos                                      |
+| `PriceObservation`                 | fotografia imutável                                | nunca atualizar preço/itinerário                                                    |
+| `AlertEvent`                       | regra atendida                                     | deduplication key única                                                             |
+| `NotificationDelivery`             | tentativa de entrega                               | delivery key única por canal/template                                               |
+| `Provider`                         | integração                                         | estado, capacidade e estratégia                                                     |
+| `ProviderQuota`                    | orçamento/cota                                     | não permitir consumo invisível                                                      |
+| `OutboxEvent`                      | publicação eventual                                | criado no mesmo commit do domínio                                                   |
+| `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas                   |
+| `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019)      |
+| `Place`                            | cidade ou aeroporto do catálogo (SPEC-029)         | chave `(code, kind)`; nunca apagado, só `searchable=false`; nenhuma lista no código |
 
 ### 8.1 Dinheiro
 

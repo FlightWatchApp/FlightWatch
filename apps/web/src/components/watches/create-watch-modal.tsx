@@ -3,19 +3,20 @@
 import { type FormEvent, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { PlaceCombobox } from '@/components/places/place-combobox';
+import type { SelectedPlace } from '@/components/places/place-options';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
 import { IconPlus } from '@/components/ui/icon';
-import { airportLabel } from '@/lib/domain/airport-coordinates';
 import { parseAmountMinor } from '@/lib/domain/money';
 import type { TripType, WatchDetail } from '@/lib/api/types';
 import { createWatchAction } from '@/app/watches/new/actions';
 import { WatchCreatedSummary } from './watch-created-summary';
 import styles from './create-watch-modal.module.css';
 
-const SUPPORTED_AIRPORTS = ['DOU', 'GRU', 'GIG', 'CGH', 'BSB', 'JFK', 'MIA'];
+// Moedas aceitas pela API — decisão de negócio. Cidades vêm do catálogo (SPEC-029).
 const SUPPORTED_CURRENCIES = ['BRL', 'USD'];
 
 export interface CreateWatchModalProps {
@@ -32,8 +33,8 @@ export function CreateWatchModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const [origin, setOrigin] = useState(SUPPORTED_AIRPORTS[0] ?? '');
-  const [destination, setDestination] = useState(SUPPORTED_AIRPORTS[1] ?? '');
+  const [origin, setOrigin] = useState<SelectedPlace | null>(null);
+  const [destination, setDestination] = useState<SelectedPlace | null>(null);
   const [tripType, setTripType] = useState<TripType>('ONE_WAY');
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
@@ -57,8 +58,12 @@ export function CreateWatchModal({
     event.preventDefault();
     setFormError(null);
 
-    if (!origin || !destination || origin === destination) {
-      setFormError('Origem e destino precisam ser diferentes.');
+    if (!origin || !destination) {
+      setFormError('Escolha a cidade de origem e a de destino na lista.');
+      return;
+    }
+    if (origin.code === destination.code) {
+      setFormError('Origem e destino precisam ser cidades diferentes.');
       return;
     }
     if (!departureDate) {
@@ -78,8 +83,8 @@ export function CreateWatchModal({
     startTransition(() => {
       void (async () => {
         const result = await createWatchAction({
-          origin,
-          destination,
+          origin: origin.code,
+          destination: destination.code,
           tripType,
           departureDate,
           returnDate: tripType === 'ROUND_TRIP' ? returnDate : null,
@@ -130,36 +135,24 @@ export function CreateWatchModal({
             <div className={styles.row}>
               <FormField label="Origem" required>
                 {(field) => (
-                  <Select
+                  <PlaceCombobox
                     id={field.id}
                     aria-describedby={field.describedBy}
                     invalid={field.invalid}
                     value={origin}
-                    onChange={(event) => setOrigin(event.target.value)}
-                  >
-                    {SUPPORTED_AIRPORTS.map((code) => (
-                      <option key={code} value={code}>
-                        {airportLabel(code)}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setOrigin}
+                  />
                 )}
               </FormField>
               <FormField label="Destino" required>
                 {(field) => (
-                  <Select
+                  <PlaceCombobox
                     id={field.id}
                     aria-describedby={field.describedBy}
                     invalid={field.invalid}
                     value={destination}
-                    onChange={(event) => setDestination(event.target.value)}
-                  >
-                    {SUPPORTED_AIRPORTS.map((code) => (
-                      <option key={code} value={code}>
-                        {airportLabel(code)}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setDestination}
+                  />
                 )}
               </FormField>
             </div>

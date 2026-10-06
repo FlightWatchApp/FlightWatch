@@ -79,6 +79,9 @@ export interface WatchSummary {
   status: WatchStatus;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
   tripType: TripType;
   departureDate: string;
   returnDate: string | null;
@@ -132,6 +135,9 @@ export interface FlightSearchResult {
   status: FlightSearchStatus;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
   tripType: TripType;
   departureDate: string;
   returnDate: string | null;
@@ -177,10 +183,24 @@ export interface OpportunityItem {
   searchTargetId: string;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
+  /** SPEC-029: coordenadas da cidade para o mapa; null sem cadastro. */
+  originCoordinates: Coordinates | null;
+  destinationCoordinates: Coordinates | null;
   tripType: TripType;
   market: string;
   departureDate: string;
   returnDate: string | null;
   deal: Deal;
   offer: OpportunityOffer;
+}
+
+/** SPEC-029: cidade do catálogo, com os aeroportos comerciais dela. */
+export type { Place } from '@flight-watch/contracts';
+
+export interface Coordinates {
+  lat: number;
+  lng: number;
 }

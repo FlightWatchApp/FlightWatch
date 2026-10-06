@@ -1,6 +1,7 @@
 import { ConfigError, loadConfig, schedulerConfig } from '@flight-watch/config';
 import { createPrismaClient } from '@flight-watch/database';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
+import { fetchTravelpayoutsPlaces } from '@flight-watch/providers';
 import {
   createNotificationOutboxHandler,
   createNotificationQueue,
@@ -12,7 +13,12 @@ import {
   publishPendingOutboxEvents,
 } from '@flight-watch/queue';
 import { createSchedulerMetrics } from './metrics.js';
+import { PLACES_SOURCE_TIMEOUT_MS, runPlacesSync } from './places-sync.js';
 import { runSchedulerTick } from './tick.js';
+
+// SPEC-029: a decisão de baixar (vazio ou com 7 dias ou mais) é de
+// runPlacesSync; este intervalo só define a frequência da verificação.
+const PLACES_SYNC_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function main(): Promise<void> {
   // SPEC-024: configuração validada uma vez; inválida impede o startup.
@@ -94,9 +100,21 @@ async function main(): Promise<void> {
   const interval = setInterval(() => void tick(), config.SCHEDULER_TICK_INTERVAL_MS);
   void tick();
 
+  // SPEC-029: não bloqueia o agendamento; falha mantém o catálogo anterior.
+  const syncPlaces = () =>
+    runPlacesSync({
+      prisma,
+      fetchPlaces: () => fetchTravelpayoutsPlaces({ timeoutMs: PLACES_SOURCE_TIMEOUT_MS }),
+      metrics,
+      now: () => new Date(),
+    });
+  const placesInterval = setInterval(() => void syncPlaces(), PLACES_SYNC_CHECK_INTERVAL_MS);
+  void syncPlaces();
+
   async function shutdown(): Promise<void> {
     logEvent({ event: 'scheduler_shutting_down' });
     clearInterval(interval);
+    clearInterval(placesInterval);
     await new Promise<void>((resolve) => metricsServer.close(() => resolve()));
     await priceCheckQueue.close();
     await priceObservedQueue.close();

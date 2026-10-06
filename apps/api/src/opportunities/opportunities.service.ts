@@ -23,6 +23,7 @@ import type {
 } from '@flight-watch/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
+import { PlacesService } from '../places/places.service.js';
 
 /** SPEC-015 §"Comportamento de domínio": string em português, só existe aqui
  * — não no domínio (locale-independente) nem no frontend (resposta pública
@@ -41,7 +42,16 @@ function explainDeal(classification: DealClassification): string {
   return '';
 }
 
-function sortOpportunities(items: OpportunityItem[], sort: ListOpportunitiesQuery['sort']): void {
+/** Sem nomes/coordenadas: o serviço completa em lote (SPEC-029). */
+type OpportunityItemBase = Omit<
+  OpportunityItem,
+  'originName' | 'destinationName' | 'originCoordinates' | 'destinationCoordinates'
+>;
+
+function sortOpportunities(
+  items: OpportunityItemBase[],
+  sort: ListOpportunitiesQuery['sort'],
+): void {
   switch (sort) {
     case 'lowest_price':
       items.sort((a, b) => a.offer.amountMinor - b.offer.amountMinor);
@@ -70,16 +80,23 @@ export class OpportunitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly places: PlacesService,
   ) {}
 
   /** SPEC-015 §"Comportamento de domínio": ver a spec pra o raciocínio completo do scan em 2 passos. */
   async listOpportunities(query: ListOpportunitiesQuery): Promise<ListOpportunitiesResponse> {
+    // SPEC-029: filtro por aeroporto (GRU) também acha a cidade dele (SAO), e
+    // o código digitado continua valendo para alvos gravados antes da spec.
+    const [originCodes, destinationCodes] = await Promise.all([
+      this.filterCodes(query.origin),
+      this.filterCodes(query.destination),
+    ]);
     const asOf = new Date();
     const candidates = await listCandidateSearchTargetsForOpportunities(this.prisma.client, {
       asOf,
     });
     const filteredCandidates = candidates.filter((candidate) =>
-      this.matchesTargetFilters(candidate, query),
+      this.matchesTargetFilters(candidate, query, originCodes, destinationCodes),
     );
 
     const stats = await summarizeObservationStats(
@@ -87,7 +104,7 @@ export class OpportunitiesService {
       filteredCandidates.map((candidate) => candidate.id),
     );
 
-    const items: OpportunityItem[] = [];
+    const items: OpportunityItemBase[] = [];
     for (const candidate of filteredCandidates) {
       const stat = stats.get(candidate.id);
       if (!stat) {
@@ -111,16 +128,27 @@ export class OpportunitiesService {
 
     sortOpportunities(items, query.sort);
 
+    // SPEC-029: nomes e coordenadas numa consulta em lote, depois de ordenar.
+    const opportunities = await this.places.withRouteNamesAndCoordinates(items);
     this.metrics.opportunitiesFeedFetchTotal.inc({ result: 'success' });
-    return { opportunities: items, total: items.length };
+    return { opportunities, total: opportunities.length };
+  }
+
+  /** Código do filtro e a cidade dele no catálogo; null quando não há filtro. */
+  private async filterCodes(code: string | undefined): Promise<Set<string> | null> {
+    if (!code) return null;
+    const city = await this.places.resolveCity(code);
+    return new Set(city ? [code, city] : [code]);
   }
 
   private matchesTargetFilters(
     candidate: OpportunityCandidateSearchTarget,
     query: ListOpportunitiesQuery,
+    originCodes: Set<string> | null,
+    destinationCodes: Set<string> | null,
   ): boolean {
-    if (query.origin && candidate.originIata !== query.origin) return false;
-    if (query.destination && candidate.destinationIata !== query.destination) return false;
+    if (originCodes && !originCodes.has(candidate.originIata)) return false;
+    if (destinationCodes && !destinationCodes.has(candidate.destinationIata)) return false;
     if (query.tripType && candidate.tripType !== query.tripType) return false;
     if (query.departureDateFrom && candidate.departureDate < new Date(query.departureDateFrom)) {
       return false;
@@ -137,7 +165,7 @@ export class OpportunitiesService {
     lowestEver: { totalAmountMinor: number; currency: string },
     stat: { observationCount: number; averageAmountMinor: number },
     query: ListOpportunitiesQuery,
-  ): OpportunityItem | null {
+  ): OpportunityItemBase | null {
     const classification = classifyDeal({
       currentAmount: { amountMinor: latest.totalAmountMinor, currency: latest.currency },
       lowestEverAmount: { amountMinor: lowestEver.totalAmountMinor, currency: lowestEver.currency },

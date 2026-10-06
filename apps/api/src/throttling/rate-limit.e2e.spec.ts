@@ -6,9 +6,11 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { LOCAL_INTERNAL_API_SECRET } from '@flight-watch/config';
+import { TEST_PLACES, syncPlacesCatalog } from '@flight-watch/database';
 import { CLIENT_IP_HEADER, INTERNAL_SECRET_HEADER } from '@flight-watch/contracts';
 import { AppModule } from '../app.module.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
  * SPEC-025 — app próprio com limites baixos. A configuração é lida quando o
@@ -41,6 +43,8 @@ beforeAll(async () => {
   await app.init();
   registerCorrelationHook(app);
   await app.getHttpAdapter().getInstance().ready();
+  // SPEC-029: rotas são validadas no catálogo de lugares.
+  await syncPlacesCatalog(app.get(PrismaService).client, TEST_PLACES, new Date());
 }, 120_000);
 
 afterAll(async () => {

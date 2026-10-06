@@ -7,6 +7,13 @@ export default defineConfig({
     include: ['src/**/*.spec.ts'],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    // Cada arquivo e2e sobe o próprio PostgreSQL (Testcontainers). Sem teto, o
+    // Vitest roda um arquivo por núcleo e, somado aos outros pacotes que o
+    // turbo executa em paralelo, dezenas de containers sobem juntos e estouram
+    // o hookTimeout (achado ao adicionar os e2e da SPEC-029 numa máquina de 20
+    // núcleos). 4 mantém a suíte rápida sem disputar recursos.
+    maxWorkers: 4,
+    minWorkers: 1,
     // SPEC-014: RATE_LIMIT_MAX é lido uma única vez, na primeira importação
     // de searches.module.ts (decorator @Module avaliado em tempo de classe)
     // — precisa estar em process.env ANTES de qualquer arquivo de teste

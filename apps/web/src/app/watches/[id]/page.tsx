@@ -59,8 +59,9 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
             <RouteLine
               origin={watch.origin}
               destination={watch.destination}
+              originName={watch.originName}
+              destinationName={watch.destinationName}
               size="lg"
-              showCities
               animated
             />
           </h1>

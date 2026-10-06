@@ -16,3 +16,4 @@ export * from './searches/create-flight-search.js';
 export * from './searches/derive-watch.js';
 export * from './searches/errors.js';
 export * from './opportunities/list-opportunities.js';
+export * from './places/places.js';
