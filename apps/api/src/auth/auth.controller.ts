@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, UseFilters, UseGuards } from '@nestjs/common';
 import type {
   AuthenticatedUser,
+  DeleteAccountRequest,
   LoginRequest,
   LoginResponse,
   PasswordResetConfirm,
@@ -15,6 +16,7 @@ import { AuthService } from './auth.service.js';
 import { AuthErrorFilter } from './auth-error.filter.js';
 import { CurrentSessionToken } from './current-session-token.decorator.js';
 import { CurrentUser } from './current-user.decorator.js';
+import { DeleteAccountValidationPipe } from './delete-account.pipe.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
 import { LoginValidationPipe } from './login.pipe.js';
 import {
@@ -104,5 +106,18 @@ export class AuthController {
     @CurrentCorrelationId() correlationId: string,
   ): Promise<void> {
     await this.authService.confirmPasswordReset(body.token, body.password, correlationId);
+  }
+
+  // SPEC-027: exige sessão e a senha atual; anonimiza a conta.
+  @Post('delete-account')
+  @HttpCode(204)
+  @UseGuards(SessionAuthGuard)
+  @AuthRateLimited()
+  async deleteAccount(
+    @CurrentUser() userId: string,
+    @Body(DeleteAccountValidationPipe) body: DeleteAccountRequest,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.deleteAccount(userId, body.password, correlationId);
   }
 }

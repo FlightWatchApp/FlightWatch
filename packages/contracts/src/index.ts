@@ -8,6 +8,7 @@ export * from './auth/register.js';
 export * from './auth/login.js';
 export * from './auth/verify-email.js';
 export * from './auth/password-reset.js';
+export * from './auth/delete-account.js';
 export * from './shared/internal-headers.js';
 export * from './shared/trip-fields.js';
 export * from './shared/trip-validation.js';

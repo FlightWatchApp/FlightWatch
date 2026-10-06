@@ -295,6 +295,83 @@ export class AuthService {
     });
   }
 
+  /** SPEC-027: `auth_account_deletion_total{result}`. */
+  async deleteAccount(userId: string, password: string, correlationId: string): Promise<void> {
+    try {
+      await this.doDeleteAccount(userId, password);
+      this.metrics.authAccountDeletionTotal.inc({ result: 'success' });
+      logEvent({ event: 'auth_account_deleted', userId, correlationId });
+    } catch (error) {
+      const result = error instanceof AuthError ? error.errorCode.toLowerCase() : 'internal_error';
+      this.metrics.authAccountDeletionTotal.inc({ result });
+      logEvent({ event: 'auth_account_deletion_failed', userId, result, correlationId });
+      throw error;
+    }
+  }
+
+  /**
+   * SPEC-027: anonimiza em vez de apagar linhas — alertas e entregas ficam
+   * como auditoria, sem dado pessoal. Tudo numa transação.
+   */
+  private async doDeleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.prisma.client.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new AuthError('ACCOUNT_LOCKED', 'account temporarily locked');
+    }
+    if (!(await verifyPassword(user.passwordHash, password))) {
+      // Conta como tentativa falha: o endpoint não vira atalho de força bruta.
+      await this.registerFailedLoginAttempt(user);
+      throw new AuthError('INVALID_CREDENTIALS', 'invalid password');
+    }
+
+    // Hash Argon2 válido de bytes aleatórios descartados: nenhuma senha o
+    // satisfaz, e um login no e-mail anonimizado responde 401, não 500.
+    const unusablePasswordHash = await hashPassword(generateOpaqueToken());
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          status: 'DELETED',
+          email: `deleted-${userId}@deleted.invalid`,
+          timezone: 'UTC',
+          passwordHash: unusablePasswordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+      await tx.session.deleteMany({ where: { userId } });
+
+      const channels = await tx.notificationChannel.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      for (const channel of channels) {
+        // version + 1: entrega já enfileirada não reaproveita a chave do
+        // destino antigo (SPEC-006 §5); REVOKED faz o worker suprimir o envio
+        // com registro auditável (EVAL-NOTIFY-004).
+        await tx.notificationChannel.update({
+          where: { id: channel.id },
+          data: {
+            status: 'REVOKED',
+            destination: `deleted-${channel.id}@deleted.invalid`,
+            verificationTokenHash: null,
+            verificationTokenExpiresAt: null,
+            version: { increment: 1 },
+          },
+        });
+      }
+
+      // Mesma transição do "encerrar" da SPEC-008; watches terminais não mudam.
+      await tx.watch.updateMany({
+        where: { userId, status: { in: ['ACTIVE', 'PAUSED'] } },
+        data: { status: 'CANCELLED', version: { increment: 1 } },
+      });
+    });
+  }
+
   /** SPEC-007 §13: `auth_login_total{result}` — success/invalid_credentials/locked/account_not_active. */
   async login(request: LoginRequest): Promise<AuthSessionResponse> {
     try {

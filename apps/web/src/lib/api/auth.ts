@@ -63,3 +63,11 @@ export async function confirmPasswordReset(token: string, password: string): Pro
     body: JSON.stringify({ token, password }),
   });
 }
+
+/** SPEC-027: anonimiza a conta; a API exige sessão e a senha atual. */
+export async function deleteAccount(password: string): Promise<void> {
+  await apiFetch<undefined>('/v1/auth/delete-account', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}

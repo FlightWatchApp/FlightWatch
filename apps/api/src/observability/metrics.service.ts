@@ -78,6 +78,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-027 §"Observabilidade". */
+  readonly authAccountDeletionTotal = new Counter({
+    name: 'auth_account_deletion_total',
+    help: 'Exclusões de conta pelo próprio usuário, por resultado — success/invalid_credentials/account_locked (SPEC-027).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
   /** SPEC-018 §"Observabilidade". */
   readonly watchPurchaseLinkClickTotal = new Counter({
     name: 'watch_purchase_link_click_total',
