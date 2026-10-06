@@ -13,6 +13,7 @@ import {
   createRedisConnection,
   type NotificationRequestedJob,
 } from '@flight-watch/queue';
+import { buildWatchManagementUrl } from './links.js';
 import { createNotificationWorkerMetrics } from './metrics.js';
 import { processNotificationJob } from './process-job.js';
 
@@ -26,10 +27,8 @@ async function main(): Promise<void> {
   const config = loadConfig(notificationWorkerConfig, process.env);
   const staleSendingThresholdMs = config.NOTIFICATION_STALE_SENDING_THRESHOLD_MS;
 
-  // Rota ainda inexistente no apps/web — corrigida junto do e-mail real
-  // (bloqueador 2 do lançamento), que também traz o descadastro em um clique.
   function buildUnsubscribeUrl(watchId: string): string {
-    return `${config.WEB_BASE_URL}/watches/${watchId}/preferences`;
+    return buildWatchManagementUrl(config.WEB_BASE_URL, watchId);
   }
 
   const metrics = createNotificationWorkerMetrics();
