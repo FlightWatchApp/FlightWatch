@@ -70,6 +70,30 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-026 §"Observabilidade". */
+  readonly authPasswordResetTotal = new Counter({
+    name: 'auth_password_reset_total',
+    help: 'Recuperação de senha por etapa e resultado — request: sent/ignored; confirm: success/invalid_reset_token/reset_token_expired (SPEC-026).',
+    labelNames: ['step', 'result'],
+    registers: [this.registry],
+  });
+
+  /** SPEC-027 §"Observabilidade". */
+  readonly authAccountDeletionTotal = new Counter({
+    name: 'auth_account_deletion_total',
+    help: 'Exclusões de conta pelo próprio usuário, por resultado — success/invalid_credentials/account_locked (SPEC-027).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
+  /** SPEC-031: aberturas do calendário de preços, por resultado. */
+  readonly priceCalendarFetchTotal = new Counter({
+    name: 'price_calendar_fetch_total',
+    help: 'Consultas ao calendário de preços, por resultado — success/empty/provider_error/not_supported (SPEC-031).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
   /** SPEC-018 §"Observabilidade". */
   readonly watchPurchaseLinkClickTotal = new Counter({
     name: 'watch_purchase_link_click_total',

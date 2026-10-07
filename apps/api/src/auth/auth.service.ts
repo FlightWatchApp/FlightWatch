@@ -9,8 +9,9 @@ import {
 import type { NotificationChannel, Prisma, PrismaClient, User } from '@flight-watch/database';
 import { isUniqueConstraintViolation } from '@flight-watch/database';
 import type { EmailSender } from '@flight-watch/notifications';
-import { renderVerificationEmail } from '@flight-watch/notifications';
+import { renderPasswordResetEmail, renderVerificationEmail } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
+import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { EMAIL_SENDER } from './email-sender.token.js';
@@ -23,11 +24,8 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // SPEC-010 §7: prazo do token de confirmação de e-mail.
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
-// SPEC-010 §3: a base do link aponta pro apps/web (onde a página /verify-email
-// existe), não pro apps/api — diferente do WEB_BASE_URL de
-// apps/notification-worker/src/main.ts, cujo default (porta 3000, a do
-// próprio apps/api) parece um bug pré-existente fora do escopo desta spec.
-const WEB_BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3100';
+// SPEC-026: prazo do link de redefinição de senha.
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 // Mitigação de enumeração por tempo de resposta (SPEC-007 §6): verificado
 // mesmo quando o email não existe, pra login com email inexistente não ser
@@ -53,6 +51,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
+    @Inject(API_CONFIG) private readonly config: ApiConfig,
   ) {}
 
   /** SPEC-007 §13: `auth_register_total{result}`. */
@@ -119,7 +118,8 @@ export class AuthService {
   }
 
   private async sendVerificationEmail(email: string, token: string): Promise<void> {
-    const verificationUrl = `${WEB_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    // SPEC-010 §3: o link aponta para o apps/web, onde a página /verify-email existe.
+    const verificationUrl = `${this.config.WEB_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
     const rendered = renderVerificationEmail({ verificationUrl });
     await this.emailSender.send({
       to: email,
@@ -197,6 +197,179 @@ export class AuthService {
       logEvent({ event: 'verification_email_send_failed', error });
     });
     return 'sent';
+  }
+
+  /**
+   * SPEC-026: resolve igual exista a conta ou não (sem enumeração). O envio do
+   * e-mail não é aguardado, para o tempo de resposta não revelar a conta.
+   */
+  async requestPasswordReset(email: string, correlationId: string): Promise<void> {
+    const user = await this.prisma.client.user.findUnique({ where: { email } });
+    if (!user || user.status !== 'ACTIVE') {
+      this.metrics.authPasswordResetTotal.inc({ step: 'request', result: 'ignored' });
+      logEvent({ event: 'auth_password_reset_request', result: 'ignored', correlationId });
+      return;
+    }
+
+    const token = generateOpaqueToken();
+    await this.prisma.client.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: hashOpaqueToken(token),
+        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+      },
+    });
+    void this.sendPasswordResetEmail(user.email, token).catch((error: unknown) => {
+      logEvent({ event: 'password_reset_email_send_failed', error, correlationId });
+    });
+
+    this.metrics.authPasswordResetTotal.inc({ step: 'request', result: 'sent' });
+    logEvent({ event: 'auth_password_reset_request', result: 'sent', correlationId });
+  }
+
+  private async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    const resetUrl = `${this.config.WEB_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    const rendered = renderPasswordResetEmail({
+      resetUrl,
+      expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MS / 60_000,
+    });
+    await this.emailSender.send({
+      to: email,
+      subject: rendered.subject,
+      textBody: rendered.textBody,
+      idempotencyKey: `password-reset-${hashOpaqueToken(token)}`,
+    });
+  }
+
+  /** SPEC-026: `auth_password_reset_total{step="confirm",result}`. */
+  async confirmPasswordReset(
+    token: string,
+    password: string,
+    correlationId: string,
+  ): Promise<void> {
+    try {
+      await this.doConfirmPasswordReset(token, password);
+      this.metrics.authPasswordResetTotal.inc({ step: 'confirm', result: 'success' });
+      logEvent({ event: 'auth_password_reset_confirm', result: 'success', correlationId });
+    } catch (error) {
+      const result = error instanceof AuthError ? error.errorCode.toLowerCase() : 'internal_error';
+      this.metrics.authPasswordResetTotal.inc({ step: 'confirm', result });
+      logEvent({ event: 'auth_password_reset_confirm', result, correlationId });
+      throw error;
+    }
+  }
+
+  private async doConfirmPasswordReset(token: string, password: string): Promise<void> {
+    const tokenHash = hashOpaqueToken(token);
+    const user = await this.prisma.client.user.findUnique({
+      where: { passwordResetTokenHash: tokenHash },
+    });
+    // Conta que deixou de estar ACTIVE responde como token inválido: não
+    // revela o estado da conta a quem só tem o link.
+    if (!user || user.status !== 'ACTIVE') {
+      throw new AuthError('INVALID_RESET_TOKEN', 'invalid password reset token');
+    }
+    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
+      throw new AuthError('RESET_TOKEN_EXPIRED', 'password reset token expired');
+    }
+
+    const passwordHash = await hashPassword(password);
+    await this.prisma.client.$transaction(async (tx) => {
+      // Condiciona ao hash ainda gravado: dois confirms concorrentes com o
+      // mesmo token — só um vence (uso único).
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, passwordResetTokenHash: tokenHash },
+        data: {
+          passwordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+      if (updated.count === 0) {
+        throw new AuthError('INVALID_RESET_TOKEN', 'invalid password reset token');
+      }
+      // Quem tinha acesso indevido à conta perde a sessão.
+      await tx.session.deleteMany({ where: { userId: user.id } });
+    });
+  }
+
+  /** SPEC-027: `auth_account_deletion_total{result}`. */
+  async deleteAccount(userId: string, password: string, correlationId: string): Promise<void> {
+    try {
+      await this.doDeleteAccount(userId, password);
+      this.metrics.authAccountDeletionTotal.inc({ result: 'success' });
+      logEvent({ event: 'auth_account_deleted', userId, correlationId });
+    } catch (error) {
+      const result = error instanceof AuthError ? error.errorCode.toLowerCase() : 'internal_error';
+      this.metrics.authAccountDeletionTotal.inc({ result });
+      logEvent({ event: 'auth_account_deletion_failed', userId, result, correlationId });
+      throw error;
+    }
+  }
+
+  /**
+   * SPEC-027: anonimiza em vez de apagar linhas — alertas e entregas ficam
+   * como auditoria, sem dado pessoal. Tudo numa transação.
+   */
+  private async doDeleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.prisma.client.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new AuthError('ACCOUNT_LOCKED', 'account temporarily locked');
+    }
+    if (!(await verifyPassword(user.passwordHash, password))) {
+      // Conta como tentativa falha: o endpoint não vira atalho de força bruta.
+      await this.registerFailedLoginAttempt(user);
+      throw new AuthError('INVALID_CREDENTIALS', 'invalid password');
+    }
+
+    // Hash Argon2 válido de bytes aleatórios descartados: nenhuma senha o
+    // satisfaz, e um login no e-mail anonimizado responde 401, não 500.
+    const unusablePasswordHash = await hashPassword(generateOpaqueToken());
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          status: 'DELETED',
+          email: `deleted-${userId}@deleted.invalid`,
+          timezone: 'UTC',
+          passwordHash: unusablePasswordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+      await tx.session.deleteMany({ where: { userId } });
+
+      const channels = await tx.notificationChannel.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      for (const channel of channels) {
+        // version + 1: entrega já enfileirada não reaproveita a chave do
+        // destino antigo (SPEC-006 §5); REVOKED faz o worker suprimir o envio
+        // com registro auditável (EVAL-NOTIFY-004).
+        await tx.notificationChannel.update({
+          where: { id: channel.id },
+          data: {
+            status: 'REVOKED',
+            destination: `deleted-${channel.id}@deleted.invalid`,
+            verificationTokenHash: null,
+            verificationTokenExpiresAt: null,
+            version: { increment: 1 },
+          },
+        });
+      }
+
+      // Mesma transição do "encerrar" da SPEC-008; watches terminais não mudam.
+      await tx.watch.updateMany({
+        where: { userId, status: { in: ['ACTIVE', 'PAUSED'] } },
+        data: { status: 'CANCELLED', version: { increment: 1 } },
+      });
+    });
   }
 
   /** SPEC-007 §13: `auth_login_total{result}` — success/invalid_credentials/locked/account_not_active. */

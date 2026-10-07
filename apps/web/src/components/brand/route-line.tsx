@@ -1,12 +1,15 @@
-import { airportCity } from '@/lib/domain/airport-coordinates';
 import styles from './route-line.module.css';
 
 export interface RouteLineProps {
   origin: string;
   destination: string;
   size?: 'sm' | 'md' | 'lg';
-  /** Mostra a cidade embaixo do código IATA quando o aeroporto é conhecido. */
-  showCities?: boolean;
+  /**
+   * Nome da cidade embaixo do código (SPEC-029: vem da API, do catálogo).
+   * Ausente ou null mostra só o código.
+   */
+  originName?: string | null | undefined;
+  destinationName?: string | null | undefined;
   /** Desenha o arco ao montar (detalhe do monitoramento, hero). */
   animated?: boolean;
   /** Texto/traço claros para uso sobre fundo petróleo — mesmo padrão de `Logo`. */
@@ -17,19 +20,20 @@ export interface RouteLineProps {
  * CP-03: motivo gráfico da marca aplicado a uma rota real — origem (ponto
  * neutro) → arco tracejado → destino (ponto laranja, igual ao símbolo da
  * marca). Toda rota na interface usa este componente. Texto acessível
- * "GRU para MIA"; o arco é decorativo. Cidade e rótulo vêm de
- * `lib/domain/airport-coordinates.ts` — único lugar com essa lógica.
+ * "GRU para MIA"; o arco é decorativo. O nome da cidade vem pronto da API
+ * (SPEC-029) — nenhuma lista de aeroportos no web.
  */
 export function RouteLine({
   origin,
   destination,
   size = 'md',
-  showCities = false,
+  originName,
+  destinationName,
   animated = false,
   inverse = false,
 }: RouteLineProps) {
-  const originCity = showCities ? airportCity(origin) : null;
-  const destinationCity = showCities ? airportCity(destination) : null;
+  const originCity = originName ?? null;
+  const destinationCity = destinationName ?? null;
 
   return (
     <span

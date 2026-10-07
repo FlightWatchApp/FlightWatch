@@ -10,12 +10,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "places:sync": "node dist/sync-places.js"
   },
   "dependencies": {
+    "@flight-watch/config": "workspace:*",
     "@flight-watch/database": "workspace:*",
     "@flight-watch/domain": "workspace:*",
     "@flight-watch/observability": "workspace:*",
+    "@flight-watch/providers": "workspace:*",
     "@flight-watch/queue": "workspace:*"
   },
   "devDependencies": {

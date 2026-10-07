@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fareSummaryViewSchema } from '../shared/fare-summary.js';
 import { applyTripInvariants } from '../shared/trip-validation.js';
 import {
   currencyCodeSchema,
@@ -55,11 +56,13 @@ export const flightSearchOfferSchema = z.object({
   searchId: z.string().uuid(),
   provider: z.string(),
   segments: z.array(flightSearchOfferSegmentSchema),
+  // SPEC-030: preenchido (e `segments` vazio) quando a oferta é um resumo de tarifa.
+  fareSummary: fareSummaryViewSchema.nullable(),
   totalAmountMinor: z.number().int(),
   currency: z.string(),
   passengerCount: z.number().int(),
   cabin: z.string(),
-  durationMinutes: z.number().int(),
+  durationMinutes: z.number().int().nullable(),
   connectionsCount: z.number().int(),
   observedAt: z.string(),
   expiresAt: z.string().nullable(),
@@ -84,6 +87,9 @@ export const flightSearchResponseSchema = z.object({
   status: flightSearchStatusSchema,
   origin: z.string(),
   destination: z.string(),
+  // SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro.
+  originName: z.string().nullable(),
+  destinationName: z.string().nullable(),
   tripType: z.enum(['ONE_WAY', 'ROUND_TRIP']),
   departureDate: z.string(),
   returnDate: z.string().nullable(),
@@ -95,6 +101,11 @@ export const flightSearchResponseSchema = z.object({
   createdAt: z.string(),
   expiresAt: z.string().nullable(),
   offers: z.array(flightSearchOfferSchema),
+  /**
+   * SPEC-031: busca completa no site parceiro ("ver todos os voos"), validada
+   * pela allowlist e com afiliado; presente mesmo sem ofertas.
+   */
+  allFlightsUrl: z.string().url().nullable(),
 });
 
 export type FlightSearchResponse = z.infer<typeof flightSearchResponseSchema>;

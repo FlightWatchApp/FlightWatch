@@ -142,6 +142,7 @@ function baseDeps(emailSender: InMemoryEmailSender): NotificationWorkerDeps {
     emailSender,
     buildUnsubscribeUrl: (watchId) => `https://example.com/watches/${watchId}/preferences`,
     metrics: createNotificationWorkerMetrics(),
+    staleSendingThresholdMs: 5 * 60 * 1000,
   };
 }
 

@@ -18,6 +18,8 @@ export interface PurchaseButtonProps {
   /** Sobre fundo petróleo (card de destaque): preenchimento petróleo do
    * botão primário ficaria quase invisível sobre o próprio fundo. */
   inverse?: boolean;
+  /** SPEC-031: rótulo próprio (ex.: "Ver todos os voos"); padrão "Comprar passagem". */
+  label?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ export function PurchaseButton({
   watchId,
   context,
   inverse = false,
+  label: customLabel,
 }: PurchaseButtonProps) {
   const current = status === 'CURRENT';
   const classes = [
@@ -44,7 +47,7 @@ export function PurchaseButton({
   ]
     .filter(Boolean)
     .join(' ');
-  const label = current ? 'Comprar passagem' : 'Atualizar preço';
+  const label = customLabel ?? (current ? 'Comprar passagem' : 'Atualizar preço');
 
   return (
     <a

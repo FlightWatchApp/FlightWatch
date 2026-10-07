@@ -75,7 +75,7 @@ export function renderAlertEmail(data: AlertEmailTemplateData): RenderedEmail {
     '',
     `Observado em: ${formatObservedAt(data.observedAt, data.userTimezone)}. Preço e disponibilidade podem mudar até a compra.`,
     '',
-    `Cancelar ou ajustar este monitoramento: ${data.unsubscribeUrl}`,
+    `Pausar, ajustar ou encerrar este monitoramento: ${data.unsubscribeUrl}`,
   ].filter((line): line is string => line !== null);
 
   return { subject, textBody: lines.join('\n'), templateVersion: ALERT_EMAIL_TEMPLATE_VERSION };

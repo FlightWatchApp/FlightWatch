@@ -1,3 +1,31 @@
+# Desenvolvimento: `docker compose up -d` sobe só PostgreSQL e Redis.
+# Stack completa (SPEC-028): `docker compose --profile stack up --build`
+# sobe também migrações, API, workers e web (http://127.0.0.1:3100), com
+# APP_ENV=staging e as imagens do Dockerfile da raiz.
+
+x-stack-env: &stack-env
+  APP_ENV: staging
+  DATABASE_URL: postgresql://flight_watch:flight_watch@postgres:5432/flight_watch
+  REDIS_URL: redis://redis:6379
+  # 127.0.0.1 e não localhost: em staging a SPEC-025 rejeita os padrões de
+  # desenvolvimento (http://localhost:3100) para pegar cópia acidental.
+  WEB_BASE_URL: http://127.0.0.1:3100
+  # Só para esta stack local; em staging/produção vem do gerenciador de segredos.
+  INTERNAL_API_SECRET: local-stack-internal-secret-not-for-real-deploys
+  FLIGHT_PROVIDER: simulated
+  EMAIL_PROVIDER: simulated
+
+x-stack-service: &stack-service
+  build: &stack-build
+    context: .
+  profiles: [stack]
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -24,6 +52,85 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    build:
+      <<: *stack-build
+      target: migrate
+    profiles: [stack]
+    environment:
+      DATABASE_URL: postgresql://flight_watch:flight_watch@postgres:5432/flight_watch
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: api
+    environment:
+      <<: *stack-env
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  scheduler:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: scheduler
+    environment:
+      <<: *stack-env
+
+  price-worker:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: price-worker
+    environment:
+      <<: *stack-env
+
+  alert-worker:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: alert-worker
+    environment:
+      <<: *stack-env
+
+  notification-worker:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: notification-worker
+    environment:
+      <<: *stack-env
+
+  web:
+    <<: *stack-service
+    build:
+      <<: *stack-build
+      target: web
+    environment:
+      API_BASE_URL: http://api:3000
+      WEB_BASE_URL: http://127.0.0.1:3100
+      INTERNAL_API_SECRET: local-stack-internal-secret-not-for-real-deploys
+    ports:
+      - '3100:3100'
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   flight-watch-postgres:

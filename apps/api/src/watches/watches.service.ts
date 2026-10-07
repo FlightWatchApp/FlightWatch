@@ -21,8 +21,10 @@ import {
 import type { Prisma, WatchStatus } from '@flight-watch/database';
 import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import {
+  type PlaceSummary,
   SearchTargetFingerprintConflictError,
   findOrCreateSearchTarget,
+  findPlaceSummaries,
   getWatchDetailForUser,
   getWatchForUser,
   listWatchesForUser,
@@ -33,7 +35,8 @@ import {
 } from '@flight-watch/database';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
-import { isSupportedSearch } from './supported-catalog.js';
+import { PlacesService } from '../places/places.service.js';
+import { isSupportedCurrencyAndMarket } from './supported-catalog.js';
 
 // Placeholder até o produto definir o limite real por plano (PRODUCT.md §10).
 const MAX_ACTIVE_WATCHES_PER_USER = 20;
@@ -111,13 +114,18 @@ function alertRuleCreateData(rule: AlertRuleInput): Prisma.AlertRuleCreateWithou
   }
 }
 
-function toCreateWatchResponse(watch: WatchWithRelations): CreateWatchResponse {
+function toCreateWatchResponse(
+  watch: WatchWithRelations,
+  names: Map<string, PlaceSummary>,
+): CreateWatchResponse {
   return {
     id: watch.id,
     status: watch.status,
     search: {
       origin: watch.searchTarget.originIata,
       destination: watch.searchTarget.destinationIata,
+      originName: names.get(watch.searchTarget.originIata)?.name ?? null,
+      destinationName: names.get(watch.searchTarget.destinationIata)?.name ?? null,
       departureDate: watch.searchTarget.departureDate.toISOString().slice(0, 10),
       returnDate: watch.searchTarget.returnDate
         ? watch.searchTarget.returnDate.toISOString().slice(0, 10)
@@ -200,7 +208,11 @@ function toCurrentOffer(
   };
 }
 
-function toWatchListItem(item: WatchListItem): WatchListItemView {
+/** Sem `originName`/`destinationName`: os métodos públicos completam em lote (SPEC-029). */
+type WatchListItemBase = Omit<WatchListItemView, 'originName' | 'destinationName'>;
+type WatchDetailBase = Omit<WatchDetailResponse, 'originName' | 'destinationName'>;
+
+function toWatchListItem(item: WatchListItem): WatchListItemBase {
   const targetPriceRule = item.alertRules.find((rule) => rule.type === 'TARGET_PRICE');
   // A query em listWatchesForUser já filtra SCHEDULED/RUNNING, então o status
   // aqui é sempre uma das 5 chaves conhecidas — mas o índice de Record ainda
@@ -245,7 +257,7 @@ function toWatchListItem(item: WatchListItem): WatchListItemView {
 }
 
 /** SPEC-009 §7: mesma forma de `toWatchListItem`, com `priceHistory` a mais. */
-function toWatchDetailResponse(item: WatchDetailItem): WatchDetailResponse {
+function toWatchDetailResponse(item: WatchDetailItem): WatchDetailBase {
   return {
     ...toWatchListItem(item),
     priceHistory: item.priceHistory.map((point) => ({
@@ -262,13 +274,14 @@ export class WatchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly places: PlacesService,
   ) {}
 
   // PRODUCT.md §7.3, sem SPEC-00X própria — ver nota em
   // packages/contracts/src/watches/list-watches.ts.
   async listWatches(userId: string): Promise<ListWatchesResponse> {
     const items = await listWatchesForUser(this.prisma.client, userId);
-    const watches = items.map(toWatchListItem);
+    const watches = await this.places.withRouteNames(items.map(toWatchListItem));
     // SPEC-018 §8: mede cobertura real do CTA de compra — "existe preço" mas
     // "não existe link mostrável" é um dado operacional distinto de "sem
     // observação nenhuma" (esse segundo caso não é contado aqui).
@@ -315,7 +328,11 @@ export class WatchesService {
     }
     this.metrics.watchDetailFetchTotal.inc({ result: 'success' });
     logEvent({ event: 'watch_detail_fetch', watchId, result: 'success', correlationId });
-    return toWatchDetailResponse(item);
+    const [named] = await this.places.withRouteNames([toWatchDetailResponse(item)]);
+    if (!named) {
+      throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found');
+    }
+    return named;
   }
 
   // SPEC-008 §13: labels definidos pela spec são success/idempotent_noop/
@@ -343,7 +360,11 @@ export class WatchesService {
       const { item, result } = await this.doTransitionWatch(userId, watchId, action);
       this.metrics.watchLifecycleTransitionTotal.inc({ action, result });
       logEvent({ event: 'watch_lifecycle_transition', watchId, action, result, correlationId });
-      return item;
+      const [named] = await this.places.withRouteNames([item]);
+      if (!named) {
+        throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found after transition');
+      }
+      return named;
     } catch (error) {
       const result = this.mapLifecycleErrorToMetricResult(error);
       this.metrics.watchLifecycleTransitionTotal.inc({ action, result });
@@ -356,7 +377,7 @@ export class WatchesService {
     userId: string,
     watchId: string,
     action: WatchLifecycleAction,
-  ): Promise<{ item: WatchListItemView; result: 'success' | 'idempotent_noop' }> {
+  ): Promise<{ item: WatchListItemBase; result: 'success' | 'idempotent_noop' }> {
     const config = LIFECYCLE_ACTION_CONFIG[action];
 
     // Review F-004: a checagem prévia só precisa do status, não da projeção
@@ -470,18 +491,15 @@ export class WatchesService {
       );
     }
 
-    if (!isSupportedSearch(request)) {
-      throw new CreateWatchError(
-        'UNSUPPORTED_SEARCH',
-        'route, currency or market not supported yet',
-      );
-    }
+    // SPEC-029: origem/destino viram cidade do catálogo. `requestHash` acima
+    // continua sobre o pedido original — reenvio idêntico segue idempotente.
+    const route = await this.resolveRoute(request);
 
     let canonical: ReturnType<typeof computeSearchTargetFingerprintV1>;
     try {
       canonical = computeSearchTargetFingerprintV1({
-        origin: request.origin,
-        destination: request.destination,
+        origin: route.origin,
+        destination: route.destination,
         departureDate: request.departureDate,
         returnDate: request.returnDate,
         tripType: request.tripType,
@@ -499,13 +517,46 @@ export class WatchesService {
 
     const watch = await this.createWatchInTransaction(
       userId,
-      request,
+      { ...request, origin: route.origin, destination: route.destination },
       canonical,
       idempotencyKey,
       requestHash,
     );
 
-    return toCreateWatchResponse(watch);
+    return this.toNamedCreateWatchResponse(watch);
+  }
+
+  /**
+   * SPEC-029: cidade pesquisável do catálogo para origem e destino (aeroporto
+   * vira a cidade dele). Desconhecido, sem voo comercial, mesma cidade nos dois
+   * lados (GRU → CGH) ou moeda/mercado fora do suportado → UNSUPPORTED_SEARCH.
+   */
+  private async resolveRoute(
+    request: CreateWatchRequest,
+  ): Promise<{ origin: string; destination: string }> {
+    const [origin, destination] = await Promise.all([
+      this.places.resolveCity(request.origin),
+      this.places.resolveCity(request.destination),
+    ]);
+    if (
+      !origin ||
+      !destination ||
+      origin === destination ||
+      !isSupportedCurrencyAndMarket(request)
+    ) {
+      throw new CreateWatchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
+    }
+    return { origin, destination };
+  }
+
+  private async toNamedCreateWatchResponse(
+    watch: WatchWithRelations,
+  ): Promise<CreateWatchResponse> {
+    const names = await findPlaceSummaries(this.prisma.client, [
+      watch.searchTarget.originIata,
+      watch.searchTarget.destinationIata,
+    ]);
+    return toCreateWatchResponse(watch, names);
   }
 
   private async createWatchInTransaction(
@@ -612,6 +663,6 @@ export class WatchesService {
         'idempotency record exists without an associated watch',
       );
     }
-    return toCreateWatchResponse(existing.watch);
+    return this.toNamedCreateWatchResponse(existing.watch);
   }
 }

@@ -1,0 +1,21 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.muted {
+  color: var(--color-text-muted);
+  margin: 0;
+}

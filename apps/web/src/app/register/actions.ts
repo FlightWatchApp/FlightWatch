@@ -13,6 +13,7 @@ export interface RegisterActionResult {
 const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_ALREADY_REGISTERED: 'Já existe uma conta com esse email.',
   INVALID_AUTH_INPUT: 'Alguns dados não são válidos — confira email e senha.',
+  RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
 };
 
 export async function registerAction(input: {

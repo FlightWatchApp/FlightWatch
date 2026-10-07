@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { coordinatesSchema } from '../places/places.js';
+import { fareSummaryViewSchema } from '../shared/fare-summary.js';
 import { iataCodeSchema, isoDateSchema } from '../shared/trip-fields.js';
 
 export const dealTypeSchema = z.enum(['HISTORICAL_LOW', 'PERCENTAGE_BELOW_REFERENCE']);
@@ -22,7 +24,9 @@ export const opportunityOfferSchema = z.object({
   expiresAt: z.string().nullable(),
   status: z.enum(['CURRENT', 'EXPIRED']),
   segments: z.array(opportunityOfferSegmentSchema),
-  durationMinutes: z.number().int(),
+  // SPEC-030: preenchido (e `segments` vazio) quando a oferta é um resumo de tarifa.
+  fareSummary: fareSummaryViewSchema.nullable(),
+  durationMinutes: z.number().int().nullable(),
   connectionsCount: z.number().int(),
 });
 
@@ -49,6 +53,11 @@ export const opportunityItemSchema = z.object({
   searchTargetId: z.string().uuid(),
   origin: z.string(),
   destination: z.string(),
+  // SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro.
+  originName: z.string().nullable(),
+  destinationName: z.string().nullable(),
+  originCoordinates: coordinatesSchema,
+  destinationCoordinates: coordinatesSchema,
   tripType: z.enum(['ONE_WAY', 'ROUND_TRIP']),
   market: z.string(),
   departureDate: z.string(),

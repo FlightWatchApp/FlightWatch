@@ -18,18 +18,17 @@ import {
 import type { NotificationRequestedJob } from '@flight-watch/queue';
 import type { NotificationWorkerMetrics } from './metrics.js';
 
-// SPEC-012 §4: bem acima da latência esperada de um envio real — só entregas
-// genuinamente presas (worker morto no meio do envio) devem ser reivindicadas
-// de novo por aqui.
-export const STALE_SENDING_THRESHOLD_MS = Number(
-  process.env.NOTIFICATION_STALE_SENDING_THRESHOLD_MS ?? 5 * 60 * 1000,
-);
-
 export interface NotificationWorkerDeps {
   prisma: PrismaClient;
   emailSender: EmailSender;
   buildUnsubscribeUrl: (watchId: string) => string;
   metrics: NotificationWorkerMetrics;
+  /**
+   * SPEC-012 §4: bem acima da latência esperada de um envio real — só entregas
+   * genuinamente presas (worker morto no meio do envio) são reivindicadas de
+   * novo. Vem de NOTIFICATION_STALE_SENDING_THRESHOLD_MS (SPEC-024).
+   */
+  staleSendingThresholdMs: number;
 }
 
 /**
@@ -42,7 +41,7 @@ export async function processNotificationJob(
   deps: NotificationWorkerDeps,
   job: Job<NotificationRequestedJob>,
 ): Promise<void> {
-  const { prisma, emailSender, buildUnsubscribeUrl, metrics } = deps;
+  const { prisma, emailSender, buildUnsubscribeUrl, metrics, staleSendingThresholdMs } = deps;
   const data = job.data;
 
   const alertEvent = await prisma.$transaction((tx) =>
@@ -138,9 +137,9 @@ export async function processNotificationJob(
   // tanto os estados terminais (DELIVERED/PERMANENT_FAILURE) quanto o caso de
   // outra entrega concorrente já ter reivindicado (SENDING), sem a janela de
   // corrida entre checar o status e escrevê-lo que existia antes. SPEC-012:
-  // também aceita reivindicar uma SENDING obsoleta (ver STALE_SENDING_THRESHOLD_MS).
+  // também aceita reivindicar uma SENDING obsoleta (ver staleSendingThresholdMs).
   const claimed = await prisma.$transaction((tx) =>
-    claimNotificationDeliveryForSending(tx, delivery.id, STALE_SENDING_THRESHOLD_MS),
+    claimNotificationDeliveryForSending(tx, delivery.id, staleSendingThresholdMs),
   );
   if (!claimed) {
     metrics.duplicateDeliveriesPreventedTotal.inc();

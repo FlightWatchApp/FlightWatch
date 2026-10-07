@@ -10,3 +10,5 @@ export * from './scheduling/schedule-window.js';
 export * from './alerting/deduplication-key.js';
 export * from './notifications/delivery-key.js';
 export * from './deal/deal-classification.js';
+export * from './places/place-search.js';
+export * from './pricing/stored-itinerary.js';

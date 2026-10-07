@@ -1,0 +1,23 @@
+# SPEC-028: contexto de build sem segredos, histórico nem artefatos locais.
+.git
+.github
+.local
+.claude
+.codex
+.agents
+.turbo
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.zip
+docs/design-refactor/**/*.png

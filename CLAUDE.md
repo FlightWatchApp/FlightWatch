@@ -117,8 +117,9 @@ O Claude não deve aumentar este arquivo com detalhes efêmeros. Detalhes extens
 
 ### 1.3 Bloqueios e decisões pendentes
 
-- `BLOQUEADO`: integração real depende de esclarecimento/aceite contratual da Duffel sobre metasearch e polling recorrente.
-- `BLOQUEADO`: nenhum provedor real deve entrar em produção antes da validação jurídica/comercial.
+- `APROVADO` (ADR-008): fonte de preços da Fase 1 é a Travelpayouts Data API (cache, um preço por dia, por cidade); a Duffel foi descartada para este modelo. Busca em tempo real (Fase 2) exige 50 mil MAU.
+- `APROVADO` (owner, 2026-10-06): escopo **integral** — qualquer cidade com voo comercial, nacional e internacional.
+- `BLOQUEADO`: produção com provider real depende do marker de afiliado e da revisão dos termos de uso da Travelpayouts pelo owner.
 - `PROPOSTO`: canal inicial comercial de notificação. E-mail existe no fluxo simulado; WhatsApp não está aprovado como canal inicial.
 - `PROPOSTO`: monetização e limites de plano.
 - `PROPOSTO`: intervalos finais de polling e orçamento por classe.
@@ -263,85 +264,64 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 
 ```text
 /
+├── AGENTS.md                     # regras para agentes (Codex, Cursor, Claude…)
 ├── CLAUDE.md
-├── AGENTS.md
 ├── README.md
-├── package.json
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
-├── turbo.json
+├── package.json · pnpm-lock.yaml · pnpm-workspace.yaml · turbo.json · .nvmrc
+├── Dockerfile · docker-compose.yml   # um target por processo; perfil `stack` (SPEC-028)
 ├── apps/
-│   ├── web/
-│   │   ├── app/ ou src/app/
+│   ├── web/src/
+│   │   ├── app/                  # App Router (rotas e server actions)
 │   │   ├── components/
-│   │   ├── features/
 │   │   ├── lib/
 │   │   └── styles/
-│   ├── api/
-│   │   └── src/
-│   │       ├── modules/
-│   │       ├── observability/
-│   │       ├── prisma/
-│   │       └── main.ts
-│   ├── scheduler/
-│   │   └── src/
-│   ├── price-worker/
-│   │   └── src/
-│   ├── alert-worker/
-│   │   └── src/
-│   └── notification-worker/
-│       └── src/
+│   ├── api/src/
+│   │   ├── auth/ watches/ searches/ opportunities/ affiliate/
+│   │   ├── observability/
+│   │   ├── prisma/
+│   │   └── main.ts
+│   ├── scheduler/src/
+│   ├── price-worker/src/
+│   ├── alert-worker/src/
+│   └── notification-worker/src/
 ├── packages/
-│   ├── domain/
-│   ├── contracts/
-│   ├── database/
-│   ├── queue/
-│   ├── providers/
-│   ├── notifications/
-│   ├── observability/
-│   ├── config/
-│   ├── testing/
-│   └── ui/                       # confirmar existência
-├── flight-watch-foundation-v0.1/
-│   ├── PRODUCT.md
-│   ├── DOMAIN.md
-│   ├── ARCHITECTURE.md
-│   ├── EVALS.md
-│   ├── QUALITY-GATES.md
-│   └── docs/
-│       ├── adr/
-│       ├── specs/
-│       └── runbooks/
-├── docs/
-│   ├── DESIGN-SYSTEM.md
-│   ├── runbooks/
-│   └── decisions/
-├── evals/
-│   ├── fixtures/
-│   ├── scenarios/
-│   └── runner/
-└── tests/
-    ├── integration/
-    ├── e2e/
-    └── performance/
+│   ├── domain/ contracts/ database/ queue/
+│   ├── providers/ notifications/ observability/ config/
+│   └── (testing/ ui/ — PROPOSTO, ainda não existem)
+├── docs/                         # índice em docs/README.md
+│   ├── PRODUCT.md DOMAIN.md ARCHITECTURE.md
+│   ├── EVALS.md QUALITY-GATES.md
+│   ├── BRAND.md DESIGN-SYSTEM.md
+│   ├── adr/
+│   ├── specs/
+│   ├── evals/
+│   ├── roadmap/                  # próximas fases + rascunhos/ de spec
+│   ├── design-refactor/          # refactor web v2 (decisões, tasks, evals)
+│   ├── reviews/
+│   └── (runbooks/ — PROPOSTO, ainda não existe)
+├── scripts/design/               # pnpm check:design
+└── .local/                       # rascunho pessoal, ignorado pelo git
 ```
+
+Testes vivem junto do código (`*.test.ts`, `*.spec.ts`, `*.integration.test.ts`);
+não há `tests/` nem `evals/` na raiz.
 
 ### 5.1 Estrutura do conteúdo e documentação
 
-| Conteúdo                | Local                      | Atualização                           |
-| ----------------------- | -------------------------- | ------------------------------------- |
-| visão e escopo          | `PRODUCT.md`               | mudança de produto                    |
-| domínio e invariantes   | `DOMAIN.md`                | nova regra, entidade ou estado        |
-| arquitetura consolidada | `ARCHITECTURE.md`          | mudança transversal                   |
-| decisão arquitetural    | `docs/adr/ADR-NNN-*.md`    | decisão relevante e suas alternativas |
-| feature                 | `docs/specs/SPEC-NNN-*.md` | antes do código                       |
-| evals                   | `EVALS.md` e `evals/`      | comportamento crítico/regressão       |
-| quality gates           | `QUALITY-GATES.md`         | mudança no processo de aceite         |
-| design system           | `docs/DESIGN-SYSTEM.md`    | decisão visual significativa          |
-| incidente/operação      | `docs/runbooks/`           | novo modo de falha                    |
-| instruções do Claude    | `CLAUDE.md`                | convenção transversal/mudança do mapa |
+| Conteúdo                | Local                           | Atualização                           |
+| ----------------------- | ------------------------------- | ------------------------------------- |
+| visão e escopo          | `docs/PRODUCT.md`               | mudança de produto                    |
+| domínio e invariantes   | `docs/DOMAIN.md`                | nova regra, entidade ou estado        |
+| arquitetura consolidada | `docs/ARCHITECTURE.md`          | mudança transversal                   |
+| decisão arquitetural    | `docs/adr/ADR-NNN-*.md`         | decisão relevante e suas alternativas |
+| feature                 | `docs/specs/SPEC-NNN-*.md`      | antes do código                       |
+| evals                   | `docs/EVALS.md` e `docs/evals/` | comportamento crítico/regressão       |
+| quality gates           | `docs/QUALITY-GATES.md`         | mudança no processo de aceite         |
+| design system           | `docs/DESIGN-SYSTEM.md`         | decisão visual significativa          |
+| incidente/operação      | `docs/runbooks/`                | novo modo de falha                    |
+| instruções do Claude    | `CLAUDE.md`                     | convenção transversal/mudança do mapa |
 
-Não criar cópias conflitantes. Se a fundação estiver em subdiretório, registrar no README a localização canônica.
+Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascunhos/` até entrarem no processo; aí passam a `docs/specs/`.
 
 ---
 
@@ -424,6 +404,7 @@ Não criar cópias conflitantes. Se a fundação estiver em subdiretório, regis
 - `AcquireScheduleLease`;
 - `ReconcileAbandonedLeases`;
 - `ExpireWatches`;
+- `SyncPlacesCatalog` (SPEC-029: catálogo de cidades/aeroportos, no startup se vazio ou com 7+ dias e a cada 24 h; `places:sync` força).
 - `EnforceProviderBudget`.
 
 **Job produzido:** `PriceCheckRequested.v1`.
@@ -472,6 +453,13 @@ Não criar cópias conflitantes. Se a fundação estiver em subdiretório, regis
 - `ProviderError`.
 
 `persistPriceObservationSuccess` retorna `{ observation, created }`; todos os call sites devem respeitar `created` para evitar métrica/evento duplicado em replay.
+
+SPEC-030: `observedAt` é o instante em que a **fonte** viu o preço (cache pode
+ter horas), nunca no futuro; o mesmo fato da última observação termina
+`SUCCEEDED` sem observação nem evento (`price_observation_total{result="unchanged"}`);
+itinerário gravado só via `toStoredItinerary`/`parseStoredItinerary` (domínio)
+— oferta tem trechos **ou** `fareSummary`, nunca trechos inventados. A
+execução registra o provedor que de fato consultou.
 
 ### 6.5 `apps/alert-worker`
 
@@ -573,23 +561,24 @@ Cada package deve exportar uma superfície pública pequena. Não importar arqui
 
 ## 8. Models e invariantes centrais
 
-| Model                              | Papel                                              | Invariantes essenciais                                                         |
-| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `User`                             | proprietário                                       | somente ativo usa canal verificado                                             |
-| `NotificationChannel`              | destino autorizado                                 | pertence ao usuário; verificado; revogável                                     |
-| `Watch`                            | intenção individual                                | terminal não retorna a ativo                                                   |
-| `AlertRule`                        | condição versionada                                | fórmula/referência explícitas                                                  |
-| `SearchTarget`                     | busca compartilhada                                | fingerprint único por schema                                                   |
-| `SearchExecution`                  | tentativa lógica                                   | chave idempotente; status tipado                                               |
-| `FlightOffer`                      | oferta normalizada                                 | total, moeda, passageiros e itinerário válidos                                 |
-| `PriceObservation`                 | fotografia imutável                                | nunca atualizar preço/itinerário                                               |
-| `AlertEvent`                       | regra atendida                                     | deduplication key única                                                        |
-| `NotificationDelivery`             | tentativa de entrega                               | delivery key única por canal/template                                          |
-| `Provider`                         | integração                                         | estado, capacidade e estratégia                                                |
-| `ProviderQuota`                    | orçamento/cota                                     | não permitir consumo invisível                                                 |
-| `OutboxEvent`                      | publicação eventual                                | criado no mesmo commit do domínio                                              |
-| `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas              |
-| `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019) |
+| Model                              | Papel                                              | Invariantes essenciais                                                              |
+| ---------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `User`                             | proprietário                                       | somente ativo usa canal verificado                                                  |
+| `NotificationChannel`              | destino autorizado                                 | pertence ao usuário; verificado; revogável                                          |
+| `Watch`                            | intenção individual                                | terminal não retorna a ativo                                                        |
+| `AlertRule`                        | condição versionada                                | fórmula/referência explícitas                                                       |
+| `SearchTarget`                     | busca compartilhada                                | fingerprint único por schema                                                        |
+| `SearchExecution`                  | tentativa lógica                                   | chave idempotente; status tipado                                                    |
+| `FlightOffer`                      | oferta normalizada                                 | total, moeda, passageiros e itinerário válidos                                      |
+| `PriceObservation`                 | fotografia imutável                                | nunca atualizar preço/itinerário                                                    |
+| `AlertEvent`                       | regra atendida                                     | deduplication key única                                                             |
+| `NotificationDelivery`             | tentativa de entrega                               | delivery key única por canal/template                                               |
+| `Provider`                         | integração                                         | estado, capacidade e estratégia                                                     |
+| `ProviderQuota`                    | orçamento/cota                                     | não permitir consumo invisível                                                      |
+| `OutboxEvent`                      | publicação eventual                                | criado no mesmo commit do domínio                                                   |
+| `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas                   |
+| `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019)      |
+| `Place`                            | cidade ou aeroporto do catálogo (SPEC-029)         | chave `(code, kind)`; nunca apagado, só `searchable=false`; nenhuma lista no código |
 
 ### 8.1 Dinheiro
 
@@ -664,17 +653,35 @@ WatchCreated
 
 ### 10.2 Variáveis verificadas
 
-| Variável               | Serviço     |     Default | Sensível | Uso                                                                                                                                                     |
-| ---------------------- | ----------- | ----------: | -------: | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                 | API         |      `3000` |      não | porta HTTP pública                                                                                                                                      |
-| `METRICS_HOST`         | API/workers | `127.0.0.1` |      não | bind interno de métricas                                                                                                                                |
-| `METRICS_PORT`         | API/workers |      `9100` |      não | porta dedicada de métricas; garantir portas distintas por processo local                                                                                |
-| `RATE_LIMIT_WINDOW_MS` | API         |     `60000` |      não | janela do throttler (SPEC-014), hoje só em `POST /v1/searches/flights`                                                                                  |
-| `RATE_LIMIT_MAX`       | API         |        `10` |      não | limite de requisições por IP na janela acima (SPEC-014); storage em memória, por processo — não escala sob múltiplas réplicas sem storage compartilhado |
+`VERIFICADO` (SPEC-024): a fonte de verdade é `packages/config/src/processes.ts`,
+e toda chave documentada em `.env.example` (raiz) é lida por um schema — um
+teste falha se os dois divergirem. Não repetir a lista aqui.
+
+Regras transversais:
+
+- cada processo chama `loadConfig(<processo>Config, process.env)` uma vez no
+  startup; configuração inválida registra `config_invalid` (chaves, nunca
+  valores) e encerra com código 1;
+- `APP_ENV` (`development`, `test`, `staging`, `production`) é obrigatória com
+  `NODE_ENV=production`; padrões locais de `DATABASE_URL`, `REDIS_URL` e
+  `WEB_BASE_URL` valem só em `development`/`test`;
+- com `APP_ENV=production`, `FLIGHT_PROVIDER`/`EMAIL_PROVIDER` `simulated`
+  impedem o startup (kill switch até existir adapter real);
+- adapter novo entra no enum de `processes.ts` e na factory do pacote
+  (`createFlightProvider`, `createEmailSender`);
+- nenhum padrão local (senha do compose, segredo de dev) é aceito fora de
+  `development`/`test`, nem se informado explicitamente (SPEC-025);
+- rate limit por IP do **cliente**: a API só vê o IP do web (BFF), então o web
+  repassa `x-fw-client-ip` autenticado por `INTERNAL_API_SECRET` (SPEC-025).
+  Throttlers `default` (busca) e `auth` (rotas públicas de autenticação), com
+  storage em memória, por processo — não escala sob múltiplas réplicas sem
+  storage compartilhado;
+- fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
+  e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`).
 
 ### 10.3 Baseline a reconciliar com o código
 
-As chaves abaixo são `PROPOSTO` até serem confirmadas no schema/configuração real. Não criar todas automaticamente; manter somente as necessárias.
+As chaves abaixo são `PROPOSTO` até serem confirmadas no schema/configuração real. Não criar todas automaticamente; manter somente as necessárias. Quando uma chave daqui já existe em `.env.example`, vale a versão de lá (ex.: `FLIGHT_PROVIDER=simulated`, não `mock`; o tick é `SCHEDULER_TICK_INTERVAL_MS`).
 
 #### Runtime e logs
 

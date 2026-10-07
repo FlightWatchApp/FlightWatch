@@ -17,17 +17,21 @@ enum UserStatus {
 }
 
 model User {
-  id                  String     @id @default(uuid())
-  email               String     @unique
-  status              UserStatus @default(PENDING_VERIFICATION)
-  timezone            String
-  passwordHash        String
+  id                     String     @id @default(uuid())
+  email                  String     @unique
+  status                 UserStatus @default(PENDING_VERIFICATION)
+  timezone               String
+  passwordHash           String
   // SPEC-007 §9: política de bloqueio ainda placeholder (5 tentativas / 15min,
   // ver apps/api/src/auth/auth.service.ts) — produto ainda não definiu valores finais.
-  failedLoginAttempts Int        @default(0)
-  lockedUntil         DateTime?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  failedLoginAttempts    Int        @default(0)
+  lockedUntil            DateTime?
+  // SPEC-026: hash SHA-256 do token de redefinição de senha (o token em si
+  // nunca é persistido). Um pedido novo substitui o anterior; apagado ao usar.
+  passwordResetTokenHash String?    @unique
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   notificationChannels NotificationChannel[]
   watches              Watch[]
@@ -439,13 +443,13 @@ enum FlightSearchStatus {
 }
 
 model FlightSearch {
-  id              String             @id @default(uuid())
+  id              String    @id @default(uuid())
   // SPEC-014: sempre null nesta fatia (ver nota em User.flightSearches).
   userId          String?
   originIata      String
   destinationIata String
-  departureDate   DateTime           @db.Date
-  returnDate      DateTime?          @db.Date
+  departureDate   DateTime  @db.Date
+  returnDate      DateTime? @db.Date
   tripType        TripType
   cabin           String
   adults          Int
@@ -495,4 +499,37 @@ model FlightSearchOffer {
 
   @@index([flightSearchId])
   @@map("flight_search_offers")
+}
+
+// ---- Catálogo de lugares (SPEC-029, ADR-008) ----
+
+enum PlaceKind {
+  CITY
+  AIRPORT
+}
+
+// Cidades e aeroportos sincronizados da Travelpayouts. Chave (code, kind):
+// código de cidade e de aeroporto coincidem com frequência (BSB é os dois).
+model Place {
+  code        String
+  kind        PlaceKind
+  name        String
+  // Para cidade, o próprio código.
+  cityCode    String
+  countryCode String
+  countryName String
+  timeZone    String?
+  latitude    Float?
+  longitude   Float?
+  // Cidade com aeroporto comercial / aeroporto com voo comercial. Lugar que
+  // sumiu da fonte vira false em vez de ser apagado.
+  searchable  Boolean
+  // Texto normalizado (sem acento, minúsculo) para o autocomplete.
+  searchText  String
+  syncedAt    DateTime
+
+  @@id([code, kind])
+  @@index([kind, searchable])
+  @@index([cityCode])
+  @@map("places")
 }

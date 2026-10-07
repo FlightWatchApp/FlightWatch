@@ -1,3 +1,5 @@
+import type { FareSummaryView } from '@flight-watch/contracts';
+
 /**
  * Modelos de visualização do front-end. `WatchStatus`, `TripType`, `AlertRuleType`
  * e o formato de `Money` seguem exatamente @flight-watch/contracts (SPEC-001) e
@@ -79,6 +81,9 @@ export interface WatchSummary {
   status: WatchStatus;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
   tripType: TripType;
   departureDate: string;
   returnDate: string | null;
@@ -114,11 +119,13 @@ export interface FlightSearchOfferView {
   searchId: string;
   provider: string;
   segments: FlightSearchOfferSegmentView[];
+  /** SPEC-030: preenchido (e `segments` vazio) quando a oferta vem de cache de preços. */
+  fareSummary: FareSummaryView | null;
   totalAmountMinor: number;
   currency: string;
   passengerCount: number;
   cabin: string;
-  durationMinutes: number;
+  durationMinutes: number | null;
   connectionsCount: number;
   observedAt: string;
   expiresAt: string | null;
@@ -132,6 +139,9 @@ export interface FlightSearchResult {
   status: FlightSearchStatus;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
   tripType: TripType;
   departureDate: string;
   returnDate: string | null;
@@ -141,6 +151,8 @@ export interface FlightSearchResult {
   createdAt: string;
   expiresAt: string | null;
   offers: FlightSearchOfferView[];
+  /** SPEC-031: busca completa no site parceiro; null quando o provedor não oferece. */
+  allFlightsUrl: string | null;
 }
 
 export type DealType = 'HISTORICAL_LOW' | 'PERCENTAGE_BELOW_REFERENCE';
@@ -169,7 +181,9 @@ export interface OpportunityOffer {
   expiresAt: string | null;
   status: 'CURRENT' | 'EXPIRED';
   segments: FlightSearchOfferSegmentView[];
-  durationMinutes: number;
+  /** SPEC-030: preenchido (e `segments` vazio) quando a oferta vem de cache de preços. */
+  fareSummary: FareSummaryView | null;
+  durationMinutes: number | null;
   connectionsCount: number;
 }
 
@@ -177,6 +191,12 @@ export interface OpportunityItem {
   searchTargetId: string;
   origin: string;
   destination: string;
+  /** SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro. */
+  originName: string | null;
+  destinationName: string | null;
+  /** SPEC-029: coordenadas da cidade para o mapa; null sem cadastro. */
+  originCoordinates: Coordinates | null;
+  destinationCoordinates: Coordinates | null;
   tripType: TripType;
   market: string;
   departureDate: string;
@@ -184,3 +204,14 @@ export interface OpportunityItem {
   deal: Deal;
   offer: OpportunityOffer;
 }
+
+/** SPEC-029: cidade do catálogo, com os aeroportos comerciais dela. */
+export type { Place } from '@flight-watch/contracts';
+
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+/** SPEC-030: menor preço encontrado para a rota e o dia (sem horário nem companhia). */
+export type { FareSummaryView };

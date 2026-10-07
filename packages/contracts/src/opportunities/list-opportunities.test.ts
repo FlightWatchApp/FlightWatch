@@ -58,6 +58,10 @@ describe('listOpportunitiesResponseSchema', () => {
           searchTargetId: '11111111-1111-1111-1111-111111111111',
           origin: 'DOU',
           destination: 'GRU',
+          originName: 'Dourados',
+          destinationName: 'São Paulo',
+          originCoordinates: { lat: -22.2, lng: -54.9 },
+          destinationCoordinates: null,
           tripType: 'ONE_WAY',
           market: 'BR',
           departureDate: '2027-03-01',
@@ -91,6 +95,7 @@ describe('listOpportunitiesResponseSchema', () => {
                 carrier: 'SIM',
               },
             ],
+            fareSummary: null,
             durationMinutes: 150,
             connectionsCount: 0,
           },
@@ -99,5 +104,30 @@ describe('listOpportunitiesResponseSchema', () => {
       total: 1,
     };
     expect(listOpportunitiesResponseSchema.safeParse(response).success).toBe(true);
+
+    // SPEC-030: oferta-resumo (cache de preços) — sem trechos, duração pode faltar.
+    const [first] = response.opportunities;
+    if (!first) throw new Error('fixture sem oferta');
+    const summary = {
+      ...response,
+      opportunities: [
+        {
+          ...first,
+          offer: {
+            ...first.offer,
+            segments: [],
+            fareSummary: {
+              departureDate: '2026-12-20',
+              returnDate: null,
+              stops: 1,
+              durationMinutes: null,
+            },
+            durationMinutes: null,
+            connectionsCount: 1,
+          },
+        },
+      ],
+    };
+    expect(listOpportunitiesResponseSchema.safeParse(summary).success).toBe(true);
   });
 });

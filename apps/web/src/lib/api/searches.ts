@@ -1,4 +1,4 @@
-import type { FlightSearchResponse } from '@flight-watch/contracts';
+import type { FlightSearchResponse, PriceCalendarResponse } from '@flight-watch/contracts';
 import { apiFetch } from './client';
 import type { AlertRuleType, FlightSearchResult } from './types';
 
@@ -37,6 +37,30 @@ export async function searchFlights(input: SearchFlightsInput): Promise<FlightSe
 
 export async function getFlightSearch(id: string): Promise<FlightSearchResult> {
   return apiFetch<FlightSearchResponse>(`/v1/searches/flights/${id}`);
+}
+
+/** SPEC-031: menor preço por dia do mês (público, mesmo rate limit da busca). */
+export async function getPriceCalendar(input: {
+  origin: string;
+  destination: string;
+  month: string;
+  tripType: 'ONE_WAY' | 'ROUND_TRIP';
+  tripLengthDays: number | null;
+  currency: string;
+  market: string;
+}): Promise<PriceCalendarResponse> {
+  const params = new URLSearchParams({
+    origin: input.origin,
+    destination: input.destination,
+    month: input.month,
+    tripType: input.tripType,
+    currency: input.currency,
+    market: input.market,
+  });
+  if (input.tripLengthDays !== null) {
+    params.set('tripLengthDays', String(input.tripLengthDays));
+  }
+  return apiFetch<PriceCalendarResponse>(`/v1/price-calendar?${params.toString()}`);
 }
 
 export interface DeriveWatchFromOfferInput {

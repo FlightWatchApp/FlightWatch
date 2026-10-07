@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@flight-watch/config": "workspace:*",
     "@flight-watch/contracts": "workspace:*",
     "leaflet": "^1.9.4",
     "next": "^16.3.5",

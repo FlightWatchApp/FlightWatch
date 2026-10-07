@@ -1,32 +1,36 @@
 import { Worker } from 'bullmq';
+import { ConfigError, alertWorkerConfig, loadConfig } from '@flight-watch/config';
 import { createPrismaClient } from '@flight-watch/database';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
 import { QUEUE_NAMES, createRedisConnection } from '@flight-watch/queue';
 import { evaluatePriceObservedJob } from './evaluate.js';
 import { createAlertWorkerMetrics } from './metrics.js';
 
-const CONCURRENCY = Number(process.env.ALERT_WORKER_CONCURRENCY ?? 5);
-const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9103);
-const METRICS_HOST = process.env.METRICS_HOST ?? '127.0.0.1';
-
 async function main(): Promise<void> {
+  // SPEC-024: configuração validada uma vez; inválida impede o startup.
+  const config = loadConfig(alertWorkerConfig, process.env);
   const metrics = createAlertWorkerMetrics();
   const metricsServer = await startMetricsServer({
     registry: metrics.registry,
-    port: METRICS_PORT,
-    host: METRICS_HOST,
+    port: config.METRICS_PORT,
+    host: config.METRICS_HOST,
     isHealthy: () => true,
   });
-  const prisma = createPrismaClient();
-  const connection = createRedisConnection();
+  const prisma = createPrismaClient(config.DATABASE_URL);
+  const connection = createRedisConnection(config.REDIS_URL);
 
   const worker = new Worker(
     QUEUE_NAMES.PRICE_OBSERVED,
     (job) => evaluatePriceObservedJob({ prisma, metrics }, job),
-    { connection, concurrency: CONCURRENCY },
+    { connection, concurrency: config.ALERT_WORKER_CONCURRENCY },
   );
 
-  logEvent({ event: 'alert_worker_starting', concurrency: CONCURRENCY, metricsPort: METRICS_PORT });
+  logEvent({
+    event: 'alert_worker_starting',
+    appEnv: config.APP_ENV,
+    concurrency: config.ALERT_WORKER_CONCURRENCY,
+    metricsPort: config.METRICS_PORT,
+  });
 
   worker.on('failed', (job, err) => {
     logEvent({
@@ -51,6 +55,10 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  logEvent({ event: 'alert_worker_startup_failed', error });
+  logEvent(
+    error instanceof ConfigError
+      ? error.toLogEvent()
+      : { event: 'alert_worker_startup_failed', error },
+  );
   process.exit(1);
 });

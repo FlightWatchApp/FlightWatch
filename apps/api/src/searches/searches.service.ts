@@ -4,6 +4,9 @@ import {
   type DeriveWatchFromOfferRequest,
   type FlightSearchOffer as FlightSearchOfferView,
   type FlightSearchResponse,
+  type FareSummaryView,
+  type PriceCalendarQuery,
+  type PriceCalendarResponse,
   CreateWatchError,
   DeriveWatchError,
   SearchError,
@@ -17,10 +20,13 @@ import {
   offerConnectionsCount,
   offerDurationMinutes,
   OFFER_SELECTION_POLICY_VERSION,
+  parseStoredItinerary,
   resolveCurrentOfferStatus,
   resolvePurchaseUrl,
+  storedItineraryAsOffer,
+  toStoredItinerary,
+  type FareSummary,
   type FlightOffer,
-  type FlightOfferSegment,
 } from '@flight-watch/domain';
 import type { FlightSearch, FlightSearchOffer, Prisma } from '@flight-watch/database';
 import {
@@ -38,7 +44,8 @@ import { ProviderError, type FlightProvider } from '@flight-watch/providers';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { WatchesService } from '../watches/watches.service.js';
-import { isSupportedSearch } from '../watches/supported-catalog.js';
+import { PlacesService } from '../places/places.service.js';
+import { isSupportedCurrencyAndMarket } from '../watches/supported-catalog.js';
 import { FLIGHT_PROVIDER } from './flight-provider.token.js';
 
 // SPEC-014: mesma normalização/seleção que o pipeline de monitoramento usa
@@ -53,25 +60,108 @@ export class SearchesService {
     private readonly metrics: MetricsService,
     private readonly watchesService: WatchesService,
     @Inject(FLIGHT_PROVIDER) private readonly provider: FlightProvider,
+    private readonly places: PlacesService,
   ) {}
 
-  /** SPEC-014 §"Comportamento de domínio e invariantes". */
+  /**
+   * SPEC-014 §"Comportamento de domínio e invariantes". SPEC-029: origem e
+   * destino viram cidade do catálogo antes de qualquer outra regra.
+   */
   async searchFlights(
+    userId: string | null,
+    rawRequest: CreateFlightSearchRequest,
+    correlationId: string,
+  ): Promise<FlightSearchResponse> {
+    const [origin, destination] = await Promise.all([
+      this.places.resolveCity(rawRequest.origin),
+      this.places.resolveCity(rawRequest.destination),
+    ]);
+    if (
+      !origin ||
+      !destination ||
+      origin === destination ||
+      !isSupportedCurrencyAndMarket(rawRequest)
+    ) {
+      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
+    }
+    const base = await this.runSearch(
+      userId,
+      { ...rawRequest, origin, destination },
+      correlationId,
+    );
+    return this.withNames(base);
+  }
+
+  private async withNames(base: FlightSearchResponseBase): Promise<FlightSearchResponse> {
+    const [named] = await this.places.withRouteNames([base]);
+    if (!named) {
+      throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
+    }
+    return { ...named, allFlightsUrl: this.allFlightsUrlFor(base) };
+  }
+
+  /**
+   * SPEC-031: "ver todos os voos" no site parceiro, pela allowlist (SPEC-018)
+   * e com afiliado (SPEC-020); null quando o provedor não oferece.
+   */
+  private allFlightsUrlFor(search: FlightSearchResponseBase): string | null {
+    const raw = this.provider.allFlightsUrl?.({
+      originIata: search.origin,
+      destinationIata: search.destination,
+      departureDate: search.departureDate,
+      returnDate: search.returnDate,
+      tripType: search.tripType,
+      cabin: search.cabin,
+      adults: search.adults,
+      currency: search.currency,
+      market: search.market,
+    });
+    return withAffiliateTracking(
+      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
+      this.provider.strategy,
+      'SEARCH',
+    );
+  }
+
+  /** SPEC-031: menor preço por dia do mês, por cidade (SPEC-029). */
+  async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResponse> {
+    const [origin, destination] = await Promise.all([
+      this.places.resolveCity(query.origin),
+      this.places.resolveCity(query.destination),
+    ]);
+    if (!origin || !destination || origin === destination || !isSupportedCurrencyAndMarket(query)) {
+      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
+    }
+    if (!this.provider.priceCalendar) {
+      this.metrics.priceCalendarFetchTotal.inc({ result: 'not_supported' });
+      return { origin, destination, month: query.month, currency: query.currency, days: [] };
+    }
+    try {
+      const days = await this.provider.priceCalendar({
+        originIata: origin,
+        destinationIata: destination,
+        month: query.month,
+        tripType: query.tripType,
+        tripLengthDays: query.tripLengthDays ?? null,
+        currency: query.currency,
+      });
+      this.metrics.priceCalendarFetchTotal.inc({ result: days.length > 0 ? 'success' : 'empty' });
+      return { origin, destination, month: query.month, currency: query.currency, days };
+    } catch (error) {
+      if (error instanceof ProviderError) {
+        this.metrics.priceCalendarFetchTotal.inc({ result: 'provider_error' });
+        logEvent({ event: 'price_calendar_provider_error', errorClass: error.errorClass });
+        throw new SearchError('PROVIDER_UNAVAILABLE', 'price calendar source unavailable');
+      }
+      throw error;
+    }
+  }
+
+  private async runSearch(
     userId: string | null,
     request: CreateFlightSearchRequest,
     correlationId: string,
-  ): Promise<FlightSearchResponse> {
-    if (
-      !isSupportedSearch({
-        origin: request.origin,
-        destination: request.destination,
-        currency: request.currency,
-        market: request.market,
-      })
-    ) {
-      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported yet');
-    }
-
+  ): Promise<FlightSearchResponseBase> {
     const flightSearch = await createPendingFlightSearch(this.prisma.client, {
       userId,
       originIata: request.origin,
@@ -122,6 +212,7 @@ export class SearchesService {
           currency: request.currency,
           adults: request.adults,
           departureDate: request.departureDate,
+          returnDate: request.returnDate,
         }),
       );
       const filtered = eligible.filter(
@@ -204,6 +295,10 @@ export class SearchesService {
 
   /** SPEC-014 §"Contrato de API": `GET /v1/searches/flights/:id`. */
   async getFlightSearch(id: string): Promise<FlightSearchResponse> {
+    return this.withNames(await this.findFlightSearch(id));
+  }
+
+  private async findFlightSearch(id: string): Promise<FlightSearchResponseBase> {
     const flightSearch = await getFlightSearchWithOffers(this.prisma.client, id);
     if (!flightSearch) {
       throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
@@ -389,7 +484,8 @@ function toOfferInsertInput(
     totalAmountMinor: offer.totalAmountMinor,
     currency: offer.currency,
     passengerCount: offer.passengerCount,
-    itinerary: offer.segments as unknown as Prisma.InputJsonValue,
+    // SPEC-030: o domínio é dono do formato gravado (trechos ou resumo).
+    itinerary: toStoredItinerary(offer) as Prisma.InputJsonValue,
     offerSignature: buildOfferSignature(offer),
     observedAt: new Date(offer.observedAt),
     expiresAt: offer.expiresAt ? new Date(offer.expiresAt) : null,
@@ -399,23 +495,22 @@ function toOfferInsertInput(
 }
 
 /**
- * `offerDurationMinutes`/`offerConnectionsCount` (packages/domain) só leem
- * `.segments` — cast local em vez de reconstruir um `FlightOffer` completo
- * só para satisfazer os outros campos do tipo, que essas duas funções nunca
- * tocam.
+ * SPEC-030: o itinerário gravado é lido pelo domínio (trechos ou resumo de
+ * tarifa); `segments` fica vazio para resumo.
  */
 function toFlightSearchOfferView(
   row: FlightSearchOffer,
   searchId: string,
   cabin: string,
 ): FlightSearchOfferView {
-  const segments = row.itinerary as unknown as FlightOfferSegment[];
-  const asFlightOffer = { segments } as FlightOffer;
+  const itinerary = parseStoredItinerary(row.itinerary);
+  const asFlightOffer = storedItineraryAsOffer(itinerary) as FlightOffer;
   return {
     id: row.id,
     searchId,
     provider: row.providerStrategy,
-    segments,
+    segments: itinerary.kind === 'SEGMENTS' ? itinerary.segments : [],
+    fareSummary: itinerary.kind === 'FARE_SUMMARY' ? toFareSummaryView(itinerary.summary) : null,
     totalAmountMinor: row.totalAmountMinor,
     currency: row.currency,
     passengerCount: row.passengerCount,
@@ -434,9 +529,24 @@ function toFlightSearchOfferView(
   };
 }
 
+function toFareSummaryView(summary: FareSummary): FareSummaryView {
+  return {
+    departureDate: summary.departureDate,
+    returnDate: summary.returnDate,
+    stops: summary.stops,
+    durationMinutes: summary.durationMinutes,
+  };
+}
+
+/** Sem `originName`/`destinationName`: o serviço completa em lote (SPEC-029). */
+type FlightSearchResponseBase = Omit<
+  FlightSearchResponse,
+  'originName' | 'destinationName' | 'allFlightsUrl'
+>;
+
 function toFlightSearchResponse(
   flightSearch: FlightSearch & { offers: FlightSearchOffer[] },
-): FlightSearchResponse {
+): FlightSearchResponseBase {
   return {
     id: flightSearch.id,
     status: flightSearch.status,

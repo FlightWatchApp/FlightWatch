@@ -1,5 +1,5 @@
 /**
- * EVAL-PERF-002 / EVAL-PERF-004 (flight-watch-foundation-v0.1/EVALS.md).
+ * EVAL-PERF-002 / EVAL-PERF-004 (docs/EVALS.md).
  *
  * Mede dois padrões de consulta distintos, ambos rotulados "fan-out/N+1" na
  * revisão de SPEC-008/009 (F-004 de WATCH-LIFECYCLE-HISTORY-CODE-REVIEW.md):

@@ -7,6 +7,13 @@ export default defineConfig({
     include: ['src/**/*.spec.ts'],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    // Cada arquivo e2e sobe o próprio PostgreSQL (Testcontainers). Sem teto, o
+    // Vitest roda um arquivo por núcleo e, somado aos outros pacotes que o
+    // turbo executa em paralelo, dezenas de containers sobem juntos e estouram
+    // o hookTimeout (achado ao adicionar os e2e da SPEC-029 numa máquina de 20
+    // núcleos). 4 mantém a suíte rápida sem disputar recursos.
+    maxWorkers: 4,
+    minWorkers: 1,
     // SPEC-014: RATE_LIMIT_MAX é lido uma única vez, na primeira importação
     // de searches.module.ts (decorator @Module avaliado em tempo de classe)
     // — precisa estar em process.env ANTES de qualquer arquivo de teste
@@ -16,6 +23,9 @@ export default defineConfig({
     // disparar 429 sem precisar de muitas requisições; alto o bastante pra
     // não colidir com o uso normal de POST /v1/searches/flights no resto da
     // suíte (nenhum outro spec chama essa rota).
-    env: { RATE_LIMIT_MAX: '15' },
+    // SPEC-025: as suítes de auth criam muitas contas do mesmo IP; o limite de
+    // auth fica alto aqui e rate-limit.e2e.spec.ts monta um app próprio com
+    // limites baixos.
+    env: { RATE_LIMIT_MAX: '15', AUTH_RATE_LIMIT_MAX: '1000' },
   },
 });

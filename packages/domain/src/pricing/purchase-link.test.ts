@@ -61,3 +61,21 @@ describe('resolveCurrentOfferStatus', () => {
     expect(resolveCurrentOfferStatus(new Date('2027-01-01T00:00:00Z'), now)).toBe('EXPIRED');
   });
 });
+
+describe('resolvePurchaseUrl — Travelpayouts (SPEC-030 AC-9, ADR-008)', () => {
+  it('aceita a busca da Aviasales para TRAVELPAYOUTS', () => {
+    const url = 'https://www.aviasales.com/search/SAO1711NYC1';
+    expect(resolvePurchaseUrl(url, 'TRAVELPAYOUTS')).toBe(url);
+  });
+
+  it('recusa outro host, mesmo parecido, e http', () => {
+    expect(
+      resolvePurchaseUrl('https://aviasales.com.evil.io/search/x', 'TRAVELPAYOUTS'),
+    ).toBeNull();
+    expect(resolvePurchaseUrl('http://www.aviasales.com/search/x', 'TRAVELPAYOUTS')).toBeNull();
+  });
+
+  it('host da Aviasales não vale para outro provider', () => {
+    expect(resolvePurchaseUrl('https://www.aviasales.com/search/x', 'SIMULATED')).toBeNull();
+  });
+});

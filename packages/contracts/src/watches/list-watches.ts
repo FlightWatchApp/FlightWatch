@@ -24,6 +24,9 @@ export const watchListItemSchema = z.object({
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'EXPIRED', 'CANCELLED']),
   origin: z.string(),
   destination: z.string(),
+  // SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro.
+  originName: z.string().nullable(),
+  destinationName: z.string().nullable(),
   tripType: z.enum(['ONE_WAY', 'ROUND_TRIP']),
   departureDate: z.string(),
   returnDate: z.string().nullable(),

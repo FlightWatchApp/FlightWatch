@@ -61,7 +61,7 @@ export function createPriceWorkerMetrics(): PriceWorkerMetrics {
 
   const priceObservationTotal = new Counter({
     name: 'price_observation_total',
-    help: 'Total de resultados de busca de preço persistidos, por resultado (SPEC-004 §12).',
+    help: 'Total de resultados de busca de preço, por resultado — success/idempotent_replay/no_offers (SPEC-004 §12) e unchanged, mesmo fato da última observação, sem gravar (SPEC-030).',
     labelNames: ['result'],
     registers: [registry],
   });

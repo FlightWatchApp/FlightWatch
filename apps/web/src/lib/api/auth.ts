@@ -48,3 +48,26 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
 export async function resendVerification(): Promise<void> {
   await apiFetch<undefined>('/v1/auth/resend-verification', { method: 'POST' });
 }
+
+/** SPEC-026: a API responde 202 exista a conta ou não. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiFetch<undefined>('/v1/auth/password-reset/request', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function confirmPasswordReset(token: string, password: string): Promise<void> {
+  await apiFetch<undefined>('/v1/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+/** SPEC-027: anonimiza a conta; a API exige sessão e a senha atual. */
+export async function deleteAccount(password: string): Promise<void> {
+  await apiFetch<undefined>('/v1/auth/delete-account', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}

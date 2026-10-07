@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   Prisma,
   PriceObservation,
+  PrismaClient,
   SearchExecution,
   SearchExecutionStatus,
   SearchTarget,
@@ -31,13 +32,25 @@ const CLAIMABLE_STATUSES: SearchExecutionStatus[] = [
 export async function claimSearchExecutionForRunning(
   tx: Prisma.TransactionClient,
   searchExecutionId: string,
+  /**
+   * SPEC-030: provedor que de fato vai consultar (o do price-worker). O
+   * scheduler só conhece o padrão do alvo; sem isto a execução ficava
+   * registrada como SIMULATED mesmo consultando a Travelpayouts.
+   */
+  providerStrategy?: string,
 ): Promise<SearchExecutionWithTarget | null> {
   // SPEC-011: novo lease a cada claim — é o que a reconciliação de abandono
   // zera para revogar a posse do worker original (ver reconcileAbandonedSearchExecutions).
   const leaseToken = randomUUID();
   const claimed = await tx.searchExecution.updateMany({
     where: { id: searchExecutionId, status: { in: CLAIMABLE_STATUSES } },
-    data: { status: 'RUNNING', startedAt: new Date(), attempt: { increment: 1 }, leaseToken },
+    data: {
+      status: 'RUNNING',
+      startedAt: new Date(),
+      attempt: { increment: 1 },
+      leaseToken,
+      ...(providerStrategy ? { providerStrategy } : {}),
+    },
   });
   if (claimed.count === 0) {
     return null;
@@ -211,6 +224,53 @@ export interface NoOffersResultInput {
  * PriceObservation nem toca na última observação válida existente (DR-005).
  * SPEC-011: escrita condicional por lease, mesmo motivo de markSearchExecutionFailed.
  */
+/** SPEC-030: o que define "o mesmo fato" — instante, valor e assinatura. */
+export interface LatestObservationFact {
+  observedAt: Date;
+  totalAmountMinor: number;
+  offerSignature: string;
+}
+
+export async function findLatestObservationFact(
+  prisma: PrismaClient,
+  searchTargetId: string,
+): Promise<LatestObservationFact | null> {
+  return prisma.priceObservation.findFirst({
+    where: { searchTargetId },
+    orderBy: { observedAt: 'desc' },
+    select: { observedAt: true, totalAmountMinor: true, offerSignature: true },
+  });
+}
+
+export type UnchangedResultInput = NoOffersResultInput;
+
+/**
+ * SPEC-030: a fonte devolveu o mesmo fato da última observação (cache sem
+ * novidade). A execução termina SUCCEEDED, o alvo é reagendado, mas nenhuma
+ * observação nem evento PriceObserved é criado — alertas não reavaliam o
+ * mesmo dado. Mesma fencing por lease de persistNoOffersResult (SPEC-011).
+ */
+export async function persistUnchangedResult(
+  tx: Prisma.TransactionClient,
+  input: UnchangedResultInput,
+): Promise<void> {
+  const claimed = await tx.searchExecution.updateMany({
+    where: { id: input.searchExecutionId, leaseToken: input.leaseToken },
+    data: {
+      status: 'SUCCEEDED',
+      completedAt: input.completedAt,
+      offersCount: input.offersReceivedCount,
+    },
+  });
+  if (claimed.count === 0) {
+    throw new StaleLeaseError(input.searchExecutionId);
+  }
+  await tx.searchTarget.update({
+    where: { id: input.searchTargetId },
+    data: { lastCheckedAt: input.completedAt, nextCheckAt: input.nextCheckAt },
+  });
+}
+
 export async function persistNoOffersResult(
   tx: Prisma.TransactionClient,
   input: NoOffersResultInput,

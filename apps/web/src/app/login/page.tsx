@@ -86,6 +86,8 @@ export default function LoginPage() {
           <Button type="submit" disabled={isPending} fullWidth>
             {isPending ? 'Entrando…' : 'Entrar'}
           </Button>
+
+          <Link href="/forgot-password">Esqueci minha senha</Link>
         </form>
       </Card>
     </AuthShell>

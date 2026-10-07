@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   ACCOUNT_LOCKED:
     'Conta temporariamente bloqueada por excesso de tentativas. Tente novamente mais tarde.',
   INVALID_AUTH_INPUT: 'Alguns dados não são válidos — confira email e senha.',
+  RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
 };
 
 export async function loginAction(input: {

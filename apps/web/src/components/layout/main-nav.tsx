@@ -102,9 +102,13 @@ export function MainNav({ userEmail }: MainNavProps) {
           {userEmail ? (
             <>
               <CreateWatchModal triggerClassName={styles.cta} />
-              <span className={styles.userEmail} title={userEmail}>
+              <Link
+                href="/account"
+                className={styles.userEmail}
+                title={`Minha conta (${userEmail})`}
+              >
                 {userEmail}
-              </span>
+              </Link>
               <form action={logoutAction}>
                 <button type="submit" className={styles.sessionLink}>
                   <IconLogOut size={16} />

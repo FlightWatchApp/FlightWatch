@@ -1,19 +1,28 @@
 import { Body, Controller, Get, HttpCode, Post, UseFilters, UseGuards } from '@nestjs/common';
 import type {
   AuthenticatedUser,
+  DeleteAccountRequest,
   LoginRequest,
   LoginResponse,
+  PasswordResetConfirm,
+  PasswordResetRequest,
   RegisterRequest,
   RegisterResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
 } from '@flight-watch/contracts';
+import { AuthRateLimited } from './auth-throttler.guard.js';
 import { AuthService } from './auth.service.js';
 import { AuthErrorFilter } from './auth-error.filter.js';
 import { CurrentSessionToken } from './current-session-token.decorator.js';
 import { CurrentUser } from './current-user.decorator.js';
+import { DeleteAccountValidationPipe } from './delete-account.pipe.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
 import { LoginValidationPipe } from './login.pipe.js';
+import {
+  PasswordResetConfirmValidationPipe,
+  PasswordResetRequestValidationPipe,
+} from './password-reset.pipe.js';
 import { RegisterValidationPipe } from './register.pipe.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import { VerifyEmailValidationPipe } from './verify-email.pipe.js';
@@ -25,12 +34,14 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(201)
+  @AuthRateLimited()
   async register(@Body(RegisterValidationPipe) body: RegisterRequest): Promise<RegisterResponse> {
     return this.authService.register(body);
   }
 
   @Post('login')
   @HttpCode(200)
+  @AuthRateLimited()
   async login(@Body(LoginValidationPipe) body: LoginRequest): Promise<LoginResponse> {
     return this.authService.login(body);
   }
@@ -53,6 +64,7 @@ export class AuthController {
   // sessão válida no dispositivo/navegador em que abriu o e-mail.
   @Post('verify-email')
   @HttpCode(200)
+  @AuthRateLimited()
   async verifyEmail(
     @Body(VerifyEmailValidationPipe) body: VerifyEmailRequest,
     @CurrentCorrelationId() correlationId: string,
@@ -66,10 +78,46 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(204)
   @UseGuards(SessionAuthGuard)
+  @AuthRateLimited()
   async resendVerification(
     @CurrentUser() userId: string,
     @CurrentCorrelationId() correlationId: string,
   ): Promise<void> {
     await this.authService.resendVerification(userId, correlationId);
+  }
+
+  // SPEC-026: sem guard — quem esqueceu a senha não tem sessão. Sempre 202.
+  @Post('password-reset/request')
+  @HttpCode(202)
+  @AuthRateLimited()
+  async requestPasswordReset(
+    @Body(PasswordResetRequestValidationPipe) body: PasswordResetRequest,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.requestPasswordReset(body.email, correlationId);
+  }
+
+  // SPEC-026: o token do e-mail é a credencial; encerra todas as sessões.
+  @Post('password-reset/confirm')
+  @HttpCode(204)
+  @AuthRateLimited()
+  async confirmPasswordReset(
+    @Body(PasswordResetConfirmValidationPipe) body: PasswordResetConfirm,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.confirmPasswordReset(body.token, body.password, correlationId);
+  }
+
+  // SPEC-027: exige sessão e a senha atual; anonimiza a conta.
+  @Post('delete-account')
+  @HttpCode(204)
+  @UseGuards(SessionAuthGuard)
+  @AuthRateLimited()
+  async deleteAccount(
+    @CurrentUser() userId: string,
+    @Body(DeleteAccountValidationPipe) body: DeleteAccountRequest,
+    @CurrentCorrelationId() correlationId: string,
+  ): Promise<void> {
+    await this.authService.deleteAccount(userId, body.password, correlationId);
   }
 }

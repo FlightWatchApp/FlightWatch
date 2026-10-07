@@ -6,12 +6,31 @@ export interface FlightOfferSegment {
   carrier: string;
 }
 
+/**
+ * SPEC-030 / ADR-008: o que um cache de preços sabe — o menor preço de uma
+ * rota num dia, sem horário nem companhia. Uma oferta tem trechos **ou**
+ * resumo; o sistema nunca inventa trechos a partir do resumo (ADR-004).
+ */
+export interface FareSummary {
+  /** Código de cidade (SPEC-029). */
+  originCode: string;
+  destinationCode: string;
+  /** YYYY-MM-DD */
+  departureDate: string;
+  returnDate: string | null;
+  /** Escalas na ida. */
+  stops: number;
+  durationMinutes: number | null;
+}
+
 export interface FlightOffer {
   providerOfferId: string;
   totalAmountMinor: number;
   currency: string;
   passengerCount: number;
+  /** Vazio quando a oferta só tem `fareSummary`. */
   segments: FlightOfferSegment[];
+  fareSummary?: FareSummary;
   observedAt: string;
   expiresAt?: string;
   deeplink?: string;
@@ -25,6 +44,11 @@ export interface OfferEligibilityContext {
   adults: number;
   /** YYYY-MM-DD — precisa bater com a data de partida realmente pesquisada. */
   departureDate: string;
+  /**
+   * SPEC-030: volta pesquisada (null = só ida). Ausente em chamadores
+   * anteriores à spec — aí a volta do resumo não é conferida.
+   */
+  returnDate?: string | null | undefined;
   /** Injetável para teste; default `new Date()`. */
   now?: Date;
 }
@@ -88,6 +112,16 @@ export function isOfferEligible(offer: FlightOffer, context: OfferEligibilityCon
   if (offer.passengerCount !== context.adults) {
     return false;
   }
+  if (offer.expiresAt) {
+    const now = context.now ?? new Date();
+    if (new Date(offer.expiresAt).getTime() <= now.getTime()) {
+      return false; // oferta expirada não é uma oferta válida, mesmo que o preço bata.
+    }
+  }
+  if (offer.fareSummary) {
+    // Trechos e resumo juntos são ambíguos (qual descreve a oferta?): inelegível.
+    return offer.segments.length === 0 && isFareSummaryEligible(offer.fareSummary, context);
+  }
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
   if (!first || !last) {
@@ -102,16 +136,27 @@ export function isOfferEligible(offer: FlightOffer, context: OfferEligibilityCon
   if (first.departureAt.slice(0, 10) !== context.departureDate) {
     return false;
   }
-  if (!areSegmentsChronologicallyConsistent(offer.segments)) {
+  return areSegmentsChronologicallyConsistent(offer.segments);
+}
+
+function isFareSummaryEligible(summary: FareSummary, context: OfferEligibilityContext): boolean {
+  if (
+    summary.originCode !== context.originIata ||
+    summary.destinationCode !== context.destinationIata ||
+    summary.departureDate !== context.departureDate
+  ) {
     return false;
   }
-  if (offer.expiresAt) {
-    const now = context.now ?? new Date();
-    if (new Date(offer.expiresAt).getTime() <= now.getTime()) {
-      return false; // oferta expirada não é uma oferta válida, mesmo que o preço bata.
-    }
+  if (context.returnDate !== undefined && summary.returnDate !== context.returnDate) {
+    return false;
   }
-  return true;
+  if (!Number.isInteger(summary.stops) || summary.stops < 0) {
+    return false;
+  }
+  return (
+    summary.durationMinutes === null ||
+    (Number.isInteger(summary.durationMinutes) && summary.durationMinutes > 0)
+  );
 }
 
 /**
@@ -129,12 +174,28 @@ export function countEligibleOffers(
 
 /** Assinatura normalizada do itinerário — usada em desempate e na chave de idempotência. */
 export function buildOfferSignature(offer: FlightOffer): string {
+  const summary = offer.fareSummary;
+  if (summary) {
+    return [
+      'FARE',
+      summary.originCode,
+      summary.destinationCode,
+      summary.departureDate,
+      summary.returnDate ?? '-',
+      summary.stops,
+      summary.durationMinutes ?? '-',
+    ].join('|');
+  }
   return offer.segments
     .map((s) => `${s.originIata}|${s.destinationIata}|${s.departureAt}|${s.arrivalAt}|${s.carrier}`)
     .join('>>');
 }
 
-export function offerDurationMinutes(offer: FlightOffer): number {
+/** `null` quando o resumo de tarifa não informa a duração (SPEC-030). */
+export function offerDurationMinutes(offer: FlightOffer): number | null {
+  if (offer.fareSummary) {
+    return offer.fareSummary.durationMinutes;
+  }
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
   if (!first || !last) {
@@ -146,6 +207,9 @@ export function offerDurationMinutes(offer: FlightOffer): number {
 }
 
 export function offerConnectionsCount(offer: FlightOffer): number {
+  if (offer.fareSummary) {
+    return offer.fareSummary.stops;
+  }
   if (offer.segments.length === 0) {
     throw new Error('offerConnectionsCount requires at least one segment');
   }
@@ -175,7 +239,8 @@ export function selectBestOffer(
     .map((offer) => ({
       offer,
       signature: buildOfferSignature(offer),
-      duration: offerDurationMinutes(offer),
+      // Sem duração conhecida perde o empate para quem tem (SPEC-030).
+      duration: offerDurationMinutes(offer) ?? Number.POSITIVE_INFINITY,
       connections: offerConnectionsCount(offer),
     }))
     .sort((a, b) => {
