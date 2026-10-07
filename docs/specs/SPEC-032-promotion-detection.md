@@ -1,138 +1,117 @@
-# SPEC-032 — Detecção de promoções, ciclo de vida e feed
+# SPEC-032 — Promoções por origem, calculadas sob demanda
 
-Status: draft — aguarda as decisões D1 a D4 do owner
+Status: approved para implementação (owner, 2026-10-07) — D3 segue em aberto
+sem bloquear esta versão
 Owner: Pricing / Discovery
-Dependências: ADR-004, ADR-008, SPEC-015 (substituída em parte, ver D1),
-SPEC-020, SPEC-029, SPEC-030, SPEC-031
+Dependências: ADR-004, ADR-008, SPEC-015, SPEC-016, SPEC-020, SPEC-025,
+SPEC-029, SPEC-030, SPEC-031
 Fase: Travelpayouts Fase 1, fatia 4 de 4
-Versão: 1.1 (revisão da proposta 1.0 do owner, recortada para a primeira entrega)
+Versão: 1.2 — substitui a 1.1 (pool fixo de origens, promoção gravada,
+histórico próprio). A proposta 1.0 do owner continua como visão de longo prazo
+e alimenta as SPEC-033/034.
 
 ## Objetivo
 
-O Flight Watch passa a descobrir sozinho, sem depender de usuário monitorando,
-preços que valem ser mostrados como promoção, com uma justificativa que a
-pessoa consegue conferir:
+A pessoa escolhe **de onde sai** e vê as melhores promoções a partir dali,
+para qualquer destino, com uma justificativa que dá para conferir:
 
 - **por que** é promoção: quanto abaixo de qual referência;
-- **com que base**: de onde veio a referência e com quantos pontos;
-- **quão recente** é o preço: idade pela hora em que a fonte o viu;
-- **até quando** vale: ciclo de vida controlado pelo Flight Watch.
+- **com que base**: quantos preços, de quais meses;
+- **quão recente** é o preço: idade pela hora em que a fonte o viu.
 
 Promoção é **dado derivado**: nenhum provedor diz "isto é promoção"; é uma
-conclusão do Flight Watch a partir de preços observados.
+conclusão do Flight Watch a partir de preços da fonte.
 
-```text
-Provider → PriceObservation → validação → referência → desconto
-        → limiar? → anomalia? → Promotion (ciclo de vida) → feed
-```
+### Decisões do owner que moldam esta versão
 
-## Fora do escopo (vai para as specs seguintes)
+| ID  | Decisão                                                                                                                                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **Nada é gravado no banco.** Promoção é calculada sob demanda e guardada só em cache reconstruível (Redis). A DR-019 ("Deal nunca é persistido") continua válida. |
+| D2  | **Sem histórico próprio na v1.** A referência vem dos preços mais recentes da fonte (distribuição de preços da rota no mês da data e nos vizinhos).               |
+| D3  | Em aberto: se a busca do usuário alimenta algum histórico. Não afeta esta versão, que não usa histórico.                                                          |
+| D4  | **Sem lista fixa de origens no site.** A pessoa escolhe a origem. Origens fixas só existirão nos canais (grupos de WhatsApp, Instagram — SPEC-034).               |
 
-| Tema                                                                                     | Onde                             |
-| ---------------------------------------------------------------------------------------- | -------------------------------- |
-| pool dinâmico de rotas, prioridade de monitoramento, polling adaptativo (hot/warm/cold)  | SPEC-033                         |
-| popularidade e percentil histórico no score                                              | SPEC-033                         |
-| distribuição por canal (Instagram, WhatsApp), política de canal, eventos `Promotion*.v1` | SPEC-034                         |
-| Premium, early access, limiares por plano                                                | após a spec de planos/assinatura |
-| segundo provedor para confirmar anomalia                                                 | quando existir segundo provedor  |
-| feature flags (o projeto não tem; exigiria ADR) — a v1 usa só kill switch por variável   | —                                |
-| ML, previsão de preço, melhor momento de compra                                          | fora do MVP (CLAUDE.md §2.2)     |
+## Fora do escopo
 
-A proposta 1.0 completa (visão do motor de oportunidades) fica como norte em
-`docs/roadmap/` e alimenta as SPEC-033/034.
-
-## Decisões do owner (pendentes)
-
-| ID  | Decisão                                                           | Recomendação (usada no texto abaixo)                                                                                                                                                      |
-| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | `Promotion` é gravada no banco?                                   | **Sim.** Estados como STALE/EXPIRED/SUSPECT exigem memória. Isso substitui a DR-019 ("Deal nunca é persistido") e a classificação da SPEC-015 → registrar em **ADR-009** antes do código. |
-| D2  | Como contar histórico próprio                                     | **Pontos de preço**: cada execução com sucesso conta, inclusive a "sem mudança" da SPEC-030 (que não gera observação nova). Sem isso, rota estável nunca junta 10 pontos.                 |
-| D3  | A busca de descoberta do usuário (SPEC-014) alimenta o histórico? | **Não na v1.** `FlightSearch` é separado de `SearchTarget`/`PriceObservation` por decisão da SPEC-014; atravessar essa fronteira pede spec própria (candidata na SPEC-033).               |
-| D4  | Cidades de origem iniciais                                        | `SAO, RIO, BSB, BHZ, POA, CWB, SSA, REC, FOR` (+ `CGR`?). Códigos de **cidade**, não aeroporto: SPEC-029 normaliza GRU/CGH/VCP → SAO e a fonte trabalha por cidade.                       |
+| Tema                                                                                    | Onde                                 |
+| --------------------------------------------------------------------------------------- | ------------------------------------ |
+| histórico próprio de preços, tendência no tempo, "menor preço já visto"                 | SPEC-033 (se D3 decidir guardar)     |
+| pool de origens, coleta antecipada, polling adaptativo, orçamento por prioridade        | SPEC-033                             |
+| canais (WhatsApp, Instagram), promoção gravada para "já publiquei?", origens dos grupos | SPEC-034                             |
+| gráfico de preço por data (evolução visual do calendário da SPEC-031)                   | spec própria, pequena                |
+| Premium, early access, limiares por plano                                               | após a spec de planos/assinatura     |
+| detecção de origem por IP/geolocalização                                                | fora (privacidade; a pessoa escolhe) |
 
 ## Atores e autorização
 
-- **Motor de promoções** (processo interno, no scheduler): coleta, avalia e
-  mantém o ciclo de vida. Sem usuário.
-- **Visitante** (público, sem login): lê o feed. Leitura pública com o rate
-  limit `default` (SPEC-025).
-- Nenhuma ação de escrita é exposta por HTTP nesta spec.
+- **Visitante** (público, sem login): escolhe a origem e lê o feed.
+  Endpoint público com o rate limit `default` (SPEC-025).
+- Nenhuma escrita é exposta por HTTP.
 
-## Universo de rotas (mínimo da v1)
+## Fluxo
 
-1. **Origens**: lista configurável `PROMOTION_ORIGIN_CITIES` (D4), validada
-   contra o catálogo (SPEC-029): código desconhecido ou não pesquisável impede
-   o startup do scheduler (`config_invalid`).
-2. **Destinos**: uma vez por dia, por origem, o endpoint de destinos populares
-   da Travelpayouts (`city-directions` ou equivalente) devolve os destinos;
-   ficam os `PROMOTION_DESTINATIONS_PER_ORIGIN` primeiros que existem no
-   catálogo como pesquisáveis. Viés conhecido: popularidade de **busca** da
-   base deles (não de venda, com peso do público russo) — por isso só
-   descobre rotas, nunca entra no score.
-3. **Meses**: o mês corrente e os `PROMOTION_MONTHS_AHEAD` seguintes.
-4. **Unidade de coleta**: `(origem, destino, tipoViagem, duração, mês)` — uma
-   chamada mensal (a mesma do calendário, SPEC-031) traz o preço de cada dia.
-   Na v1: só ida (`ONE_WAY`) e ida e volta com `PROMOTION_ROUND_TRIP_LENGTH_DAYS`
-   (padrão 7). Classe econômica, 1 adulto, moeda BRL, mercado BR.
-5. **Frequência fixa** na v1: cada unidade é coletada no máximo uma vez a cada
-   `PROMOTION_REFRESH_INTERVAL_HOURS` (padrão 24). Prioridade e polling
-   adaptativo são da SPEC-033.
+```text
+GET /v1/promotions?origin=CGR
+  │
+  ├─ cache da origem fresco? ──sim──► responde
+  │
+  ├─ 1 chamada: mais barato por destino a partir da origem   (candidatos)
+  ├─ filtra: válidos, ≤ 72 h, destino pesquisável no catálogo
+  ├─ ordena por preço, pega os N primeiros
+  ├─ para cada candidato: preços da rota no mês da data e nos
+  │  meses vizinhos (consulta mensal da SPEC-031, cache por rota-mês)
+  ├─ avalia (função pura): referência, desconto, suspeita, score
+  └─ guarda o resultado no cache da origem e responde
+```
 
-### Regra de ouro (cache-first)
+### Provedor (porta ADR-004, nova capacidade opcional)
 
-Antes de chamar a fonte, o motor verifica, nesta ordem, e **não chama** se
-algum responder:
+```ts
+interface FlightProvider {
+  // ...search, priceCalendar, allFlightsUrl (SPEC-030/031)
+  cheapestByDestination?(query: CheapestByDestinationQuery): Promise<DestinationFare[]>;
+}
+interface CheapestByDestinationQuery {
+  originIata: string; // código de cidade (SPEC-029)
+  tripType: 'ONE_WAY' | 'ROUND_TRIP';
+  currency: string;
+  market: string;
+}
+interface DestinationFare {
+  destinationIata: string;
+  departureDate: string; // AAAA-MM-DD
+  returnDate: string | null;
+  amountMinor: number;
+  stops: number;
+  observedAt: string; // hora em que a fonte viu (SPEC-030), nunca no futuro
+}
+```
 
-1. a unidade foi coletada há menos de `PROMOTION_REFRESH_INTERVAL_HOURS`;
-2. existe coleta da mesma unidade em andamento (lease, P12);
-3. o orçamento do dia acabou.
+- **Travelpayouts:** `v2/prices/latest` só com `origin` (verificado em
+  2026-10-07: SAO devolveu 338 destinos distintos e CGR 21 numa chamada, um
+  preço por destino). Mesmas regras de normalização da SPEC-030: `observedAt`
+  = `found_at` limitado a agora; moeda e mercado pedidos.
+- **Simulado:** lista determinística para desenvolvimento e testes, coerente
+  com o `priceCalendar` simulado (a mesma rota/data dá o mesmo preço).
+- Provedor sem a capacidade → feed vazio, sem erro.
 
-Monitoramento de usuário (`Watch`/`SearchTarget`) e busca de usuário **não**
-consomem o orçamento de promoções e nunca esperam por ele.
+### Referência
 
-### Orçamento
+- Para cada candidato, a referência é a **mediana** dos preços da mesma rota
+  e tipo de viagem no **mês da data** e nos **meses vizinhos** (anterior, se
+  não for passado, e seguinte), **excluindo a própria data**. Em ida e volta,
+  só entram datas com a mesma duração (regra da SPEC-031).
+- Mínimo de `PROMOTION_MIN_REFERENCE_POINTS` (padrão 8) preços; abaixo disso o
+  candidato fica fora (`INSUFFICIENT_DATA`).
+- Preços com mais de 72 h ficam fora da referência e do candidato (SPEC-030).
+- Mediana com quantidade par: média dos dois do meio, arredondada para baixo
+  em unidade mínima.
+- O que a referência mede, e é isso que a tela diz: **"mais barato que as
+  outras datas próximas nesta rota"**. Não é "mais barato que o normal da
+  rota" (isso exige histórico, SPEC-033). Limitação conhecida: se a companhia
+  baixar o período inteiro, a mediana cai junto e a promoção não aparece.
 
-`PROMOTION_DAILY_SEARCH_BUDGET` chamadas por dia (dia UTC). Esgotado: o motor
-para de coletar até o dia seguinte, registra métrica e log
-(`promotion_budget_exhausted`), e as promoções existentes seguem o ciclo de
-vida normalmente (podem ficar STALE/EXPIRED).
-
-## Referência de preço
-
-### Fontes
-
-| `referenceSource`             | O que mede                               | Mínimo para valer                                                                                                                   | Texto na tela                                                  |
-| ----------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `FLIGHTWATCH_HISTORY`         | o normal **da rota no tempo**            | ≥ `PROMOTION_MIN_HISTORY_POINTS` (10) pontos (D2) em ≥ `PROMOTION_MIN_HISTORY_DAYS` (7) dias distintos de coleta, janela de 60 dias | "X% abaixo da referência da rota (N preços em D dias)"         |
-| `PROVIDER_MONTH_DISTRIBUTION` | o normal **entre as datas do mesmo mês** | ≥ `PROMOTION_MIN_MONTH_DAYS` (8) **outras** datas com preço na mesma coleta                                                         | "X% abaixo da mediana das outras datas de novembro nesta rota" |
-
-- Preferência: `FLIGHTWATCH_HISTORY` quando atinge o mínimo; senão
-  `PROVIDER_MONTH_DISTRIBUTION`; senão `INSUFFICIENT_DATA` (nada é publicado).
-- A distribuição do mês **exclui a própria data** avaliada da mediana.
-- As duas fontes medem coisas diferentes e por isso têm textos diferentes. A
-  tela nunca diz "abaixo do normal" quando a base é só o mês.
-- Histórico/média/preço típico vindos do provedor (`PROVIDER_HISTORY` da
-  proposta 1.0): a Travelpayouts Data API não fornece; fica reservado no enum
-  para um provedor futuro que forneça, sem implementação na v1.
-
-### Cálculo
-
-- Referência = **mediana**, nunca média e nunca o mínimo sozinho. Quantidade
-  par de valores: média dos dois do meio, arredondada para baixo em unidade
-  mínima.
-- Dinheiro em `amountMinor` inteiro + moeda (CLAUDE.md §8.1). Moedas
-  diferentes nunca se comparam: ponto em outra moeda fica fora da referência.
-- `discountBps = floor((referência − atual) × 10000 / referência)` — inteiro em
-  pontos-base; nenhum float decide limiar.
-- `absoluteSavingMinor = referência − atual`.
-- **Contexto**: só entram na referência preços da mesma
-  `(origem, destino, tipoViagem, duração, moeda, mercado)`. A fragmentação por
-  antecedência/período (proposta 1.0 §66) fica para quando houver volume.
-- O selo "menor preço já observado" (SPEC-015 `HISTORICAL_LOW`) passa a ser
-  **complemento** de uma promoção já qualificada com `FLIGHTWATCH_HISTORY`, nunca
-  critério sozinho.
-
-## Qualificação
+### Qualificação
 
 | Regra                         |  Valor inicial | Variável                                   |
 | ----------------------------- | -------------: | ------------------------------------------ |
@@ -140,285 +119,265 @@ vida normalmente (podem ficar STALE/EXPIRED).
 | desconto mínimo internacional | 2000 bps (20%) | `PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS` |
 | suspeito acima de             | 7000 bps (70%) | `PROMOTION_SUSPECT_DISCOUNT_BPS`           |
 
+- Dinheiro em `amountMinor` inteiro + moeda; moedas diferentes nunca se
+  comparam (CLAUDE.md §8.1).
+- `discountBps = floor((referência − preço) × 10000 / referência)`;
+  `absoluteSavingMinor = referência − preço`. Nenhum float decide limiar.
 - **Nacional** = origem e destino com o mesmo `countryCode` no catálogo
   (SPEC-029).
-- Rejeitado antes de qualquer cálculo (`INVALID_PRICE`, não entra na
-  referência): preço ≤ 0, moeda diferente da pedida, data de viagem no
-  passado, rota diferente da pedida, preço com mais de 72 h (regra da
-  SPEC-030).
-- Resultado da avaliação (função pura no domínio, sem estado):
+- Inválido (fora do feed, não entra em referência): preço ≤ 0, moeda diferente
+  da pedida, data de viagem no passado, mais de 72 h.
+- **Suspeito** (desconto acima do limite): **nunca** aparece no feed; só
+  métrica e log. Consultar a mesma fonte de novo devolve o mesmo cache e não
+  confirma nada.
+- Uma promoção por destino (a fonte já devolve a melhor data de cada um).
+
+Resultado da avaliação (função pura em `packages/domain`, relógio injetado):
 
 ```ts
 type PromotionEvaluation =
-  | {
-      result: 'QUALIFIES';
-      reference: Reference;
-      discountBps: number;
-      absoluteSavingMinor: number;
-      score: number;
-    }
-  | { result: 'SUSPECT'; reference: Reference; discountBps: number }
-  | { result: 'NOT_PROMOTIONAL'; reference: Reference; discountBps: number }
-  | { result: 'INSUFFICIENT_DATA' }
-  | { result: 'INVALID_PRICE'; reason: InvalidPriceReason };
+  | { result: 'QUALIFIES'; promotion: PromotionView }
+  | { result: 'SUSPECT'; discountBps: number }
+  | { result: 'NOT_PROMOTIONAL'; discountBps: number }
+  | { result: 'INSUFFICIENT_DATA'; referencePoints: number }
+  | { result: 'INVALID_PRICE'; reason: 'NON_POSITIVE' | 'CURRENCY' | 'PAST_DATE' | 'TOO_OLD' };
 ```
 
-## Agrupamento e identidade
+### Score (v1, só para ordenar)
 
-Uma promoção representa a **melhor data** de uma unidade. Chave única:
+`score` inteiro de 0 a 100; `scoreVersion = 1` na resposta.
 
-```text
-(origem, destino, tipoViagem, duração, mês de viagem, moeda, mercado)
-```
+| Componente | Peso | Cálculo                                                                                |
+| ---------- | ---: | -------------------------------------------------------------------------------------- |
+| desconto   |   50 | linear de 0 (no limiar) a 100 (em 5000 bps), satura acima                              |
+| economia   |   20 | linear até `PROMOTION_SAVING_SCORE_CAP_MINOR` (padrão 100000 = R$ 1.000), satura acima |
+| frescor    |   30 | 100 com idade 0, −100/72 por hora de idade, mínimo 0                                   |
 
-- Se novembro inteiro de SAO → LIS qualificar, o feed mostra **uma** promoção
-  (a data mais barata), com "outras datas no calendário" — nunca 30 cartões.
-- Coleta nova cuja melhor data (a mesma ou outra) ainda qualifica **atualiza**
-  a promoção ativa: preço, data, referência, score e `lastConfirmedAt`; o
-  estado volta a `ACTIVE` se estava `STALE`. Só vira `ENDED` quando a melhor
-  data da coleta nova não qualifica.
-- Avaliar de novo a mesma coleta não cria nem altera nada (idempotência por
-  `(chave, observedAt da melhor data, preço)`), mesmo com entrega
-  at-least-once (H05).
-- Duas avaliações concorrentes da mesma chave: uma vence pelo lease da
-  unidade; a outra encerra sem efeito.
+Popularidade e percentil histórico não entram na v1 (não há dado; não se
+inventa valor neutro).
 
-## Ciclo de vida
+### Frescor (substitui o ciclo de vida da 1.1)
 
-```text
-          QUALIFIES                      nova coleta não qualifica
- (nada) ───────────► ACTIVE ─────────────────────────────────► ENDED
-   │                  │  ▲                                          ▲
-   │ SUSPECT          │  │ nova coleta confirma                     │
-   ▼                  ▼  │                                          │
- SUSPECT          STALE ─┘  (idade > STALE)   ── idade > EXPIRED ──► EXPIRED
-   │ próxima coleta: ainda suspeito ou some → REJECTED
-   │ próxima coleta: preço plausível que qualifica → ACTIVE (preço novo)
-```
+Sem estados gravados. A idade é sempre calculada a partir de `observedAt`:
 
-| Estado     | Público?                                                  | Significado                                                                 |
-| ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `ACTIVE`   | sim                                                       | qualificada; preço visto pela fonte há ≤ `PROMOTION_STALE_AFTER_HOURS` (24) |
-| `STALE`    | sim, com aviso "preço encontrado há N h, pode ter mudado" | idade entre 24 h e `PROMOTION_EXPIRE_AFTER_HOURS` (72)                      |
-| `ENDED`    | não                                                       | coleta mais nova mostrou preço que não qualifica — muda **na hora**         |
-| `EXPIRED`  | não                                                       | sem confirmação até 72 h de idade                                           |
-| `SUSPECT`  | **nunca**                                                 | desconto acima do limite de suspeita                                        |
-| `REJECTED` | não                                                       | suspeita não confirmada; o preço sai da referência histórica                |
+- até 24 h: exibida normalmente, com "preço encontrado há N h";
+- de 24 h a 72 h: exibida com aviso "pode ter mudado";
+- acima de 72 h: fora do feed.
 
-- **Idade conta a partir de `observedAt`** — a hora em que a fonte viu o
-  preço (SPEC-030), não a hora da nossa consulta. Na Travelpayouts um preço
-  pode chegar com horas de idade; os limites de 24/72 h refletem isso (a
-  proposta 1.0 sugeria 6/24 h, que fariam quase toda promoção nascer velha).
-- **SUSPECT nunca é publicado automaticamente.** Consultar a mesma fonte de
-  novo devolve o mesmo cache e não confirma nada; sem segundo provedor, a
-  única confirmação é uma coleta seguinte com preço plausível.
-- Estados terminais (`ENDED`, `EXPIRED`, `REJECTED`) não voltam; uma nova
-  qualificação da mesma chave cria um novo registro.
-- A validade de 72 h da fonte é da fonte; a validade comercial é a desta
-  máquina de estados.
+## Cache e custo (regra de ouro: não chamar se já sabemos)
 
-## Score (v1)
+| Cache (Redis, reconstruível)                                        | Chave                                                                                          | TTL (variável, padrão)                   |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| resultado do feed por origem                                        | `promotions:v1:{origin}:{tripType}:{currency}:{market}`                                        | `PROMOTION_FEED_CACHE_TTL_MINUTES` (360) |
+| preços da rota por mês (compartilhado com o calendário da SPEC-031) | `price-calendar:v1:{origin}:{destination}:{month}:{tripType}:{tripLength}:{currency}:{market}` | `PRICE_CALENDAR_CACHE_TTL_MINUTES` (360) |
 
-`score` de 0 a 100, só para ordenar o feed. Versão registrada em cada
-promoção (`scoreVersion = 1`) para comparar mudanças futuras.
-
-| Componente | Peso | Cálculo                                                                                                 |
-| ---------- | ---: | ------------------------------------------------------------------------------------------------------- |
-| desconto   |   50 | linear de 0 (no limiar) a 100 (em 5000 bps)                                                             |
-| economia   |   20 | linear até o teto `PROMOTION_SAVING_SCORE_CAP_MINOR` (padrão 100000 = R$ 1.000), satura acima           |
-| confiança  |   30 | `FLIGHTWATCH_HISTORY` 100 / `PROVIDER_MONTH_DISTRIBUTION` 60, menos 1 ponto por hora de idade, mínimo 0 |
-
-Popularidade e percentil histórico ficam para a SPEC-033, quando houver dado
-real; até lá não entram com valor neutro inventado.
+- Custo de uma origem fria: 1 + até `PROMOTION_CANDIDATES_PER_ORIGIN` (padrão 10) × 3 meses = até 31 chamadas; origem quente: 0. O custo cresce com o
+  número de **origens diferentes** pedidas, não com o número de pessoas.
+- Requisições simultâneas para a mesma origem fria no mesmo processo
+  compartilham o mesmo cálculo (single-flight). Entre réplicas pode haver um
+  cálculo duplicado; aceito na v1 e medido.
+- Orçamento: `PROMOTION_DAILY_CALL_BUDGET` chamadas por dia UTC, contado no
+  Redis. Esgotado: só serve cache; origem sem cache responde
+  `status: "BUDGET_EXHAUSTED"` com lista vazia (a tela explica). Busca e
+  monitoramento de usuário não entram nesse orçamento e nunca esperam por ele.
+- Redis fora: o feed é calculado sem cache, respeitando o orçamento local do
+  processo; nunca derruba a API.
+- O calendário da SPEC-031 passa a usar o mesmo cache por rota-mês (hoje
+  consulta a fonte a cada abertura) — mesmo dado, uma chamada a menos.
 
 ## Contrato da API
 
-`GET /v1/promotions?origin&destination&scope=domestic|international&sort=score|price|discount|recent&limit`
+`GET /v1/promotions?origin&tripType=ONE_WAY|ROUND_TRIP&scope=all|domestic|international&sort=score|price|discount&limit`
 
-- público, rate limit `default`; filtros normalizados para cidade (SPEC-029);
-- devolve só `ACTIVE` e `STALE`, ordenado por `score` por padrão;
-- resposta:
+- `origin` obrigatório, normalizado para cidade (SPEC-029); código
+  desconhecido → `400 UNSUPPORTED_SEARCH` (o mesmo código da busca e do
+  calendário).
+- `tripType` padrão `ONE_WAY`; `limit` padrão 20, máximo 50; moeda BRL e
+  mercado BR fixos na v1.
+- Erro da fonte sem cache → `502 PROVIDER_UNAVAILABLE` (a tela some com o
+  bloco, como no calendário).
 
 ```ts
 {
+  origin: string;
+  originName: string;
+  status: 'OK' | 'BUDGET_EXHAUSTED';
+  generatedAt: string; // quando o feed desta origem foi calculado
   promotions: Array<{
-    id: string;
-    origin: string;
-    originName: string;
     destination: string;
     destinationName: string;
+    destinationCoordinates: { latitude: number; longitude: number } | null;
     scope: 'DOMESTIC' | 'INTERNATIONAL';
     tripType: 'ONE_WAY' | 'ROUND_TRIP';
     departureDate: string;
-    returnDate: string | null; // AAAA-MM-DD
+    returnDate: string | null;
     price: { amountMinor: number; currency: string };
+    stops: number;
     discountBps: number;
     absoluteSavingMinor: number;
     reference: {
       amountMinor: number;
-      source: 'FLIGHTWATCH_HISTORY' | 'PROVIDER_MONTH_DISTRIBUTION';
       pointCount: number;
-      periodDays: number;
+      months: string[]; // ['2026-10','2026-11','2026-12']
       explanation: string; // texto pronto em pt-BR
     };
-    historicalLow: boolean;
-    status: 'ACTIVE' | 'STALE';
-    observedAt: string; // RFC3339 UTC — idade do preço
+    observedAt: string; // idade do preço
     score: number;
-    purchaseUrl: string | null; // allowlist (SPEC-018) + afiliado (SPEC-020, superfície PROMOTION)
+    scoreVersion: 1;
+    purchaseUrl: string | null; // allowlist (SPEC-018) + afiliado, superfície OPPORTUNITY (SPEC-020)
   }>;
-  total: number;
 }
 ```
 
-- `/v1/opportunities` e o `Deal` da SPEC-015 continuam funcionando até esta
-  spec estar verificada; a remoção é uma mudança separada, registrada no
-  ADR-009 (D1).
+Texto de `explanation` (exemplo): "R$ 590 está 31% abaixo da mediana de 24
+preços encontrados para Campo Grande → Salvador entre outubro e dezembro."
 
 ## Web
 
-- `/opportunities` (feed e mapa) passa a ler `/v1/promotions`.
-- Cartão: rota, preço, "↓ 31% abaixo da referência" (nunca "% OFF"),
-  referência em reais, idade do preço, data(s) e "Como calculamos?" com o
-  `explanation`.
-- `STALE` aparece com o aviso de idade; estado vazio diz que não há promoção
-  agora (não é erro).
+- `/opportunities` ganha seletor de origem (o `PlaceCombobox` existente). A
+  escolha fica num cookie de preferência (`fw_origin`, sem dado pessoal, 1
+  ano) e na URL (`?origin=CGR`), para o link ser compartilhável.
+- Sem origem escolhida: estado vazio que pede a cidade — nunca uma origem
+  inventada.
+- Cartão: destino, preço, "↓ 31% abaixo das datas próximas" (nunca "% OFF"),
+  referência em reais, idade do preço, data(s), escalas e "Como calculamos?"
+  com a `explanation`. Botão de compra pelo `PurchaseButton` + `PurchaseNote`.
+- Mapa (SPEC-016) mostra os destinos do feed a partir da origem.
+- Estados distintos: carregando, sem origem, sem promoção agora (não é erro),
+  orçamento esgotado, fonte indisponível.
 - Linguagem: "menor preço observado pelo sistema", nunca "do mercado" ou
   "garantido" (CLAUDE.md §2.3).
+- `/v1/opportunities` e o `Deal` da SPEC-015 continuam no ar até esta spec
+  estar verificada; removê-los é uma mudança separada.
 
 ## Persistência e migração
 
-Migração expansiva (sem tocar tabelas existentes):
-
-- `promotion_routes` — `(origin, destination)` descobertas, `discoveredAt`,
-  `lastSeenAt`, `active`;
-- `promotion_collections` — uma linha por coleta de unidade: chave da
-  unidade, `collectedAt`, resultado (`SUCCEEDED`/`NO_OFFERS`/falha tipada),
-  lease; os preços por data da coleta (pontos de referência, D2) em tabela
-  filha `promotion_price_points` imutável;
-- `promotions` — chave de agrupamento, estado, preço e data representativos,
-  referência (valor, fonte, pontos, período), `discountBps`,
-  `absoluteSavingMinor`, `score`, `scoreVersion`, `observedAt`,
-  `lastConfirmedAt`, `stateChangedAt`; índice único parcial em
-  `(chave) WHERE status IN ('ACTIVE','STALE','SUSPECT')`.
-
-Pontos de preço do motor ficam em tabelas próprias, não em
-`PriceObservation`: não há `Watch`/`SearchTarget` por trás e o fan-out de
-alertas não deve vê-los. Unificar com o histórico de `SearchTarget` é decisão
-da SPEC-033.
+Nenhuma. Tudo em cache reconstruível.
 
 ## Falhas e retries
 
-- Erro da fonte: classificação de erro existente (`ProviderError`); temporário
-  → coleta marcada como falha e reagendada pelo próximo tick, sem retry
-  imediato (H08); 429 respeita `Retry-After` e para o motor até lá.
-- Falha não mexe em promoção existente: ela segue o ciclo por idade.
-- Kill switch `PROMOTION_ENGINE_ENABLED=false`: não coleta nem avalia; o feed
-  devolve vazio. `PROMOTION_DISCOVERY_ENABLED=false`: não descobre destinos
-  novos, mantém as rotas já conhecidas.
+- Erro na chamada de candidatos: sem cache → 502; com cache vencido há menos
+  de 72 h de idade de preço → serve o cache antigo com `generatedAt` real.
+- Erro na consulta mensal de um candidato: esse candidato sai do feed desta
+  rodada; os outros seguem.
+- 429 da fonte: respeita `Retry-After` (sem novas chamadas do feed até lá),
+  serve cache.
+- Sem retry imediato dentro da requisição (H08). Timeout por chamada já
+  existente no adaptador.
+- Kill switch `PROMOTION_ENGINE_ENABLED=false`: o endpoint responde lista
+  vazia sem chamar a fonte; a tela some com o bloco.
 
 ## Segurança e privacidade
 
-Sem dado pessoal. Links de compra só pela allowlist. Endpoint público com rate
-limit. Nenhum payload bruto da fonte em log.
+Sem dado pessoal; a origem é preferência de navegação, não identifica
+ninguém. Links só pela allowlist. Endpoint público com rate limit. Nenhum
+payload bruto da fonte em log.
 
 ## Observabilidade
 
-| Métrica                       | Labels                                                                                               |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `promotion_collections_total` | `result` (`succeeded`, `no_offers`, `failed`, `skipped_fresh`, `skipped_budget`)                     |
-| `promotion_evaluations_total` | `result` (`qualifies`, `suspect`, `not_promotional`, `insufficient_data`, `invalid_price`), `source` |
-| `promotion_transitions_total` | `from`, `to`                                                                                         |
-| `promotions_current`          | `status` (gauge)                                                                                     |
-| `promotion_budget_remaining`  | — (gauge)                                                                                            |
-| `promotion_feed_fetch_total`  | `result`                                                                                             |
+| Métrica                           | Labels                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `promotion_feed_requests_total`   | `cache` (`hit`, `miss`, `stale`), `result` (`ok`, `budget_exhausted`, `provider_unavailable`, `disabled`) |
+| `promotion_provider_calls_total`  | `kind` (`candidates`, `month`), `result` (`ok`, `error`, `rate_limited`, `cache_hit`)                     |
+| `promotion_evaluations_total`     | `result` (`qualifies`, `suspect`, `not_promotional`, `insufficient_data`, `invalid_price`)                |
+| `promotion_budget_remaining`      | — (gauge)                                                                                                 |
+| `promotion_feed_duration_seconds` | `cache` (histograma)                                                                                      |
 
-Taxas (cache hit, cliques por promoção, custo por promoção) são calculadas no
-Prometheus a partir dessas séries e de `purchase_clicks`; não viram métrica
-própria. Log `promotion_budget_exhausted` e `promotion_suspect_detected`
-com a chave da unidade.
+Origem **não** vira label (cardinalidade). Logs: `promotion_suspect_detected`
+(rota, desconto), `promotion_budget_exhausted`, `promotion_feed_computed`
+(origem, candidatos, qualificadas, chamadas, duração).
 
-## Variáveis de ambiente (novas, `packages/config`, scheduler e api)
+## Variáveis de ambiente (novas, api, `packages/config` e `.env.example`)
 
-`PROMOTION_ENGINE_ENABLED` (false), `PROMOTION_DISCOVERY_ENABLED` (false),
-`PROMOTION_ORIGIN_CITIES`, `PROMOTION_DESTINATIONS_PER_ORIGIN` (15),
-`PROMOTION_MONTHS_AHEAD` (2), `PROMOTION_ROUND_TRIP_LENGTH_DAYS` (7),
-`PROMOTION_REFRESH_INTERVAL_HOURS` (24), `PROMOTION_DAILY_SEARCH_BUDGET`,
-`PROMOTION_MIN_HISTORY_POINTS` (10), `PROMOTION_MIN_HISTORY_DAYS` (7),
-`PROMOTION_MIN_MONTH_DAYS` (8), `PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS` (1500),
-`PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS` (2000),
-`PROMOTION_SUSPECT_DISCOUNT_BPS` (7000), `PROMOTION_STALE_AFTER_HOURS` (24),
-`PROMOTION_EXPIRE_AFTER_HOURS` (72), `PROMOTION_SAVING_SCORE_CAP_MINOR`
-(100000). Todas em `.env.example`. Motor desligado por padrão.
-
-Custo de referência (10 origens × 15 destinos × 3 meses × 2 tipos de viagem):
-900 unidades/dia com refresh de 24 h → orçamento inicial sugerido de 1000
-chamadas/dia, a confirmar contra os limites da conta Travelpayouts.
+`PROMOTION_ENGINE_ENABLED` (false), `PROMOTION_CANDIDATES_PER_ORIGIN` (10),
+`PROMOTION_MIN_REFERENCE_POINTS` (8), `PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS`
+(1500), `PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS` (2000),
+`PROMOTION_SUSPECT_DISCOUNT_BPS` (7000), `PROMOTION_SAVING_SCORE_CAP_MINOR`
+(100000), `PROMOTION_FEED_CACHE_TTL_MINUTES` (360),
+`PRICE_CALENDAR_CACHE_TTL_MINUTES` (360), `PROMOTION_DAILY_CALL_BUDGET`
+(2000). A API passa a usar `REDIS_URL` (hoje só scheduler e workers usam).
 
 ## Critérios de aceitação
 
-- **AC-1** Referência é a mediana, de `FLIGHTWATCH_HISTORY` quando atinge o
-  mínimo, senão `PROVIDER_MONTH_DISTRIBUTION` excluindo a própria data, senão
-  `INSUFFICIENT_DATA`.
-- **AC-2** Desconto e economia em inteiros (bps e unidade mínima); limiar
-  nacional/internacional pelo `countryCode`; 1499 bps nacional não qualifica,
-  1500 qualifica.
-- **AC-3** Preço inválido é rejeitado e não entra em nenhuma referência.
-- **AC-4** Desconto acima do limite de suspeita vira `SUSPECT`, nunca aparece
-  no feed; confirmado só por coleta seguinte plausível; senão `REJECTED`.
-- **AC-5** Uma promoção por chave de agrupamento; reavaliar a mesma coleta não
-  muda nada.
-- **AC-6** Ciclo de vida por idade a partir de `observedAt`: `ACTIVE` →
-  `STALE` (24 h) → `EXPIRED` (72 h); coleta que não qualifica → `ENDED`
-  imediato; terminais não voltam.
-- **AC-7** Cache-first: unidade fresca, em andamento ou sem orçamento não gera
-  chamada; orçamento esgotado não afeta Watch nem busca de usuário.
-- **AC-8** `GET /v1/promotions` devolve só `ACTIVE`/`STALE`, com referência,
-  fonte, pontos, período, explicação e idade; link pela allowlist com
-  afiliado.
-- **AC-9** O feed web mostra a base da comparação e a idade de toda promoção,
-  com textos distintos por fonte de referência.
-- **AC-10** Kill switches desligam motor e descoberta separadamente.
-- **AC-11** Execução real: com o motor ligado para 2 origens, o feed mostra
-  promoções reais da Travelpayouts com explicação conferível à mão.
+- **AC-1** Travelpayouts `cheapestByDestination`: um preço por destino, regras
+  de normalização da SPEC-030, preço com mais de 72 h fora. Simulado coerente
+  com o calendário simulado.
+- **AC-2** Referência = mediana do mês da data e vizinhos, sem a própria data,
+  mesma duração em ida e volta; abaixo do mínimo → `INSUFFICIENT_DATA`.
+- **AC-3** Desconto e economia em inteiros; limiar nacional/internacional pelo
+  `countryCode`; 1499 bps nacional não qualifica, 1500 qualifica.
+- **AC-4** Desconto acima do limite de suspeita nunca aparece no feed.
+- **AC-5** Score de 0 a 100 conforme a tabela; ordenação por score, preço ou
+  desconto.
+- **AC-6** Cache por origem e por rota-mês: segunda requisição da mesma origem
+  dentro do TTL faz 0 chamadas; requisições simultâneas da mesma origem fria
+  no mesmo processo fazem um cálculo só; o calendário da SPEC-031 reaproveita
+  o cache por rota-mês.
+- **AC-7** Orçamento esgotado: só cache; origem sem cache → `BUDGET_EXHAUSTED`;
+  busca e monitoramento não são afetados.
+- **AC-8** `GET /v1/promotions` valida e normaliza a origem, devolve
+  referência, pontos, meses, explicação e idade em toda promoção; link pela
+  allowlist com afiliado; erro da fonte sem cache → 502.
+- **AC-9** Web: seletor de origem lembrado em cookie e na URL; estados
+  distintos; base da comparação e idade em todo cartão; mapa com os destinos.
+- **AC-10** Kill switch desliga o feed sem chamar a fonte.
+- **AC-11** Execução real: com `FLIGHT_PROVIDER=travelpayouts`, o feed de SAO
+  e de CGR mostra promoções reais com explicação conferível à mão contra o
+  calendário da rota.
 
 ## Testes e evals
 
-- Unitários de domínio: mediana (par/ímpar), bps nas bordas, escolha da fonte,
-  validação, score, máquina de estados (todas as transições e as proibidas).
-- Integração (Postgres real): unicidade da chave, idempotência da reavaliação,
-  lease concorrente, orçamento.
-- e2e da API: filtros, ordenação, só estados públicos, link com afiliado.
-- **EVAL-PROMO-001** — conjunto rotulado em `docs/evals/` com ≥ 50 casos
-  (preço, pontos de referência, rótulo "é/não é promoção" dado pelo owner):
-  precisão ≥ 90%. Sem o conjunto rotulado o eval não conta.
-- **EVAL-PROMO-002** — anomalia (≥ 7000 bps) nunca publicada: 100%.
-- **EVAL-PROMO-003** — sem referência mínima, nunca afirmação estatística: 100%.
-- **EVAL-PROMO-004** — toda promoção no feed tem referência, fonte e
-  explicação: 100%.
-- **EVAL-PROMO-005** — nenhuma chamada para unidade fresca ou em andamento:
-  0 chamadas duplicadas no cenário de dois ticks concorrentes.
-- **EVAL-PROMO-006** — orçamento esgotado: 0 chamadas do motor e Watch/busca
-  de usuário sem impacto: 100%.
+- Unitários de domínio: mediana (par/ímpar), bps nas bordas, nacional ×
+  internacional, inválidos, suspeita, score, frescor, com relógio injetado.
+- Adaptadores: Travelpayouts com fixture sanitizada do `v2/prices/latest` só
+  com origem; simulado.
+- API (e2e): cache hit/miss com chamadas contadas, single-flight, orçamento,
+  kill switch, 400/502, link com afiliado.
+- Web: lógica de apresentação (texto da referência, frescor, estados) em
+  `lib/domain`.
+- **EVAL-PROMO-001** — conjunto rotulado em `docs/evals/EVALS-032-promotions.md`
+  com ≥ 50 casos (candidato + preços de referência + rótulo "é/não é
+  promoção" do owner): precisão ≥ 90%. O conjunto é montado pelo owner a
+  partir de casos reais; sem ele, o eval não conta.
+- **EVAL-PROMO-002** — anomalia (≥ 7000 bps) nunca no feed: 100%.
+- **EVAL-PROMO-003** — abaixo do mínimo de referência, nenhuma afirmação
+  estatística: 100%.
+- **EVAL-PROMO-004** — toda promoção do feed tem referência, pontos, meses,
+  explicação e idade: 100%.
+- **EVAL-PROMO-005** — origem quente: 0 chamadas; duas requisições
+  simultâneas de origem fria: 1 cálculo.
+- **EVAL-PROMO-006** — orçamento esgotado: 0 chamadas do feed; busca e Watch
+  inalterados.
+
+## Fatias de implementação
+
+1. **Domínio**: `evaluatePromotion`, mediana, score, frescor, nacional ×
+   internacional — puros, com testes (AC-2 a AC-5).
+2. **Provedor**: `cheapestByDestination` na porta, Travelpayouts e simulado
+   (AC-1).
+3. **Config + cache**: variáveis em `packages/config`, Redis na API, cache por
+   rota-mês aplicado também ao calendário da SPEC-031 (AC-6 parcial).
+4. **API**: `PromotionsService` (fluxo, single-flight, orçamento, kill switch,
+   métricas), contrato em `packages/contracts`, `GET /v1/promotions` (AC-6 a
+   AC-8, AC-10).
+5. **Web**: seletor de origem, cookie/URL, cartões, mapa, estados (AC-9).
+6. **Verificação real** (AC-11) e evidência nesta spec.
 
 ## Rollout, rollback e kill switch
 
-1. Migração expansiva; motor desligado por padrão.
-2. Liga a descoberta e o motor para 2 origens em desenvolvimento; confere o
-   feed (AC-11) e o consumo real de chamadas.
-3. Liga as demais origens; ajusta orçamento.
-4. Troca o `/opportunities` para `/v1/promotions`.
-
-Rollback: kill switch; o web volta ao `/v1/opportunities` (mantido até a
-remoção do `Deal`). As tabelas novas não afetam as existentes.
+1. Motor desligado por padrão; liga em desenvolvimento e confere AC-11.
+2. `/opportunities` passa a usar `/v1/promotions`.
+3. Rollback: `PROMOTION_ENGINE_ENABLED=false` e o web volta ao
+   `/v1/opportunities` (mantido até a remoção do `Deal`). Sem migração, nada
+   a desfazer no banco.
 
 ## Perguntas abertas
 
-- D1 a D4 acima.
-- Limites de uso da conta Travelpayouts para `city-directions` e para a
-  consulta mensal (define o orçamento real).
-- A proposta 1.0 citava 6 h/24 h para STALE/EXPIRED; a revisão usa 24 h/72 h
-  pela idade da fonte — confirmar.
+- D3 (histórico próprio) — decide o escopo da SPEC-033.
+- Limites de uso da conta Travelpayouts (define `PROMOTION_DAILY_CALL_BUDGET`
+  real).
+- `PROMOTION_CANDIDATES_PER_ORIGIN = 10` vs. mostrar mais destinos: medir
+  quantos candidatos qualificam por origem na verificação real.
 
 ## Evidência de implementação
 
