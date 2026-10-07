@@ -20,6 +20,11 @@ tarefa fechada; pendências em lista.
   `npx turbo run test --concurrency=1` para o gate de testes: concorrência
   padrão derruba Testcontainers por pressão de memória neste ambiente (não é
   regressão de nenhuma tarefa — ver eval de A3).
+- Atualização documental em 2026-10-06: o onboarding do repositório foi
+  consolidado em `README.md`, `docs/GETTING-STARTED.md`, `docs/WEB.md`,
+  `docs/API.md`, `docs/CONTRIBUTING.md`, `docs/OPERATIONS.md` e
+  `docs/PROJECT-STATUS.md`. O pacote visual continua concluído; esta linha só
+  registra a nova porta de entrada para colaboradores.
 
 ## Métricas (`pnpm check:design` e `eval-ui.mjs`)
 
