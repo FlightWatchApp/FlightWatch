@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fareSummaryViewSchema } from '../shared/fare-summary.js';
 import { applyTripInvariants } from '../shared/trip-validation.js';
 import {
   currencyCodeSchema,
@@ -55,11 +56,13 @@ export const flightSearchOfferSchema = z.object({
   searchId: z.string().uuid(),
   provider: z.string(),
   segments: z.array(flightSearchOfferSegmentSchema),
+  // SPEC-030: preenchido (e `segments` vazio) quando a oferta é um resumo de tarifa.
+  fareSummary: fareSummaryViewSchema.nullable(),
   totalAmountMinor: z.number().int(),
   currency: z.string(),
   passengerCount: z.number().int(),
   cabin: z.string(),
-  durationMinutes: z.number().int(),
+  durationMinutes: z.number().int().nullable(),
   connectionsCount: z.number().int(),
   observedAt: z.string(),
   expiresAt: z.string().nullable(),

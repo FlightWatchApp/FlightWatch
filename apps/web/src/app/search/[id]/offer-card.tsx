@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/modal';
 import { TextInput } from '@/components/ui/text-input';
 import { WatchCreatedSummary } from '@/components/watches/watch-created-summary';
 import type { FlightSearchOfferView, WatchDetail } from '@/lib/api/types';
+import { fareSummaryHeadline, formatDuration, formatStops } from '@/lib/domain/flight-format';
 import { formatFlightTime } from '@/lib/domain/freshness';
 import { formatMoney, parseAmountMinor } from '@/lib/domain/money';
 import { deriveWatchAction } from './actions';
@@ -23,12 +24,6 @@ export interface OfferCardProps {
   offer: FlightSearchOfferView;
   /** CP-16: a oferta mais barata desta busca ganha a marca — nunca "do mercado". */
   cheapest?: boolean;
-}
-
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  return `${hours}h${remaining.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -47,10 +42,8 @@ export function OfferCard({ offer, cheapest = false }: OfferCardProps) {
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
   const carriers = [...new Set(offer.segments.map((segment) => segment.carrier))].join(' + ');
-  const stops =
-    offer.connectionsCount === 0
-      ? 'Direto'
-      : `${offer.connectionsCount} ${offer.connectionsCount === 1 ? 'conexão' : 'conexões'}`;
+  const stops = formatStops(offer.connectionsCount);
+  const duration = formatDuration(offer.durationMinutes);
 
   function handleConfirm(): void {
     const targetAmountMinor = parseAmountMinor(desiredPrice);
@@ -92,14 +85,24 @@ export function OfferCard({ offer, cheapest = false }: OfferCardProps) {
           <span className={styles.offerTimesNote}>(horários de Brasília)</span>
         </p>
       )}
+      {/* SPEC-030: cache de preços não informa horário nem companhia — o card
+          diz o que o dado é, sem inventar o que falta. */}
+      {offer.fareSummary && (
+        <p className={styles.offerTimes}>
+          {fareSummaryHeadline(offer.fareSummary)}{' '}
+          <span className={styles.offerTimesNote}>(horários e companhias no site parceiro)</span>
+        </p>
+      )}
 
       <div className={styles.offerMeta}>
-        <span>
-          <IconClock size={14} /> {formatDuration(offer.durationMinutes)}
-        </span>
+        {duration && (
+          <span>
+            <IconClock size={14} /> {duration}
+          </span>
+        )}
         <span>{stops}</span>
         <span>
-          {carriers || 'Companhia não informada'} ·{' '}
+          {offer.fareSummary ? '' : `${carriers || 'Companhia não informada'} · `}
           {offer.cabin === 'ECONOMY' ? 'Econômica' : offer.cabin}
         </span>
       </div>

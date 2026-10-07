@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { DealClassification, FlightOffer, FlightOfferSegment } from '@flight-watch/domain';
+import type { DealClassification, FlightOffer } from '@flight-watch/domain';
 import {
   classifyDeal,
   offerConnectionsCount,
   offerDurationMinutes,
+  parseStoredItinerary,
   resolveCurrentOfferStatus,
   resolvePurchaseUrl,
+  storedItineraryAsOffer,
 } from '@flight-watch/domain';
 import {
   findLatestObservationForSearchTarget,
@@ -60,7 +62,12 @@ function sortOpportunities(
       items.sort((a, b) => (a.offer.observedAt < b.offer.observedAt ? 1 : -1));
       break;
     case 'shortest_duration':
-      items.sort((a, b) => a.offer.durationMinutes - b.offer.durationMinutes);
+      // SPEC-030: resumo sem duração conhecida vai para o fim.
+      items.sort(
+        (a, b) =>
+          (a.offer.durationMinutes ?? Number.POSITIVE_INFINITY) -
+          (b.offer.durationMinutes ?? Number.POSITIVE_INFINITY),
+      );
       break;
     case 'best_value':
     default:
@@ -182,11 +189,9 @@ export class OpportunitiesService {
       return null;
     }
 
-    // `offerConnectionsCount`/`offerDurationMinutes` só leem `.segments` —
-    // cast local em vez de reconstruir um FlightOffer completo (mesmo
-    // precedente de searches.service.ts no SPEC-014).
-    const segments = latest.itinerary as unknown as FlightOfferSegment[];
-    const asFlightOffer = { segments } as FlightOffer;
+    // SPEC-030: o itinerário gravado é lido pelo domínio (trechos ou resumo).
+    const itinerary = parseStoredItinerary(latest.itinerary);
+    const asFlightOffer = storedItineraryAsOffer(itinerary) as FlightOffer;
     const connectionsCount = offerConnectionsCount(asFlightOffer);
     if (query.maxStops !== undefined && connectionsCount > query.maxStops) {
       return null;
@@ -226,7 +231,16 @@ export class OpportunitiesService {
         observedAt: latest.observedAt.toISOString(),
         expiresAt: latest.expiresAt ? latest.expiresAt.toISOString() : null,
         status: resolveCurrentOfferStatus(latest.expiresAt),
-        segments,
+        segments: itinerary.kind === 'SEGMENTS' ? itinerary.segments : [],
+        fareSummary:
+          itinerary.kind === 'FARE_SUMMARY'
+            ? {
+                departureDate: itinerary.summary.departureDate,
+                returnDate: itinerary.summary.returnDate,
+                stops: itinerary.summary.stops,
+                durationMinutes: itinerary.summary.durationMinutes,
+              }
+            : null,
         durationMinutes,
         connectionsCount,
       },

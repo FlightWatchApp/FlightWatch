@@ -28,6 +28,11 @@ export interface ConfigDefinition<Shape extends z.ZodRawShape> {
   shape: Shape;
   /** Padrões aplicados só com `APP_ENV` `development` ou `test`. */
   localDefaults?: Partial<Record<keyof Shape & string, string>>;
+  /**
+   * Regras entre campos, rodadas depois que cada campo é válido (ex.: token
+   * obrigatório só com um provedor). Mensagens sem valores (AC-6).
+   */
+  rules?: (values: z.output<z.ZodObject<Shape>>) => ConfigIssue[];
 }
 
 export type LoadedConfig<Shape extends z.ZodRawShape> = z.output<z.ZodObject<Shape>> & {
@@ -64,7 +69,7 @@ const runtimeShape = {
 };
 
 /** Todas as chaves que uma definição lê, incluindo as de runtime. */
-export function definitionKeys(definition: ConfigDefinition<z.ZodRawShape>): string[] {
+export function definitionKeys(definition: { shape: z.ZodRawShape }): string[] {
   return [...Object.keys(runtimeShape), ...Object.keys(definition.shape)];
 }
 
@@ -137,6 +142,10 @@ export function loadConfig<Shape extends z.ZodRawShape>(
         });
       }
     }
+  }
+
+  if (parsed.success && definition.rules) {
+    issues.push(...definition.rules(parsed.data));
   }
 
   if (appEnv === 'production' && parsed.success) {

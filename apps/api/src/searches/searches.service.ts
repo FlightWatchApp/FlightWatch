@@ -4,6 +4,7 @@ import {
   type DeriveWatchFromOfferRequest,
   type FlightSearchOffer as FlightSearchOfferView,
   type FlightSearchResponse,
+  type FareSummaryView,
   CreateWatchError,
   DeriveWatchError,
   SearchError,
@@ -17,10 +18,13 @@ import {
   offerConnectionsCount,
   offerDurationMinutes,
   OFFER_SELECTION_POLICY_VERSION,
+  parseStoredItinerary,
   resolveCurrentOfferStatus,
   resolvePurchaseUrl,
+  storedItineraryAsOffer,
+  toStoredItinerary,
+  type FareSummary,
   type FlightOffer,
-  type FlightOfferSegment,
 } from '@flight-watch/domain';
 import type { FlightSearch, FlightSearchOffer, Prisma } from '@flight-watch/database';
 import {
@@ -149,6 +153,7 @@ export class SearchesService {
           currency: request.currency,
           adults: request.adults,
           departureDate: request.departureDate,
+          returnDate: request.returnDate,
         }),
       );
       const filtered = eligible.filter(
@@ -420,7 +425,8 @@ function toOfferInsertInput(
     totalAmountMinor: offer.totalAmountMinor,
     currency: offer.currency,
     passengerCount: offer.passengerCount,
-    itinerary: offer.segments as unknown as Prisma.InputJsonValue,
+    // SPEC-030: o domínio é dono do formato gravado (trechos ou resumo).
+    itinerary: toStoredItinerary(offer) as Prisma.InputJsonValue,
     offerSignature: buildOfferSignature(offer),
     observedAt: new Date(offer.observedAt),
     expiresAt: offer.expiresAt ? new Date(offer.expiresAt) : null,
@@ -430,23 +436,22 @@ function toOfferInsertInput(
 }
 
 /**
- * `offerDurationMinutes`/`offerConnectionsCount` (packages/domain) só leem
- * `.segments` — cast local em vez de reconstruir um `FlightOffer` completo
- * só para satisfazer os outros campos do tipo, que essas duas funções nunca
- * tocam.
+ * SPEC-030: o itinerário gravado é lido pelo domínio (trechos ou resumo de
+ * tarifa); `segments` fica vazio para resumo.
  */
 function toFlightSearchOfferView(
   row: FlightSearchOffer,
   searchId: string,
   cabin: string,
 ): FlightSearchOfferView {
-  const segments = row.itinerary as unknown as FlightOfferSegment[];
-  const asFlightOffer = { segments } as FlightOffer;
+  const itinerary = parseStoredItinerary(row.itinerary);
+  const asFlightOffer = storedItineraryAsOffer(itinerary) as FlightOffer;
   return {
     id: row.id,
     searchId,
     provider: row.providerStrategy,
-    segments,
+    segments: itinerary.kind === 'SEGMENTS' ? itinerary.segments : [],
+    fareSummary: itinerary.kind === 'FARE_SUMMARY' ? toFareSummaryView(itinerary.summary) : null,
     totalAmountMinor: row.totalAmountMinor,
     currency: row.currency,
     passengerCount: row.passengerCount,
@@ -462,6 +467,15 @@ function toFlightSearchOfferView(
     ),
     availabilityStatus: resolveCurrentOfferStatus(row.expiresAt),
     qualityFlags: row.qualityFlags,
+  };
+}
+
+function toFareSummaryView(summary: FareSummary): FareSummaryView {
+  return {
+    departureDate: summary.departureDate,
+    returnDate: summary.returnDate,
+    stops: summary.stops,
+    durationMinutes: summary.durationMinutes,
   };
 }
 

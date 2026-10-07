@@ -12,6 +12,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Freshness } from '@/components/ui/freshness';
 import { IconClock } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
+import { formatDuration, formatStops } from '@/lib/domain/flight-format';
 import { Modal } from '@/components/ui/modal';
 import { TextInput } from '@/components/ui/text-input';
 import { WatchCreatedSummary } from '@/components/watches/watch-created-summary';
@@ -27,12 +28,6 @@ export interface DealCardProps {
   selected?: boolean;
   /** Cartões compactos (home) não repetem o `PurchaseNote` individualmente. */
   compact?: boolean;
-}
-
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  return `${hours}h${remaining.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -55,10 +50,8 @@ export function DealCard({ opportunity, selected = false, compact = false }: Dea
     opportunity.tripType === 'ROUND_TRIP' && opportunity.returnDate
       ? `${formatDate(opportunity.departureDate)} → ${formatDate(opportunity.returnDate)}`
       : `Só ida · ${formatDate(opportunity.departureDate)}`;
-  const stops =
-    offer.connectionsCount === 0
-      ? 'Direto'
-      : `${offer.connectionsCount} ${offer.connectionsCount === 1 ? 'conexão' : 'conexões'}`;
+  const stops = formatStops(offer.connectionsCount);
+  const duration = formatDuration(offer.durationMinutes);
   const savingAmountMinor = deal.referenceAmountMinor - deal.currentAmountMinor;
   const ariaLabel = `Promoção ${opportunity.origin} para ${opportunity.destination}, ${formatMoney({
     amountMinor: offer.amountMinor,
@@ -120,9 +113,11 @@ export function DealCard({ opportunity, selected = false, compact = false }: Dea
 
         <div className={styles.meta}>
           <span>{tripLabel}</span>
-          <span>
-            <IconClock size={14} /> {formatDuration(offer.durationMinutes)}
-          </span>
+          {duration && (
+            <span>
+              <IconClock size={14} /> {duration}
+            </span>
+          )}
           <span>{stops}</span>
         </div>
 

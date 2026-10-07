@@ -4,11 +4,13 @@ import {
   type PrismaClient,
   StaleLeaseError,
   claimSearchExecutionForRunning,
+  findLatestObservationFact,
   findSearchExecutionByIdempotencyKey,
   isSearchTargetStillEligible,
   markSearchExecutionFailed,
   persistNoOffersResult,
   persistPriceObservationSuccess,
+  persistUnchangedResult,
   withUniqueConstraintRetry,
 } from '@flight-watch/database';
 import {
@@ -16,6 +18,7 @@ import {
   computeObservedAtBucket,
   countEligibleOffers,
   selectBestOffer,
+  toStoredItinerary,
 } from '@flight-watch/domain';
 import { logEvent } from '@flight-watch/observability';
 import {
@@ -101,7 +104,7 @@ export async function processPriceCheckJob(
   }
 
   const running = await prisma.$transaction((tx) =>
-    claimSearchExecutionForRunning(tx, executionRef.id),
+    claimSearchExecutionForRunning(tx, executionRef.id, provider.strategy),
   );
   if (!running) {
     // Corrida perdida (outra entrega já reivindicou) ou virou terminal entre a
@@ -230,6 +233,7 @@ export async function processPriceCheckJob(
     currency: running.searchTarget.currency,
     adults: running.searchTarget.adults,
     departureDate: query.departureDate,
+    returnDate: query.returnDate,
   };
   metrics.offersReceivedTotal.inc(searchResult.offers.length);
   metrics.offersEligibleTotal.inc(countEligibleOffers(searchResult.offers, offerContext));
@@ -255,7 +259,50 @@ export async function processPriceCheckJob(
     return;
   }
 
-  const observedAt = new Date();
+  // SPEC-030: o instante em que o preço foi encontrado pela fonte (para um
+  // cache, pode ser horas antes desta checagem), nunca no futuro. A idade
+  // exibida ao usuário é a do preço, não a da nossa consulta.
+  const now = new Date();
+  const offerObservedAt = new Date(selected.offer.observedAt);
+  const observedAt =
+    Number.isNaN(offerObservedAt.getTime()) || offerObservedAt > now ? now : offerObservedAt;
+
+  // SPEC-030: mesmo fato da última observação (cache sem novidade) não vira
+  // observação nova nem reavalia alertas; só reagenda o alvo.
+  const latest = await findLatestObservationFact(prisma, running.searchTarget.id);
+  if (
+    latest &&
+    latest.observedAt.getTime() === observedAt.getTime() &&
+    latest.totalAmountMinor === selected.offer.totalAmountMinor &&
+    latest.offerSignature === selected.signature
+  ) {
+    try {
+      await prisma.$transaction((tx) =>
+        persistUnchangedResult(tx, {
+          searchExecutionId: running.id,
+          leaseToken,
+          searchTargetId: running.searchTarget.id,
+          completedAt: now,
+          nextCheckAt,
+          offersReceivedCount: searchResult.offers.length,
+        }),
+      );
+      metrics.priceObservationTotal.inc({ result: 'unchanged' });
+    } catch (error) {
+      if (error instanceof StaleLeaseError) {
+        metrics.staleLeaseRejectionsTotal.inc({ action: 'persist_unchanged' });
+        logEvent({
+          event: 'search_execution_stale_lease_rejected',
+          searchExecutionId: running.id,
+          action: 'persist_unchanged',
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
   const observedAtBucket = computeObservedAtBucket(observedAt);
   const observationKey = computeObservationKey({
     searchExecutionId: running.id,
@@ -282,7 +329,8 @@ export async function processPriceCheckJob(
             observedAt,
             totalAmountMinor: selected.offer.totalAmountMinor,
             currency: selected.offer.currency,
-            itinerary: selected.offer.segments as unknown as Prisma.InputJsonValue,
+            // SPEC-030: o domínio é dono do formato gravado (trechos ou resumo).
+            itinerary: toStoredItinerary(selected.offer) as Prisma.InputJsonValue,
             offerSignature: selected.signature,
             deeplink: selected.offer.deeplink ?? null,
             expiresAt: selected.offer.expiresAt ? new Date(selected.offer.expiresAt) : null,

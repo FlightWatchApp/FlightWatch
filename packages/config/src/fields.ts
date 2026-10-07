@@ -111,6 +111,23 @@ export function secretField(minLength: number) {
     });
 }
 
+/** Segredo opcional; quando informado, mesmo tamanho mínimo (e nunca ecoado). */
+export function optionalSecretField(minLength: number) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw !== undefined && raw.length < minLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `deve ter pelo menos ${minLength} caracteres`,
+        });
+        return z.NEVER;
+      }
+      return raw;
+    });
+}
+
 /** Host de bind: IPv4, IPv6 sem colchetes ou nome DNS. */
 export function hostField(defaultHost: string) {
   return z

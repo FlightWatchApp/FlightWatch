@@ -5,12 +5,14 @@
  * é a fronteira antes de expor a URL ao usuário (CLAUDE.md §12: "URL externa
  * passa por allowlist e proteção SSRF").
  *
- * Allowlist por `providerStrategy` — hoje só `SIMULATED` existe. Um provider
- * real exige decisão humana explícita (ADR) para entrar aqui, não é algo que
- * esta função decide sozinha (CLAUDE.md §21/§22).
+ * Allowlist por `providerStrategy`. Um provider real exige decisão humana
+ * explícita (ADR) para entrar aqui, não é algo que esta função decide
+ * sozinha (CLAUDE.md §21/§22). TRAVELPAYOUTS entrou pela ADR-008: o link é a
+ * busca da Aviasales montada pelo adaptador (SPEC-030).
  */
 const ALLOWED_PURCHASE_URL_HOSTS: Record<string, string> = {
   SIMULATED: 'booking.simulated-provider.flightwatch.dev',
+  TRAVELPAYOUTS: 'www.aviasales.com',
 };
 
 /**

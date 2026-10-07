@@ -16,7 +16,11 @@ async function main(): Promise<void> {
   const config = loadConfig(priceWorkerConfig, process.env);
   // ADR-004: provedor real entra atrás da mesma porta FlightProvider, escolhido
   // por FLIGHT_PROVIDER — nada mais neste arquivo muda.
-  const provider = createFlightProvider(config.FLIGHT_PROVIDER);
+  const provider = createFlightProvider({
+    kind: config.FLIGHT_PROVIDER,
+    travelpayoutsToken: config.TRAVELPAYOUTS_TOKEN,
+    timeoutMs: config.FLIGHT_PROVIDER_TIMEOUT_MS,
+  });
   const rateLimiter = new TokenBucketRateLimiter(
     config.PRICE_WORKER_RATE_LIMIT_CAPACITY,
     config.PRICE_WORKER_RATE_LIMIT_PER_SECOND,

@@ -1,3 +1,5 @@
+import type { FareSummaryView } from '@flight-watch/contracts';
+
 /**
  * Modelos de visualização do front-end. `WatchStatus`, `TripType`, `AlertRuleType`
  * e o formato de `Money` seguem exatamente @flight-watch/contracts (SPEC-001) e
@@ -117,11 +119,13 @@ export interface FlightSearchOfferView {
   searchId: string;
   provider: string;
   segments: FlightSearchOfferSegmentView[];
+  /** SPEC-030: preenchido (e `segments` vazio) quando a oferta vem de cache de preços. */
+  fareSummary: FareSummaryView | null;
   totalAmountMinor: number;
   currency: string;
   passengerCount: number;
   cabin: string;
-  durationMinutes: number;
+  durationMinutes: number | null;
   connectionsCount: number;
   observedAt: string;
   expiresAt: string | null;
@@ -175,7 +179,9 @@ export interface OpportunityOffer {
   expiresAt: string | null;
   status: 'CURRENT' | 'EXPIRED';
   segments: FlightSearchOfferSegmentView[];
-  durationMinutes: number;
+  /** SPEC-030: preenchido (e `segments` vazio) quando a oferta vem de cache de preços. */
+  fareSummary: FareSummaryView | null;
+  durationMinutes: number | null;
   connectionsCount: number;
 }
 
@@ -204,3 +210,6 @@ export interface Coordinates {
   lat: number;
   lng: number;
 }
+
+/** SPEC-030: menor preço encontrado para a rota e o dia (sem horário nem companhia). */
+export type { FareSummaryView };

@@ -17,7 +17,12 @@ import { SearchesService } from './searches.service.js';
     {
       provide: FLIGHT_PROVIDER,
       inject: [API_CONFIG],
-      useFactory: (config: ApiConfig) => createFlightProvider(config.FLIGHT_PROVIDER),
+      useFactory: (config: ApiConfig) =>
+        createFlightProvider({
+          kind: config.FLIGHT_PROVIDER,
+          travelpayoutsToken: config.TRAVELPAYOUTS_TOKEN,
+          timeoutMs: config.FLIGHT_PROVIDER_TIMEOUT_MS,
+        }),
     },
   ],
 })

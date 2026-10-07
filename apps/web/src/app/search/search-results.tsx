@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { IconSearch } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import type { FlightSearchResult } from '@/lib/api/types';
+import { formatDuration } from '@/lib/domain/flight-format';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
 import { OfferCard } from './[id]/offer-card';
@@ -13,12 +14,6 @@ import styles from './search-results.module.css';
 export interface SearchResultsProps {
   search: FlightSearchResult;
   embedded?: boolean;
-}
-
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  return `${hours}h${remaining.toString().padStart(2, '0')}`;
 }
 
 export function SearchResults({ search, embedded = false }: SearchResultsProps) {
@@ -32,12 +27,14 @@ export function SearchResults({ search, embedded = false }: SearchResultsProps) 
           offer.totalAmountMinor < min.totalAmountMinor ? offer : min,
         )
       : null;
-  const fastest =
-    search.offers.length > 0
-      ? search.offers.reduce((min, offer) =>
-          offer.durationMinutes < min.durationMinutes ? offer : min,
-        )
-      : null;
+  // SPEC-030: resumo de tarifa pode não ter duração; só entra quem tem.
+  const fastestMinutes = search.offers.reduce<number | null>(
+    (min, offer) =>
+      offer.durationMinutes !== null && (min === null || offer.durationMinutes < min)
+        ? offer.durationMinutes
+        : min,
+    null,
+  );
   const resultCount = `${search.offers.length} ${search.offers.length === 1 ? 'oferta' : 'ofertas'}`;
 
   return (
@@ -101,7 +98,7 @@ export function SearchResults({ search, embedded = false }: SearchResultsProps) 
           </div>
           <div>
             <span>Mais rápido</span>
-            <strong>{fastest ? formatDuration(fastest.durationMinutes) : '—'}</strong>
+            <strong>{formatDuration(fastestMinutes) ?? '—'}</strong>
           </div>
         </div>
       )}

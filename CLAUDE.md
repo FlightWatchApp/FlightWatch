@@ -454,6 +454,13 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 
 `persistPriceObservationSuccess` retorna `{ observation, created }`; todos os call sites devem respeitar `created` para evitar métrica/evento duplicado em replay.
 
+SPEC-030: `observedAt` é o instante em que a **fonte** viu o preço (cache pode
+ter horas), nunca no futuro; o mesmo fato da última observação termina
+`SUCCEEDED` sem observação nem evento (`price_observation_total{result="unchanged"}`);
+itinerário gravado só via `toStoredItinerary`/`parseStoredItinerary` (domínio)
+— oferta tem trechos **ou** `fareSummary`, nunca trechos inventados. A
+execução registra o provedor que de fato consultou.
+
 ### 6.5 `apps/alert-worker`
 
 **Responsabilidade:** avaliar regras de Watches ativos vinculados à observação.

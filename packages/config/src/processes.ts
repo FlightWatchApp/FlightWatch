@@ -3,6 +3,7 @@ import {
   enumField,
   hostField,
   intField,
+  optionalSecretField,
   portField,
   secretField,
   urlField,
@@ -14,7 +15,7 @@ import {
  */
 
 /** Adapters disponíveis. Um adapter real entra aqui e na factory do pacote dele. */
-export const FLIGHT_PROVIDERS = ['simulated'] as const;
+export const FLIGHT_PROVIDERS = ['simulated', 'travelpayouts'] as const;
 export const EMAIL_PROVIDERS = ['simulated'] as const;
 
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
@@ -35,7 +36,22 @@ function metrics(defaultPort: number) {
 const database = { DATABASE_URL: urlField(['postgresql:', 'postgres:']) };
 const redis = { REDIS_URL: urlField(['redis:', 'rediss:']) };
 const webBaseUrl = { WEB_BASE_URL: urlField(['http:', 'https:']) };
-const flightProvider = { FLIGHT_PROVIDER: enumField(FLIGHT_PROVIDERS, 'simulated') };
+const flightProvider = {
+  FLIGHT_PROVIDER: enumField(FLIGHT_PROVIDERS, 'simulated'),
+  // SPEC-030: obrigatório com FLIGHT_PROVIDER=travelpayouts (regra abaixo).
+  TRAVELPAYOUTS_TOKEN: optionalSecretField(16),
+  FLIGHT_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+};
+
+/** SPEC-030 AC-8: provedor real sem credencial não sobe. */
+function requireProviderCredentials(values: {
+  FLIGHT_PROVIDER: (typeof FLIGHT_PROVIDERS)[number];
+  TRAVELPAYOUTS_TOKEN?: string | undefined;
+}) {
+  return values.FLIGHT_PROVIDER === 'travelpayouts' && !values.TRAVELPAYOUTS_TOKEN
+    ? [{ key: 'TRAVELPAYOUTS_TOKEN', message: 'obrigatória com FLIGHT_PROVIDER=travelpayouts' }]
+    : [];
+}
 const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };
 
 export const apiConfig = {
@@ -59,6 +75,7 @@ export const apiConfig = {
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
+  rules: requireProviderCredentials,
 };
 
 export const schedulerConfig = {
@@ -86,6 +103,7 @@ export const priceWorkerConfig = {
     PRICE_WORKER_CIRCUIT_RESET_TIMEOUT_MS: durationMsField(30_000),
   },
   localDefaults: { DATABASE_URL: LOCAL_DATABASE_URL, REDIS_URL: LOCAL_REDIS_URL },
+  rules: requireProviderCredentials,
 };
 
 export const alertWorkerConfig = {

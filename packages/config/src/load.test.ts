@@ -159,6 +159,7 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       AUTH_RATE_LIMIT_WINDOW_MS: 600_000,
       AUTH_RATE_LIMIT_MAX: 20,
       INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
+      FLIGHT_PROVIDER_TIMEOUT_MS: 10_000,
     });
   });
 
@@ -275,5 +276,52 @@ describe('SPEC-025 AC-6 — segredo interno entre web e API', () => {
       }),
     );
     expect(keysOf(error)).toEqual(['DATABASE_URL']);
+  });
+});
+
+describe('SPEC-030 AC-8 — provedor Travelpayouts', () => {
+  it('aceita travelpayouts com token e usa o timeout padrão', () => {
+    const config = loadConfig(priceWorkerConfig, {
+      FLIGHT_PROVIDER: 'travelpayouts',
+      TRAVELPAYOUTS_TOKEN: 'token-de-teste-0123456789',
+    });
+    expect(config.FLIGHT_PROVIDER).toBe('travelpayouts');
+    expect(config.TRAVELPAYOUTS_TOKEN).toBe('token-de-teste-0123456789');
+    expect(config.FLIGHT_PROVIDER_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it('travelpayouts sem token impede o startup, na API e no price-worker', () => {
+    const env = { FLIGHT_PROVIDER: 'travelpayouts' };
+    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual([
+      'TRAVELPAYOUTS_TOKEN',
+    ]);
+    expect(keysOf(configErrorOf(() => loadConfig(priceWorkerConfig, env)))).toEqual([
+      'TRAVELPAYOUTS_TOKEN',
+    ]);
+  });
+
+  it('simulated não exige token', () => {
+    expect(loadConfig(priceWorkerConfig, {}).TRAVELPAYOUTS_TOKEN).toBeUndefined();
+  });
+
+  it('token curto demais é recusado sem ecoar o valor', () => {
+    const error = configErrorOf(() =>
+      loadConfig(priceWorkerConfig, {
+        FLIGHT_PROVIDER: 'travelpayouts',
+        TRAVELPAYOUTS_TOKEN: 'curto',
+      }),
+    );
+    expect(keysOf(error)).toEqual(['TRAVELPAYOUTS_TOKEN']);
+    expect(error.message).not.toContain('curto');
+  });
+
+  it('em produção, travelpayouts passa pela trava (o e-mail simulado ainda bloqueia a API)', () => {
+    const env = {
+      ...PRODUCTION_BASE,
+      FLIGHT_PROVIDER: 'travelpayouts',
+      TRAVELPAYOUTS_TOKEN: 'token-de-producao-0123456789',
+    };
+    expect(loadConfig(priceWorkerConfig, env).FLIGHT_PROVIDER).toBe('travelpayouts');
+    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual(['EMAIL_PROVIDER']);
   });
 });

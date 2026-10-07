@@ -416,3 +416,150 @@ describe('processPriceCheckJob', () => {
     );
   });
 });
+
+// ---- SPEC-030: resumo de tarifa e "mesmo fato não vira observação nova" ----
+
+function summaryOffer(overrides: Partial<FlightOffer> = {}): FlightOffer {
+  const observedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  return {
+    providerOfferId: 'tp|DOU|GRU|2027-01-01',
+    totalAmountMinor: 256_800,
+    currency: 'BRL',
+    passengerCount: 1,
+    segments: [],
+    fareSummary: {
+      originCode: 'DOU',
+      destinationCode: 'GRU',
+      departureDate: '2027-01-01',
+      returnDate: null,
+      stops: 1,
+      durationMinutes: 150,
+    },
+    observedAt: observedAt.toISOString(),
+    expiresAt: new Date(observedAt.getTime() + 72 * 60 * 60 * 1000).toISOString(),
+    deeplink: 'https://www.aviasales.com/search/DOU0101GRU1',
+    qualityFlags: ['CACHED_PRICE'],
+    ...overrides,
+  };
+}
+
+/** Nova execução agendada para um alvo já existente (segunda checagem). */
+async function scheduleAnotherExecution(searchTargetId: string): Promise<string> {
+  const idempotencyKey = randomUUID();
+  await prisma.searchExecution.create({
+    data: {
+      searchTargetId,
+      providerStrategy: 'SIMULATED',
+      status: 'SCHEDULED',
+      idempotencyKey,
+      correlationId: randomUUID(),
+    },
+  });
+  return idempotencyKey;
+}
+
+function priceObservedEvents(): Promise<number> {
+  return prisma.outboxEvent.count({ where: { eventType: 'PriceObserved.v1' } });
+}
+
+describe('processPriceCheckJob — resumo de tarifa (SPEC-030 AC-7)', () => {
+  it('grava a oferta-resumo com o observedAt da oferta (quando o preço foi encontrado)', async () => {
+    const { target, idempotencyKey } = await seedScheduledExecution();
+    const offer = summaryOffer();
+    const provider = new SimulatedFlightProvider(offersScenario([offer]));
+
+    await processPriceCheckJob(baseDeps(provider), fakeJob(idempotencyKey, target.id));
+
+    const observation = await prisma.priceObservation.findFirstOrThrow({
+      where: { searchTargetId: target.id },
+    });
+    expect(observation.observedAt.toISOString()).toBe(offer.observedAt);
+    expect(observation.itinerary).toEqual({ kind: 'FARE_SUMMARY', ...offer.fareSummary });
+    expect(observation.offerSignature).toBe('FARE|DOU|GRU|2027-01-01|-|1|150');
+  });
+
+  it('o mesmo fato na checagem seguinte não grava observação nem evento, e reagenda', async () => {
+    const { target, idempotencyKey } = await seedScheduledExecution();
+    const offer = summaryOffer();
+    const provider = new SimulatedFlightProvider(offersScenario([offer]));
+    await processPriceCheckJob(baseDeps(provider), fakeJob(idempotencyKey, target.id));
+    const eventsAfterFirst = await priceObservedEvents();
+
+    const secondKey = await scheduleAnotherExecution(target.id);
+    await prisma.searchTarget.update({
+      where: { id: target.id },
+      data: { nextCheckAt: new Date(Date.now() - 1000) },
+    });
+    const deps = baseDeps(provider);
+    await processPriceCheckJob(deps, fakeJob(secondKey, target.id));
+
+    expect(await prisma.priceObservation.count({ where: { searchTargetId: target.id } })).toBe(1);
+    expect(await priceObservedEvents()).toBe(eventsAfterFirst);
+    const second = await prisma.searchExecution.findUniqueOrThrow({
+      where: { idempotencyKey: secondKey },
+    });
+    expect(second.status).toBe('SUCCEEDED');
+    const updatedTarget = await prisma.searchTarget.findUniqueOrThrow({ where: { id: target.id } });
+    expect(updatedTarget.nextCheckAt?.getTime()).toBeGreaterThan(Date.now());
+    expect(await deps.metrics.registry.metrics()).toContain(
+      'price_observation_total{result="unchanged"} 1',
+    );
+  });
+
+  it('preço diferente na checagem seguinte grava nova observação', async () => {
+    const { target, idempotencyKey } = await seedScheduledExecution();
+    await processPriceCheckJob(
+      baseDeps(new SimulatedFlightProvider(offersScenario([summaryOffer()]))),
+      fakeJob(idempotencyKey, target.id),
+    );
+
+    const secondKey = await scheduleAnotherExecution(target.id);
+    const cheaper = summaryOffer({
+      totalAmountMinor: 199_000,
+      observedAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    await processPriceCheckJob(
+      baseDeps(new SimulatedFlightProvider(offersScenario([cheaper]))),
+      fakeJob(secondKey, target.id),
+    );
+
+    expect(await prisma.priceObservation.count({ where: { searchTargetId: target.id } })).toBe(2);
+  });
+
+  it('observedAt no futuro é limitado a agora', async () => {
+    const { target, idempotencyKey } = await seedScheduledExecution();
+    const before = Date.now();
+    const future = summaryOffer({
+      observedAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+    });
+
+    await processPriceCheckJob(
+      baseDeps(new SimulatedFlightProvider(offersScenario([future]))),
+      fakeJob(idempotencyKey, target.id),
+    );
+
+    const observation = await prisma.priceObservation.findFirstOrThrow({
+      where: { searchTargetId: target.id },
+    });
+    expect(observation.observedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(observation.observedAt.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe('processPriceCheckJob — auditoria do provedor (achado na verificação real da SPEC-030)', () => {
+  it('registra na execução o provedor que de fato consultou, não o padrão do alvo', async () => {
+    const { target, idempotencyKey } = await seedScheduledExecution();
+    const provider: ProcessJobDeps['provider'] = {
+      strategy: 'TRAVELPAYOUTS',
+      search: async () => ({ kind: 'offers', offers: [summaryOffer()] }),
+    };
+
+    await processPriceCheckJob(baseDeps(provider), fakeJob(idempotencyKey, target.id));
+
+    const execution = await prisma.searchExecution.findUniqueOrThrow({
+      where: { idempotencyKey },
+    });
+    expect(execution.providerStrategy).toBe('TRAVELPAYOUTS');
+  });
+});
