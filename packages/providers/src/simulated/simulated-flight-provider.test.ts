@@ -104,3 +104,62 @@ describe('scenario builders', () => {
     await expect(provider.search(query, context)).resolves.toEqual({ kind: 'offers', offers: [] });
   });
 });
+
+describe('SimulatedFlightProvider — calendário e todos os voos (SPEC-031)', () => {
+  const provider = new SimulatedFlightProvider();
+  const calendarQuery = {
+    originIata: 'SAO',
+    destinationIata: 'LIS',
+    month: '2027-02',
+    tripType: 'ONE_WAY' as const,
+    tripLengthDays: null,
+    currency: 'BRL',
+  };
+
+  it('um preço determinístico por dia do mês', async () => {
+    const first = await provider.priceCalendar(calendarQuery);
+    const second = await provider.priceCalendar(calendarQuery);
+    expect(first).toHaveLength(28);
+    expect(first[0]?.date).toBe('2027-02-01');
+    expect(first.at(-1)?.date).toBe('2027-02-28');
+    expect(first.map((day) => day.amountMinor)).toEqual(second.map((day) => day.amountMinor));
+  });
+
+  it('o preço do dia é o mesmo da busca daquele dia', async () => {
+    const days = await provider.priceCalendar(calendarQuery);
+    const result = await provider.search(
+      {
+        originIata: 'SAO',
+        destinationIata: 'LIS',
+        departureDate: '2027-02-10',
+        returnDate: null,
+        tripType: 'ONE_WAY',
+        cabin: 'ECONOMY',
+        adults: 1,
+        currency: 'BRL',
+        market: 'BR',
+      },
+      { correlationId: 'c', searchExecutionId: 'e' },
+    );
+    if (result.kind !== 'offers') throw new Error('esperava oferta');
+    expect(days.find((day) => day.date === '2027-02-10')?.amountMinor).toBe(
+      result.offers[0]?.totalAmountMinor,
+    );
+  });
+
+  it('todos os voos aponta para o host simulado da allowlist', () => {
+    expect(
+      provider.allFlightsUrl({
+        originIata: 'SAO',
+        destinationIata: 'LIS',
+        departureDate: '2027-02-10',
+        returnDate: null,
+        tripType: 'ONE_WAY',
+        cabin: 'ECONOMY',
+        adults: 1,
+        currency: 'BRL',
+        market: 'BR',
+      }),
+    ).toBe('https://booking.simulated-provider.flightwatch.dev/search/SAO-LIS-2027-02-10');
+  });
+});

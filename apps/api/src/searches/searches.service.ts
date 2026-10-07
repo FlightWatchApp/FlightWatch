@@ -5,6 +5,8 @@ import {
   type FlightSearchOffer as FlightSearchOfferView,
   type FlightSearchResponse,
   type FareSummaryView,
+  type PriceCalendarQuery,
+  type PriceCalendarResponse,
   CreateWatchError,
   DeriveWatchError,
   SearchError,
@@ -95,7 +97,64 @@ export class SearchesService {
     if (!named) {
       throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
     }
-    return named;
+    return { ...named, allFlightsUrl: this.allFlightsUrlFor(base) };
+  }
+
+  /**
+   * SPEC-031: "ver todos os voos" no site parceiro, pela allowlist (SPEC-018)
+   * e com afiliado (SPEC-020); null quando o provedor não oferece.
+   */
+  private allFlightsUrlFor(search: FlightSearchResponseBase): string | null {
+    const raw = this.provider.allFlightsUrl?.({
+      originIata: search.origin,
+      destinationIata: search.destination,
+      departureDate: search.departureDate,
+      returnDate: search.returnDate,
+      tripType: search.tripType,
+      cabin: search.cabin,
+      adults: search.adults,
+      currency: search.currency,
+      market: search.market,
+    });
+    return withAffiliateTracking(
+      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
+      this.provider.strategy,
+      'SEARCH',
+    );
+  }
+
+  /** SPEC-031: menor preço por dia do mês, por cidade (SPEC-029). */
+  async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResponse> {
+    const [origin, destination] = await Promise.all([
+      this.places.resolveCity(query.origin),
+      this.places.resolveCity(query.destination),
+    ]);
+    if (!origin || !destination || origin === destination || !isSupportedCurrencyAndMarket(query)) {
+      throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
+    }
+    if (!this.provider.priceCalendar) {
+      this.metrics.priceCalendarFetchTotal.inc({ result: 'not_supported' });
+      return { origin, destination, month: query.month, currency: query.currency, days: [] };
+    }
+    try {
+      const days = await this.provider.priceCalendar({
+        originIata: origin,
+        destinationIata: destination,
+        month: query.month,
+        tripType: query.tripType,
+        tripLengthDays: query.tripLengthDays ?? null,
+        currency: query.currency,
+      });
+      this.metrics.priceCalendarFetchTotal.inc({ result: days.length > 0 ? 'success' : 'empty' });
+      return { origin, destination, month: query.month, currency: query.currency, days };
+    } catch (error) {
+      if (error instanceof ProviderError) {
+        this.metrics.priceCalendarFetchTotal.inc({ result: 'provider_error' });
+        logEvent({ event: 'price_calendar_provider_error', errorClass: error.errorClass });
+        throw new SearchError('PROVIDER_UNAVAILABLE', 'price calendar source unavailable');
+      }
+      throw error;
+    }
   }
 
   private async runSearch(
@@ -480,7 +539,10 @@ function toFareSummaryView(summary: FareSummary): FareSummaryView {
 }
 
 /** Sem `originName`/`destinationName`: o serviço completa em lote (SPEC-029). */
-type FlightSearchResponseBase = Omit<FlightSearchResponse, 'originName' | 'destinationName'>;
+type FlightSearchResponseBase = Omit<
+  FlightSearchResponse,
+  'originName' | 'destinationName' | 'allFlightsUrl'
+>;
 
 function toFlightSearchResponse(
   flightSearch: FlightSearch & { offers: FlightSearchOffer[] },

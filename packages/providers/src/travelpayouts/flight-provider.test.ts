@@ -268,3 +268,95 @@ describe('TravelpayoutsFlightProvider (SPEC-030)', () => {
     }
   });
 });
+
+describe('TravelpayoutsFlightProvider.priceCalendar (SPEC-031 AC-1)', () => {
+  const calendarQuery = {
+    originIata: 'SAO',
+    destinationIata: 'NYC',
+    month: '2026-11',
+    tripType: 'ONE_WAY' as const,
+    tripLengthDays: null,
+    currency: 'BRL',
+  };
+
+  it('um dia por data, com o menor preço, em ordem', async () => {
+    const { fn, calls } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          entry({ depart_date: '2026-11-20', value: 3000 }),
+          entry({ depart_date: '2026-11-17', value: 2800, number_of_changes: 0 }),
+          entry({ depart_date: '2026-11-17', value: 2568, number_of_changes: 1 }),
+          entry({ depart_date: '2026-12-01', value: 100 }), // outro mês
+        ],
+      },
+    });
+
+    const days = await provider(fn).priceCalendar?.(calendarQuery);
+
+    expect(days).toEqual([
+      {
+        date: '2026-11-17',
+        amountMinor: 256_800,
+        stops: 1,
+        observedAt: '2026-10-06T04:53:47.000Z',
+      },
+      {
+        date: '2026-11-20',
+        amountMinor: 300_000,
+        stops: 1,
+        observedAt: '2026-10-06T04:53:47.000Z',
+      },
+    ]);
+    expect(new URL(calls[0]?.url ?? '').searchParams.get('beginning_of_period')).toBe('2026-11-01');
+  });
+
+  it('ida e volta: só a mesma duração de viagem', async () => {
+    const { fn, calls } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          entry({ depart_date: '2026-11-10', return_date: '2026-11-17', value: 4000 }), // 7 dias
+          entry({ depart_date: '2026-11-10', return_date: '2026-11-12', value: 1000 }), // 2 dias
+          entry({ depart_date: '2026-11-11', return_date: '2026-11-18', value: 4200 }), // 7 dias
+          entry({ depart_date: '2026-11-12', value: 500 }), // só ida
+        ],
+      },
+    });
+
+    const days = await provider(fn).priceCalendar?.({
+      ...calendarQuery,
+      tripType: 'ROUND_TRIP',
+      tripLengthDays: 7,
+    });
+
+    expect(days?.map((day) => [day.date, day.amountMinor])).toEqual([
+      ['2026-11-10', 400_000],
+      ['2026-11-11', 420_000],
+    ]);
+    expect(new URL(calls[0]?.url ?? '').searchParams.get('one_way')).toBe('false');
+  });
+
+  it('preço encontrado há mais de 72 h fica fora; classe executiva e actual=false também', async () => {
+    const { fn } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          entry({ depart_date: '2026-11-17', found_at: '2026-10-02T00:00:00' }),
+          entry({ depart_date: '2026-11-18', trip_class: 1 }),
+          entry({ depart_date: '2026-11-19', actual: false }),
+          entry({ depart_date: '2026-11-20' }),
+        ],
+      },
+    });
+
+    const days = await provider(fn).priceCalendar?.(calendarQuery);
+    expect(days?.map((day) => day.date)).toEqual(['2026-11-20']);
+  });
+
+  it('allFlightsUrl é a busca da Aviasales', () => {
+    expect(provider(fakeFetch({}).fn).allFlightsUrl?.(oneWay)).toBe(
+      'https://www.aviasales.com/search/SAO1711NYC1',
+    );
+  });
+});

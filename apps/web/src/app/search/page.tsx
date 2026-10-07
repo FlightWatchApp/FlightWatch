@@ -2,7 +2,9 @@ import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { ApiError } from '@/lib/api/client';
-import { getFlightSearch } from '@/lib/api/searches';
+import { getFlightSearch, getPriceCalendar } from '@/lib/api/searches';
+import type { FlightSearchResult } from '@/lib/api/types';
+import { tripLengthDays } from '@/lib/domain/price-calendar';
 import { SearchForm } from './search-form';
 import { SearchResults } from './search-results';
 import styles from './page.module.css';
@@ -33,6 +35,8 @@ export default async function SearchPage({
     }
   }
 
+  const calendar = search ? await loadCalendar(search) : null;
+
   return (
     <div className={styles.page}>
       <section className={styles.band}>
@@ -40,8 +44,8 @@ export default async function SearchPage({
           <p className={styles.eyebrow}>Buscar passagens</p>
           <h1 className={styles.title}>Para onde você quer ir?</h1>
           <p className={styles.subtitle}>
-            Veja as opções disponíveis agora e compre no site parceiro. Não precisa de conta para
-            buscar; só para monitorar um preço.
+            Veja o menor preço encontrado em cada dia e todos os voos no site parceiro. Não precisa
+            de conta para buscar; só para monitorar um preço.
           </p>
         </div>
       </section>
@@ -53,10 +57,32 @@ export default async function SearchPage({
           >
             <SearchForm />
           </div>
-          {search && <SearchResults search={search} embedded />}
+          {search && <SearchResults search={search} calendar={calendar} embedded />}
         </div>
         <PurchaseNote align="center" />
       </div>
     </div>
   );
+}
+
+/**
+ * SPEC-031 AC-5: falha ou limite no calendário não derruba a busca — a página
+ * só deixa de mostrar o bloco.
+ */
+async function loadCalendar(search: FlightSearchResult) {
+  const month = search.departureDate.slice(0, 7);
+  try {
+    const result = await getPriceCalendar({
+      origin: search.origin,
+      destination: search.destination,
+      month,
+      tripType: search.tripType,
+      tripLengthDays: tripLengthDays(search.departureDate, search.returnDate),
+      currency: search.currency,
+      market: search.market,
+    });
+    return { month, days: result.days };
+  } catch {
+    return null;
+  }
 }

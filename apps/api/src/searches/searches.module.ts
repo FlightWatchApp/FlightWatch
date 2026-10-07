@@ -6,12 +6,13 @@ import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { WatchesModule } from '../watches/watches.module.js';
 import { FLIGHT_PROVIDER } from './flight-provider.token.js';
 import { OffersController } from './offers.controller.js';
+import { PriceCalendarController } from './price-calendar.controller.js';
 import { SearchesController } from './searches.controller.js';
 import { SearchesService } from './searches.service.js';
 
 @Module({
   imports: [AuthModule, WatchesModule, PlacesModule],
-  controllers: [SearchesController, OffersController],
+  controllers: [SearchesController, OffersController, PriceCalendarController],
   providers: [
     SearchesService,
     {

@@ -151,6 +151,8 @@ export interface FlightSearchResult {
   createdAt: string;
   expiresAt: string | null;
   offers: FlightSearchOfferView[];
+  /** SPEC-031: busca completa no site parceiro; null quando o provedor não oferece. */
+  allFlightsUrl: string | null;
 }
 
 export type DealType = 'HISTORICAL_LOW' | 'PERCENTAGE_BELOW_REFERENCE';

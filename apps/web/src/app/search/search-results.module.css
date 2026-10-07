@@ -158,3 +158,11 @@
     animation: none;
   }
 }
+
+/* SPEC-031: "Ver todos os voos" e aviso de comissão. */
+.allFlights {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

@@ -101,6 +101,11 @@ export const flightSearchResponseSchema = z.object({
   createdAt: z.string(),
   expiresAt: z.string().nullable(),
   offers: z.array(flightSearchOfferSchema),
+  /**
+   * SPEC-031: busca completa no site parceiro ("ver todos os voos"), validada
+   * pela allowlist e com afiliado; presente mesmo sem ofertas.
+   */
+  allFlightsUrl: z.string().url().nullable(),
 });
 
 export type FlightSearchResponse = z.infer<typeof flightSearchResponseSchema>;

@@ -4,7 +4,10 @@ import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { EmptyState } from '@/components/ui/empty-state';
 import { IconSearch } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
+import { PriceCalendar } from '@/components/search/price-calendar';
+import { PurchaseButton } from '@/components/purchase/purchase-button';
 import type { FlightSearchResult } from '@/lib/api/types';
+import type { CalendarDayInput } from '@/lib/domain/price-calendar';
 import { formatDuration } from '@/lib/domain/flight-format';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
@@ -14,9 +17,11 @@ import styles from './search-results.module.css';
 export interface SearchResultsProps {
   search: FlightSearchResult;
   embedded?: boolean;
+  /** SPEC-031: calendário do mês da busca; null quando a fonte não respondeu. */
+  calendar?: { month: string; days: CalendarDayInput[] } | null;
 }
 
-export function SearchResults({ search, embedded = false }: SearchResultsProps) {
+export function SearchResults({ search, embedded = false, calendar = null }: SearchResultsProps) {
   const tripLabel =
     search.tripType === 'ROUND_TRIP' && search.returnDate
       ? `${formatDate(search.departureDate)} → ${formatDate(search.returnDate)}`
@@ -65,8 +70,26 @@ export function SearchResults({ search, embedded = false }: SearchResultsProps) 
             {tripLabel} · {resultCount}
           </p>
         </div>
-        <span className={styles.liveMark}>Preço observado agora</span>
+        <span className={styles.liveMark}>Preços encontrados recentemente</span>
       </header>
+
+      {/* SPEC-031: todos os voos (companhias e horários) no site parceiro —
+          presente mesmo sem oferta, quando a pessoa mais precisa dele. */}
+      {search.allFlightsUrl && (
+        <div className={styles.allFlights}>
+          <PurchaseButton
+            href={search.allFlightsUrl}
+            status="CURRENT"
+            label="Ver todos os voos no site parceiro"
+            context={`${search.originName ?? search.origin} para ${search.destinationName ?? search.destination}`}
+          />
+          <PurchaseNote />
+        </div>
+      )}
+
+      {calendar && calendar.days.length > 0 && (
+        <PriceCalendar search={search} month={calendar.month} days={calendar.days} />
+      )}
 
       {search.offers.length > 0 && (
         <div className={styles.summaryRail} aria-label="Resumo das ofertas">
@@ -113,8 +136,8 @@ export function SearchResults({ search, embedded = false }: SearchResultsProps) 
       {search.status !== 'FAILED' && search.offers.length === 0 && (
         <EmptyState
           icon={<IconSearch size={32} />}
-          title="Nenhuma oferta encontrada"
-          description="Não encontramos passagens para essa combinação de rota, data e filtros."
+          title="Ainda não temos preço para esse dia"
+          description="Isso não quer dizer que não haja voos. Escolha outro dia no calendário ou veja todos os voos no site parceiro."
         />
       )}
 

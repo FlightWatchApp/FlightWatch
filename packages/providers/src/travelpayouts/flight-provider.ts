@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import type { FlightOffer } from '@flight-watch/domain';
 import { ProviderError } from '../errors.js';
-import type { FlightProvider, FlightSearchQuery, ProviderSearchResult } from '../port.js';
+import type {
+  CalendarDay,
+  FlightProvider,
+  FlightSearchQuery,
+  PriceCalendarQuery,
+  ProviderSearchResult,
+} from '../port.js';
 
 /**
  * SPEC-030 / ADR-008 — Travelpayouts Data API (`v2/prices/latest`), um cache
@@ -57,6 +63,21 @@ export function buildAviasalesSearchUrl(query: FlightSearchQuery): string {
   return `${AVIASALES_SEARCH_URL}/${query.originIata}${ddmm(query.departureDate)}${query.destinationIata}${back}${query.adults}`;
 }
 
+interface MonthRequest {
+  originIata: string;
+  destinationIata: string;
+  currency: string;
+  /** AAAA-MM */
+  month: string;
+  oneWay: boolean;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / MS_PER_DAY);
+}
+
 function retryAfterMs(header: string | null): number | undefined {
   if (!header) return undefined;
   const seconds = Number(header);
@@ -84,7 +105,13 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
       throw new ProviderError('INVALID_QUERY', 'travelpayouts: cached prices are per 1 adult');
     }
 
-    const entries = await this.fetchMonth(query);
+    const entries = await this.fetchMonth({
+      originIata: query.originIata,
+      destinationIata: query.destinationIata,
+      currency: query.currency,
+      month: query.departureDate.slice(0, 7),
+      oneWay: query.tripType === 'ONE_WAY',
+    });
     const now = this.now();
     const offers = entries
       .filter((entry) => this.matches(entry, query))
@@ -92,14 +119,53 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     return offers.length > 0 ? { kind: 'offers', offers } : { kind: 'no_offers' };
   }
 
-  private async fetchMonth(query: FlightSearchQuery): Promise<Entry[]> {
+  /**
+   * SPEC-031: menor preço por dia do mês. Em ida e volta, só a duração de
+   * viagem pedida — o calendário compara viagens equivalentes.
+   */
+  async priceCalendar(query: PriceCalendarQuery): Promise<CalendarDay[]> {
+    const entries = await this.fetchMonth({
+      originIata: query.originIata,
+      destinationIata: query.destinationIata,
+      currency: query.currency,
+      month: query.month,
+      oneWay: query.tripType === 'ONE_WAY',
+    });
+    const now = this.now();
+    const byDate = new Map<string, CalendarDay>();
+    for (const entry of entries) {
+      if (!this.isUsable(entry) || !entry.depart_date.startsWith(query.month)) continue;
+      const back = entry.return_date ? entry.return_date : null;
+      if (query.tripType === 'ONE_WAY' ? back !== null : back === null) continue;
+      if (back !== null && daysBetween(entry.depart_date, back) !== query.tripLengthDays) continue;
+      const observedAt = this.observedAtOf(entry, now);
+      if (now.getTime() - observedAt.getTime() > CACHED_PRICE_TTL_MS) continue;
+      const amountMinor = Math.round(entry.value * 100);
+      const current = byDate.get(entry.depart_date);
+      if (!current || amountMinor < current.amountMinor) {
+        byDate.set(entry.depart_date, {
+          date: entry.depart_date,
+          amountMinor,
+          stops: entry.number_of_changes ?? 0,
+          observedAt: observedAt.toISOString(),
+        });
+      }
+    }
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  allFlightsUrl(query: FlightSearchQuery): string {
+    return buildAviasalesSearchUrl(query);
+  }
+
+  private async fetchMonth(request: MonthRequest): Promise<Entry[]> {
     const params = new URLSearchParams({
-      origin: query.originIata,
-      destination: query.destinationIata,
-      currency: query.currency.toLowerCase(),
+      origin: request.originIata,
+      destination: request.destinationIata,
+      currency: request.currency.toLowerCase(),
       period_type: 'month',
-      beginning_of_period: `${query.departureDate.slice(0, 7)}-01`,
-      one_way: String(query.tripType === 'ONE_WAY'),
+      beginning_of_period: `${request.month}-01`,
+      one_way: String(request.oneWay),
       limit: '1000',
       show_to_affiliates: 'true',
     });
@@ -155,11 +221,9 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     });
   }
 
-  private matches(entry: Entry, query: FlightSearchQuery): boolean {
-    const entryReturn = entry.return_date ? entry.return_date : null;
+  /** Econômica, ainda atual segundo a fonte e com preço positivo. */
+  private isUsable(entry: Entry): boolean {
     return (
-      entry.depart_date === query.departureDate &&
-      entryReturn === query.returnDate &&
       (entry.trip_class ?? 0) === 0 &&
       entry.actual !== false &&
       Number.isFinite(entry.value) &&
@@ -167,10 +231,23 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     );
   }
 
-  private toOffer(entry: Entry, query: FlightSearchQuery, now: Date): FlightOffer {
-    // `found_at` vem sem fuso; tratado como UTC (ADR-008) e nunca no futuro.
+  private matches(entry: Entry, query: FlightSearchQuery): boolean {
+    const entryReturn = entry.return_date ? entry.return_date : null;
+    return (
+      this.isUsable(entry) &&
+      entry.depart_date === query.departureDate &&
+      entryReturn === query.returnDate
+    );
+  }
+
+  /** `found_at` vem sem fuso; tratado como UTC (ADR-008) e nunca no futuro. */
+  private observedAtOf(entry: Entry, now: Date): Date {
     const foundAt = new Date(`${entry.found_at}Z`);
-    const observedAt = Number.isNaN(foundAt.getTime()) || foundAt > now ? now : foundAt;
+    return Number.isNaN(foundAt.getTime()) || foundAt > now ? now : foundAt;
+  }
+
+  private toOffer(entry: Entry, query: FlightSearchQuery, now: Date): FlightOffer {
+    const observedAt = this.observedAtOf(entry, now);
     const duration =
       typeof entry.duration === 'number' && Number.isInteger(entry.duration) && entry.duration > 0
         ? entry.duration

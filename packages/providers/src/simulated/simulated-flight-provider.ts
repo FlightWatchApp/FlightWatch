@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto';
 import type { FlightOffer } from '@flight-watch/domain';
 import { ProviderError } from '../errors.js';
 import type {
+  CalendarDay,
   FlightProvider,
   FlightSearchQuery,
+  PriceCalendarQuery,
   ProviderContext,
   ProviderSearchResult,
 } from '../port.js';
@@ -97,5 +99,30 @@ export class SimulatedFlightProvider implements FlightProvider {
   // na chamada de search() — contrato que quem consome a porta pode confiar.
   async search(query: FlightSearchQuery, context: ProviderContext): Promise<ProviderSearchResult> {
     return this.scenario(query, context);
+  }
+
+  /**
+   * SPEC-031: um preço por dia, com a mesma semente do cenário padrão — o
+   * dia do calendário bate com a busca daquele dia.
+   */
+  async priceCalendar(query: PriceCalendarQuery): Promise<CalendarDay[]> {
+    const [year, month] = query.month.split('-').map(Number);
+    const daysInMonth = new Date(Date.UTC(year ?? 0, month ?? 1, 0)).getUTCDate();
+    const observedAt = new Date().toISOString();
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      const date = `${query.month}-${String(index + 1).padStart(2, '0')}`;
+      return {
+        date,
+        amountMinor: deterministicPriceMinor(
+          `${query.originIata}|${query.destinationIata}|${date}`,
+        ),
+        stops: 0,
+        observedAt,
+      };
+    });
+  }
+
+  allFlightsUrl(query: FlightSearchQuery): string {
+    return `https://${SIMULATED_BOOKING_HOST}/search/${query.originIata}-${query.destinationIata}-${query.departureDate}`;
   }
 }

@@ -4,6 +4,8 @@ export const SEARCH_ERROR_CODES = {
   UNSUPPORTED_SEARCH: { status: 422, code: 'UNSUPPORTED_SEARCH' },
   RATE_LIMITED: { status: 429, code: 'RATE_LIMITED' },
   FLIGHT_SEARCH_NOT_FOUND: { status: 404, code: 'FLIGHT_SEARCH_NOT_FOUND' },
+  // SPEC-031: a fonte do calendário falhou; a tela esconde o bloco.
+  PROVIDER_UNAVAILABLE: { status: 502, code: 'PROVIDER_UNAVAILABLE' },
 } as const;
 
 export type SearchErrorCode = keyof typeof SEARCH_ERROR_CODES;
