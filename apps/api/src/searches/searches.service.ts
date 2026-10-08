@@ -46,6 +46,7 @@ import { MetricsService } from '../observability/metrics.service.js';
 import { WatchesService } from '../watches/watches.service.js';
 import { PlacesService } from '../places/places.service.js';
 import { isSupportedCurrencyAndMarket } from '../watches/supported-catalog.js';
+import { PriceCalendarCache } from '../pricing-source/price-calendar-cache.js';
 import { FLIGHT_PROVIDER } from './flight-provider.token.js';
 
 // SPEC-014: mesma normalização/seleção que o pipeline de monitoramento usa
@@ -61,6 +62,7 @@ export class SearchesService {
     private readonly watchesService: WatchesService,
     @Inject(FLIGHT_PROVIDER) private readonly provider: FlightProvider,
     private readonly places: PlacesService,
+    private readonly calendarCache: PriceCalendarCache,
   ) {}
 
   /**
@@ -123,7 +125,11 @@ export class SearchesService {
     );
   }
 
-  /** SPEC-031: menor preço por dia do mês, por cidade (SPEC-029). */
+  /**
+   * SPEC-031: menor preço por dia do mês, por cidade (SPEC-029). SPEC-032:
+   * pelo cache por rota-mês, o mesmo do feed de promoções; o orçamento do
+   * feed não se aplica aqui.
+   */
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResponse> {
     const [origin, destination] = await Promise.all([
       this.places.resolveCity(query.origin),
@@ -132,19 +138,21 @@ export class SearchesService {
     if (!origin || !destination || origin === destination || !isSupportedCurrencyAndMarket(query)) {
       throw new SearchError('UNSUPPORTED_SEARCH', 'route, currency or market not supported');
     }
-    if (!this.provider.priceCalendar) {
-      this.metrics.priceCalendarFetchTotal.inc({ result: 'not_supported' });
-      return { origin, destination, month: query.month, currency: query.currency, days: [] };
-    }
     try {
-      const days = await this.provider.priceCalendar({
+      const result = await this.calendarCache.get({
         originIata: origin,
         destinationIata: destination,
         month: query.month,
         tripType: query.tripType,
         tripLengthDays: query.tripLengthDays ?? null,
         currency: query.currency,
+        market: query.market,
       });
+      if (!result) {
+        this.metrics.priceCalendarFetchTotal.inc({ result: 'not_supported' });
+        return { origin, destination, month: query.month, currency: query.currency, days: [] };
+      }
+      const { days } = result;
       this.metrics.priceCalendarFetchTotal.inc({ result: days.length > 0 ? 'success' : 'empty' });
       return { origin, destination, month: query.month, currency: query.currency, days };
     } catch (error) {

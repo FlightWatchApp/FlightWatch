@@ -37,6 +37,23 @@ export function intField(options: { min: number; max: number; default?: number |
     });
 }
 
+/** Liga/desliga: só "true" ou "false". */
+export function booleanField(defaultValue: boolean) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined) {
+        return defaultValue;
+      }
+      if (raw !== 'true' && raw !== 'false') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'deve ser true ou false' });
+        return z.NEVER;
+      }
+      return raw === 'true';
+    });
+}
+
 export function portField(defaultPort?: number) {
   return intField({ min: 1, max: 65_535, default: defaultPort });
 }

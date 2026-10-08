@@ -120,3 +120,7 @@
     min-height: 2.75rem;
   }
 }
+
+.originPicker {
+  max-width: 28rem;
+}

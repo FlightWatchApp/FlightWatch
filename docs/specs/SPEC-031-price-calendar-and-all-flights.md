@@ -21,7 +21,8 @@ fonte da Fase 1 permite (ADR-008):
 - lista de voos dentro do nosso site (Fase 2);
 - calendário de dois meses ou de datas flexíveis em volta do dia;
 - cache do calendário (cada abertura consulta a fonte; o rate limit da busca
-  protege).
+  protege). Atualizado pela SPEC-032: o calendário passou a usar o cache por
+  rota-mês do feed de promoções.
 
 ## Comportamento
 

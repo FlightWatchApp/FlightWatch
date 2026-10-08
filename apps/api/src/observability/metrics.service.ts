@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   Counter,
+  Gauge,
   Histogram,
   createMetricsRegistry,
   type Registry,
@@ -155,6 +156,42 @@ export class MetricsService {
     name: 'deal_classification_total',
     help: 'Total de ofertas classificadas como oportunidade, por tipo de deal (SPEC-015).',
     labelNames: ['type'],
+    registers: [this.registry],
+  });
+
+  /** SPEC-032 §Observabilidade. Origem nunca vira label (cardinalidade). */
+  readonly promotionFeedRequestsTotal = new Counter({
+    name: 'promotion_feed_requests_total',
+    help: 'Requisições ao feed de promoções, por cache (hit/miss/stale/none) e resultado (ok/budget_exhausted/provider_unavailable/disabled) (SPEC-032).',
+    labelNames: ['cache', 'result'],
+    registers: [this.registry],
+  });
+
+  readonly promotionProviderCallsTotal = new Counter({
+    name: 'promotion_provider_calls_total',
+    help: 'Consultas do feed de promoções à fonte, por tipo (candidates/month) e resultado (ok/error/rate_limited/cache_hit/budget_exhausted) (SPEC-032).',
+    labelNames: ['kind', 'result'],
+    registers: [this.registry],
+  });
+
+  readonly promotionEvaluationsTotal = new Counter({
+    name: 'promotion_evaluations_total',
+    help: 'Candidatos avaliados, por resultado (qualifies/suspect/not_promotional/insufficient_data/invalid_price) (SPEC-032).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
+  readonly promotionBudgetRemaining = new Gauge({
+    name: 'promotion_budget_remaining',
+    help: 'Chamadas à fonte que ainda cabem no orçamento do feed hoje (dia UTC) (SPEC-032).',
+    registers: [this.registry],
+  });
+
+  readonly promotionFeedDurationSeconds = new Histogram({
+    name: 'promotion_feed_duration_seconds',
+    help: 'Duração da resposta do feed de promoções, por cache (SPEC-032).',
+    labelNames: ['cache'],
+    buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 20],
     registers: [this.registry],
   });
 }

@@ -13,6 +13,7 @@ import {
 } from '@flight-watch/providers';
 import { AppModule } from '../app.module.js';
 import { registerCorrelationHook } from '../observability/correlation.js';
+import { KEY_VALUE_STORE, MemoryKeyValueStore } from '../pricing-source/key-value-store.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FLIGHT_PROVIDER } from './flight-provider.token.js';
 
@@ -46,6 +47,8 @@ beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(FLIGHT_PROVIDER)
     .useValue(provider)
+    .overrideProvider(KEY_VALUE_STORE)
+    .useValue(new MemoryKeyValueStore())
     .compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   await app.init();

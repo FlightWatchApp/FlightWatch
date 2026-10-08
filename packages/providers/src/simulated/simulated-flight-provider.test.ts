@@ -163,3 +163,45 @@ describe('SimulatedFlightProvider — calendário e todos os voos (SPEC-031)', (
     ).toBe('https://booking.simulated-provider.flightwatch.dev/search/SAO-LIS-2027-02-10');
   });
 });
+
+describe('SimulatedFlightProvider.cheapestByDestination (SPEC-032 AC-1)', () => {
+  const NOW = new Date('2026-10-07T12:00:00Z');
+  const provider = new SimulatedFlightProvider(undefined, () => NOW);
+  const fareQuery = {
+    originIata: 'SAO',
+    tripType: 'ONE_WAY' as const,
+    currency: 'BRL',
+    market: 'BR',
+  };
+
+  it('lista determinística, um preço por destino, sem a própria origem', async () => {
+    const fares = (await provider.cheapestByDestination(fareQuery)) ?? [];
+    expect(fares.length).toBeGreaterThan(5);
+    expect(new Set(fares.map((fare) => fare.destinationIata)).size).toBe(fares.length);
+    expect(fares.some((fare) => fare.destinationIata === 'SAO')).toBe(false);
+    expect(await provider.cheapestByDestination(fareQuery)).toEqual(fares);
+  });
+
+  it('coerente com o calendário: o preço é o do dia e o menor da janela', async () => {
+    const fares = await provider.cheapestByDestination(fareQuery);
+    for (const fare of fares.slice(0, 3)) {
+      const month = fare.departureDate.slice(0, 7);
+      const days = await provider.priceCalendar({
+        originIata: 'SAO',
+        destinationIata: fare.destinationIata,
+        month,
+        tripType: 'ONE_WAY',
+        tripLengthDays: null,
+        currency: 'BRL',
+      });
+      const day = days.find((candidate) => candidate.date === fare.departureDate);
+      expect(day?.amountMinor).toBe(fare.amountMinor);
+      expect(fare.departureDate > '2026-10-07').toBe(true);
+    }
+  });
+
+  it('ida e volta traz a data de volta', async () => {
+    const fares = await provider.cheapestByDestination({ ...fareQuery, tripType: 'ROUND_TRIP' });
+    expect(fares.every((fare) => fare.returnDate !== null)).toBe(true);
+  });
+});

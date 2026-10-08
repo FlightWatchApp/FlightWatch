@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { ProviderError } from '../errors.js';
 import type { FlightProvider, FlightSearchQuery } from '../port.js';
 import { TravelpayoutsFlightProvider } from './flight-provider.js';
@@ -358,5 +359,122 @@ describe('TravelpayoutsFlightProvider.priceCalendar (SPEC-031 AC-1)', () => {
     expect(provider(fakeFetch({}).fn).allFlightsUrl?.(oneWay)).toBe(
       'https://www.aviasales.com/search/SAO1711NYC1',
     );
+  });
+});
+
+describe('TravelpayoutsFlightProvider.cheapestByDestination (SPEC-032 AC-1)', () => {
+  const query = {
+    originIata: 'CGR',
+    tripType: 'ONE_WAY' as const,
+    currency: 'BRL',
+    market: 'BR',
+  };
+  // Sondagem real de 2026-10-07 (v2/prices/latest só com origin=CGR), recortada.
+  const fixture: unknown = JSON.parse(
+    readFileSync(new URL('./fixtures/latest-by-origin-cgr.json', import.meta.url), 'utf8'),
+  );
+  const FIXTURE_NOW = new Date('2026-10-07T18:00:00Z');
+
+  function at(now: Date, fetchFn: typeof fetch): FlightProvider {
+    return new TravelpayoutsFlightProvider({
+      token: TOKEN,
+      timeoutMs: 5000,
+      fetchFn,
+      now: () => now,
+    });
+  }
+
+  it('fixture real: um preço por destino, mais de 72 h fora', async () => {
+    const { fn, calls } = fakeFetch({ body: fixture });
+
+    const fares = await at(FIXTURE_NOW, fn).cheapestByDestination?.(query);
+
+    // SSA, RIO e SAO foram vistos há mais de 72 h.
+    expect(fares).toEqual([
+      {
+        destinationIata: 'SRZ',
+        departureDate: '2026-10-17',
+        returnDate: null,
+        amountMinor: 98_200,
+        stops: 1,
+        observedAt: '2026-10-07T15:50:01.000Z',
+      },
+      {
+        destinationIata: 'NAT',
+        departureDate: '2026-10-16',
+        returnDate: null,
+        amountMinor: 104_800,
+        stops: 2,
+        observedAt: '2026-10-06T15:25:36.000Z',
+      },
+      {
+        destinationIata: 'STM',
+        departureDate: '2026-10-30',
+        returnDate: null,
+        amountMinor: 156_300,
+        stops: 3,
+        observedAt: '2026-10-07T00:53:18.000Z',
+      },
+    ]);
+    const params = new URL(calls[0]?.url ?? '').searchParams;
+    expect(params.get('origin')).toBe('CGR');
+    expect(params.has('destination')).toBe(false);
+    expect(params.get('one_way')).toBe('true');
+    expect(params.get('currency')).toBe('brl');
+    expect(calls[0]?.headers['X-Access-Token']).toBe(TOKEN);
+    expect(calls[0]?.url).not.toContain(TOKEN);
+  });
+
+  it('mais de uma entrada por destino: fica a mais barata; a própria origem sai', async () => {
+    const { fn } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          entry({ origin: 'SAO', destination: 'LIS', depart_date: '2026-11-20', value: 3000 }),
+          entry({ origin: 'SAO', destination: 'LIS', depart_date: '2026-11-21', value: 2500 }),
+          entry({ origin: 'SAO', destination: 'SAO', value: 10 }),
+          entry({ origin: 'SAO', destination: 'MIA', trip_class: 1, value: 100 }),
+          entry({ origin: 'SAO', destination: 'BSB', actual: false }),
+        ],
+      },
+    });
+
+    const fares = await provider(fn).cheapestByDestination?.({ ...query, originIata: 'SAO' });
+
+    expect(
+      fares?.map((fare) => [fare.destinationIata, fare.departureDate, fare.amountMinor]),
+    ).toEqual([['LIS', '2026-11-21', 250_000]]);
+  });
+
+  it('ida e volta: só entradas com volta, e one_way=false', async () => {
+    const { fn, calls } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          entry({ destination: 'LIS', depart_date: '2026-11-10', return_date: '2026-11-17' }),
+          entry({ destination: 'MIA', depart_date: '2026-11-12' }),
+        ],
+      },
+    });
+
+    const fares = await provider(fn).cheapestByDestination?.({
+      ...query,
+      originIata: 'SAO',
+      tripType: 'ROUND_TRIP',
+    });
+
+    expect(fares?.map((fare) => [fare.destinationIata, fare.returnDate])).toEqual([
+      ['LIS', '2026-11-17'],
+    ]);
+    expect(new URL(calls[0]?.url ?? '').searchParams.get('one_way')).toBe('false');
+  });
+
+  it('429 respeita Retry-After', async () => {
+    const { fn } = fakeFetch({ status: 429, headers: { 'retry-after': '30' } });
+    const error = await provider(fn)
+      .cheapestByDestination?.(query)
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect((error as ProviderError).retryAfterMs).toBe(30_000);
   });
 });

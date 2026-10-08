@@ -202,6 +202,33 @@ export async function resolveSearchableCityCode(
   return airportCity?.searchable ? airport.cityCode : null;
 }
 
+export interface SearchableCity {
+  code: string;
+  name: string;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/**
+ * SPEC-032: cidades pesquisáveis entre os códigos, numa consulta só. Código
+ * fora do catálogo ou sem voo comercial fica de fora.
+ */
+export async function findSearchableCities(
+  prisma: PrismaClient,
+  codes: readonly string[],
+): Promise<Map<string, SearchableCity>> {
+  const unique = [...new Set(codes)];
+  if (unique.length === 0) {
+    return new Map();
+  }
+  const cities = await prisma.place.findMany({
+    where: { kind: 'CITY', searchable: true, code: { in: unique } },
+    select: { code: true, name: true, countryCode: true, latitude: true, longitude: true },
+  });
+  return new Map(cities.map((city) => [city.code, city]));
+}
+
 export interface PlaceSummary {
   name: string;
   lat: number | null;

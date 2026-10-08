@@ -97,6 +97,11 @@ O Claude não deve aumentar este arquivo com detalhes efêmeros. Detalhes extens
   SPEC-016 (mapa de oportunidades em `/opportunities`, OpenStreetMap +
   Leaflet) implementadas e verificadas — ver evidência de implementação em
   cada spec.
+- SPEC-032 (promoções por origem, `GET /v1/promotions`) implementada e
+  verificada com a Travelpayouts: calculadas sob demanda, guardadas só no
+  Redis (nada no banco), motor desligado por padrão
+  (`PROMOTION_ENGINE_ENABLED`); `/opportunities` escolhe a origem e volta ao
+  feed da SPEC-015 quando o motor está desligado.
 - Primeira rota pública com rate limit real (`@nestjs/throttler`,
   `POST /v1/searches/flights`) — `RATE_LIMIT_WINDOW_MS`/`RATE_LIMIT_MAX`
   agora `VERIFICADO` (§10.2).
@@ -276,7 +281,8 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 │   │   ├── lib/
 │   │   └── styles/
 │   ├── api/src/
-│   │   ├── auth/ watches/ searches/ opportunities/ affiliate/
+│   │   ├── auth/ watches/ searches/ opportunities/ promotions/ affiliate/
+│   │   ├── pricing-source/       # provedor + cache Redis (rota-mês) compartilhados
 │   │   ├── observability/
 │   │   ├── prisma/
 │   │   └── main.ts
@@ -370,6 +376,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - PriceHistory;
 - Searches/Offers (SPEC-014: busca de descoberta pública e derivação de Watch a partir de uma oferta);
 - Opportunities (SPEC-015: feed público de oportunidades, `Deal` computado em leitura);
+- Promotions (SPEC-032: feed público por origem; provedor e cache vêm do `PricingSourceModule`, global);
 - Health;
 - Observability interna.
 
@@ -579,6 +586,7 @@ Cada package deve exportar uma superfície pública pequena. Não importar arqui
 | `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas                   |
 | `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019)      |
 | `Place`                            | cidade ou aeroporto do catálogo (SPEC-029)         | chave `(code, kind)`; nunca apagado, só `searchable=false`; nenhuma lista no código |
+| promoção (SPEC-032)                | conclusão sobre preços da fonte, por origem        | **não é model Prisma** — só cache Redis reconstruível; avaliação pura no domínio    |
 
 ### 8.1 Dinheiro
 
@@ -676,6 +684,9 @@ Regras transversais:
   Throttlers `default` (busca) e `auth` (rotas públicas de autenticação), com
   storage em memória, por processo — não escala sob múltiplas réplicas sem
   storage compartilhado;
+- a API usa `REDIS_URL` desde a SPEC-032 (cache de promoções e do calendário,
+  orçamento diário do feed); Redis fora é falta de cache, nunca erro. Os e2e
+  da API apontam para `redis://127.0.0.1:1` e usam `MemoryKeyValueStore`;
 - fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
   e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`).
 

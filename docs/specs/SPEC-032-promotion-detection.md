@@ -1,6 +1,6 @@
 # SPEC-032 — Promoções por origem, calculadas sob demanda
 
-Status: approved para implementação (owner, 2026-10-07) — D3 segue em aberto
+Status: implementada (ver "Evidência de implementação") — D3 segue em aberto
 sem bloquear esta versão
 Owner: Pricing / Discovery
 Dependências: ADR-004, ADR-008, SPEC-015, SPEC-016, SPEC-020, SPEC-025,
@@ -127,7 +127,7 @@ interface DestinationFare {
   (SPEC-029).
 - Inválido (fora do feed, não entra em referência): preço ≤ 0, moeda diferente
   da pedida, data de viagem no passado, mais de 72 h.
-- **Suspeito** (desconto acima do limite): **nunca** aparece no feed; só
+- **Suspeito** (desconto a partir do limite, `≥ 7000 bps`): **nunca** aparece no feed; só
   métrica e log. Consultar a mesma fonte de novo devolve o mesmo cache e não
   confirma nada.
 - Uma promoção por destino (a fonte já devolve a melhor data de cada um).
@@ -190,8 +190,8 @@ Sem estados gravados. A idade é sempre calculada a partir de `observedAt`:
 `GET /v1/promotions?origin&tripType=ONE_WAY|ROUND_TRIP&scope=all|domestic|international&sort=score|price|discount&limit`
 
 - `origin` obrigatório, normalizado para cidade (SPEC-029); código
-  desconhecido → `400 UNSUPPORTED_SEARCH` (o mesmo código da busca e do
-  calendário).
+  desconhecido → `422 UNSUPPORTED_SEARCH` (o mesmo código e status da busca e
+  do calendário); query inválida → `400 INVALID_SEARCH_INPUT`.
 - `tripType` padrão `ONE_WAY`; `limit` padrão 20, máximo 50; moeda BRL e
   mercado BR fixos na v1.
 - Erro da fonte sem cache → `502 PROVIDER_UNAVAILABLE` (a tela some com o
@@ -201,7 +201,7 @@ Sem estados gravados. A idade é sempre calculada a partir de `observedAt`:
 {
   origin: string;
   originName: string;
-  status: 'OK' | 'BUDGET_EXHAUSTED';
+  status: 'OK' | 'BUDGET_EXHAUSTED' | 'DISABLED'; // DISABLED = kill switch
   generatedAt: string; // quando o feed desta origem foi calculado
   promotions: Array<{
     destination: string;
@@ -218,7 +218,7 @@ Sem estados gravados. A idade é sempre calculada a partir de `observedAt`:
     reference: {
       amountMinor: number;
       pointCount: number;
-      months: string[]; // ['2026-10','2026-11','2026-12']
+      months: string[]; // meses que contribuíram: ['2026-10','2026-11','2026-12']
       explanation: string; // texto pronto em pt-BR
     };
     observedAt: string; // idade do preço
@@ -264,8 +264,12 @@ Nenhuma. Tudo em cache reconstruível.
   serve cache.
 - Sem retry imediato dentro da requisição (H08). Timeout por chamada já
   existente no adaptador.
-- Kill switch `PROMOTION_ENGINE_ENABLED=false`: o endpoint responde lista
-  vazia sem chamar a fonte; a tela some com o bloco.
+- Kill switch `PROMOTION_ENGINE_ENABLED=false`: o endpoint responde
+  `status: "DISABLED"` com lista vazia, sem chamar a fonte; a tela volta ao
+  feed da SPEC-015 (rollback).
+- Rodada incompleta (alguma chamada recusada por orçamento ou Retry-After) não
+  vai para o cache do feed: a próxima requisição tenta de novo, e os meses já
+  consultados estão no cache por rota-mês.
 
 ## Segurança e privacidade
 
@@ -275,17 +279,19 @@ payload bruto da fonte em log.
 
 ## Observabilidade
 
-| Métrica                           | Labels                                                                                                    |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `promotion_feed_requests_total`   | `cache` (`hit`, `miss`, `stale`), `result` (`ok`, `budget_exhausted`, `provider_unavailable`, `disabled`) |
-| `promotion_provider_calls_total`  | `kind` (`candidates`, `month`), `result` (`ok`, `error`, `rate_limited`, `cache_hit`)                     |
-| `promotion_evaluations_total`     | `result` (`qualifies`, `suspect`, `not_promotional`, `insufficient_data`, `invalid_price`)                |
-| `promotion_budget_remaining`      | — (gauge)                                                                                                 |
-| `promotion_feed_duration_seconds` | `cache` (histograma)                                                                                      |
+| Métrica                           | Labels                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `promotion_feed_requests_total`   | `cache` (`hit`, `miss`, `stale`, `none` = kill switch), `result` (`ok`, `budget_exhausted`, `provider_unavailable`, `disabled`) |
+| `promotion_provider_calls_total`  | `kind` (`candidates`, `month`), `result` (`ok`, `error`, `rate_limited`, `cache_hit`, `budget_exhausted`)                       |
+| `promotion_evaluations_total`     | `result` (`qualifies`, `suspect`, `not_promotional`, `insufficient_data`, `invalid_price`)                                      |
+| `promotion_budget_remaining`      | — (gauge)                                                                                                                       |
+| `promotion_feed_duration_seconds` | `cache` (histograma)                                                                                                            |
 
 Origem **não** vira label (cardinalidade). Logs: `promotion_suspect_detected`
-(rota, desconto), `promotion_budget_exhausted`, `promotion_feed_computed`
-(origem, candidatos, qualificadas, chamadas, duração).
+(`route`, desconto — `destination` é campo redigido no logger),
+`promotion_budget_exhausted`, `promotion_provider_rate_limited`,
+`promotion_provider_error`, `promotion_feed_computed` (origem, candidatos,
+qualificadas, chamadas, duração).
 
 ## Variáveis de ambiente (novas, api, `packages/config` e `.env.example`)
 
@@ -381,4 +387,76 @@ Origem **não** vira label (cardinalidade). Logs: `promotion_suspect_detected`
 
 ## Evidência de implementação
 
-Pendente.
+2026-10-07, branch `feat/promotions` (sobre `docs/spec-032-promocoes`).
+
+**Ajustes ao texto durante a implementação** (já refletidos acima):
+`422 UNSUPPORTED_SEARCH` em vez de 400, para bater com busca e calendário;
+`status: "DISABLED"` no kill switch (a tela precisa distinguir "desligado" de
+"sem promoção"); suspeito a partir de 7000 bps (o AC-4 dizia "acima", o
+EVAL-PROMO-002 dizia "≥" — ficou o mais seguro); `reference.months` são os
+meses que contribuíram com preço; a explicação traz o ano; rótulos `none` e
+`budget_exhausted` nas métricas; rodada incompleta não vai ao cache.
+
+- **Domínio** (`packages/domain/src/promotion/`): `evaluatePromotion`,
+  `medianMinor`, `referenceMonths`, `promotionScope`, `promotionFreshness`,
+  `invalidPriceReason`, `promotionScore` — puros, relógio injetado, só
+  inteiros. 27 testes (mediana par/ímpar, 1499 × 1500 bps, nacional ×
+  internacional, inválidos, 6999 × 7000 bps, pesos 50/20/30 do score, frescor
+  24/72 h).
+- **Provedor**: `cheapestByDestination` opcional na porta. Travelpayouts com
+  `v2/prices/latest` só com `origin` (`period_type=year`, `sorting=price`), um
+  por destino, sem a própria origem, mais de 72 h fora — fixture real
+  sanitizada de CGR (`fixtures/latest-by-origin-cgr.json`) + 3 casos. Simulado:
+  o dia mais barato dos próximos 60 dias com a mesma semente do calendário (3
+  testes de coerência).
+- **Config**: 10 variáveis em `packages/config` e `.env.example`
+  (`booleanField` novo); a API passa a ler `REDIS_URL` (padrão local em
+  development/test). 4 testes.
+- **Cache** (`apps/api/src/pricing-source/`): `RedisKeyValueStore` (sem fila
+  offline, timeout de 500 ms, conecta no primeiro uso) e
+  `MemoryKeyValueStore`; `PriceCalendarCache` por rota-mês usado pelo
+  calendário da SPEC-031 e pelo feed. O provedor saiu do `SearchesModule` para
+  o `PricingSourceModule` global. 4 testes com Redis real (Testcontainers),
+  inclusive "Redis fora falha na hora". Os e2e da API usam
+  `REDIS_URL=redis://127.0.0.1:1` (achado: o e2e do calendário gravava no Redis
+  de desenvolvimento).
+- **API**: `GET /v1/promotions` (`PromotionsService`, single-flight por
+  processo, orçamento diário no Redis com reserva local, Retry-After global,
+  cache vencido como reserva, kill switch, 5 métricas). e2e
+  `promotions.e2e.spec.ts`, 13 casos: qualificação com
+  suspeito/insuficiente/não-promoção/erro de mês fora, origem quente com 0
+  chamadas, calendário reaproveitando o cache, escopo/ordem/limite, single-flight,
+  400/422/502, cache vencido servido, afiliado, 429, orçamento esgotado
+  (inclusive no meio da rodada), kill switch e Redis fora. Achado: o
+  `increment` do store em memória não era atômico (o do Redis é) — corrigido.
+- **Web**: `/opportunities` com seletor de origem (`PlaceCombobox`), cookie
+  `fw_origin` (1 ano, httpOnly) e `?origin=` na URL; estados carregando
+  (`loading.tsx`), sem origem, sem promoção, orçamento esgotado, fonte
+  indisponível; `DISABLED` volta ao feed da SPEC-015 (`legacy-opportunities.tsx`).
+  `PromotionCard` com "↓ N% abaixo das datas próximas", mediana em reais,
+  idade ("pode ter mudado" entre 24 e 72 h) e "Como calculamos?". Mapa com os
+  destinos. Lógica de apresentação em `lib/domain/promotion.ts` (5 testes) e
+  `origin.ts` (2 testes).
+- **Gates**: format, lint, typecheck, `check:design` e build verdes; 827 testes
+  verdes. Os pacotes com Testcontainers estouraram o `hookTimeout` subindo
+  containers em paralelo na primeira rodada e passaram em sequência
+  (`--concurrency=1`), sem mudança de código.
+- **Execução real (AC-11)**, API com `FLIGHT_PROVIDER=travelpayouts` e motor
+  ligado:
+  - **SAO**: 10 candidatos → 6 promoções, 3 não-promoção, 1 sem dados; 1 + 44
+    chamadas, 3,7 s. Ex.: SAO → CWB em 11/12, R$ 132 contra mediana de R$ 265
+    em 26 preços (nov–jan) = 5018 bps. **Conferido à mão** contra
+    `GET /v1/price-calendar` dos três meses: 26 pontos, mediana 26.500, 5018
+    bps — idêntico. Segunda requisição: cache, 0 chamadas, 29 ms.
+  - **CGR**: 8 candidatos, todos `INSUFFICIENT_DATA` (menos de 8 preços nas
+    datas próximas) → feed vazio, "Nenhuma promoção agora". Confirma o achado
+    da SPEC-029/ADR-008 sobre a pouca cobertura de CGR.
+  - Web (`next dev`) contra essa API: SAO com os 6 cartões, explicação e
+    idade; cookie `fw_origin=CGR` sem `?origin` mostra Campo Grande; `ZZZ` volta
+    a pedir a cidade.
+- **Não verificado**: escolher a origem pelo combobox num navegador (ação do
+  servidor que grava o cookie e redireciona), mapa e leitura em celular.
+- **Pendente do owner**: EVAL-PROMO-001 (conjunto rotulado em
+  `docs/evals/EVALS-032-promotions.md`); limite real de
+  `PROMOTION_DAILY_CALL_BUDGET`. Sobre `PROMOTION_CANDIDATES_PER_ORIGIN = 10`:
+  em SAO 6 de 10 qualificaram; em CGR o limite não é o gargalo, a cobertura é.

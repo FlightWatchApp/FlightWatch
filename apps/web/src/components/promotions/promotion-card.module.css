@@ -1,0 +1,106 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.selected {
+  box-shadow: 0 0 0 2px var(--color-action);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.25rem var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-success-soft-bg);
+  color: var(--color-success-soft-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.aging {
+  color: var(--color-warning-soft-text);
+  font-weight: 600;
+}
+
+.routeRow {
+  margin-top: var(--space-4);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.priceBlock {
+  margin-top: var(--space-4);
+}
+
+.priceLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.price {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.reference {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.howTo {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.howTo summary {
+  cursor: pointer;
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.howTo p {
+  margin-top: var(--space-2);
+}
+
+.actions {
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.purchaseUnavailable {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
