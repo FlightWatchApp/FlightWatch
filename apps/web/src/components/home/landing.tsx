@@ -6,6 +6,7 @@ import buttonStyles from '@/components/ui/button.module.css';
 import { IconBell, IconExternalLink, IconSearch, IconShield } from '@/components/ui/icon';
 import type { OpportunityItem } from '@/lib/api/types';
 import { HeroIllustration } from './hero-illustration';
+import type { HeroPromotion } from './hero-promotion';
 import styles from './landing.module.css';
 
 const primaryLg = [buttonStyles.button, buttonStyles.primary, buttonStyles.lg].join(' ');
@@ -15,6 +16,8 @@ const delay = (ms: number) => ({ '--reveal-delay': `${ms}ms` }) as CSSProperties
 
 export interface LandingProps {
   opportunities: OpportunityItem[];
+  /** SPEC-032: promoção real do cartão do topo; null mostra o exemplo. */
+  heroPromotion?: HeroPromotion | null;
 }
 
 /**
@@ -23,7 +26,7 @@ export interface LandingProps {
  * página não decide isso, só mostra o estado vazio quando a lista é []
  * (falha ou ausência de dado são o mesmo estado aqui, de propósito).
  */
-export function Landing({ opportunities }: LandingProps) {
+export function Landing({ opportunities, heroPromotion = null }: LandingProps) {
   const featured = opportunities.slice(0, 3);
 
   return (
@@ -51,7 +54,14 @@ export function Landing({ opportunities }: LandingProps) {
             </p>
           </div>
           <div className={styles.heroArt}>
-            <HeroIllustration />
+            <HeroIllustration live={heroPromotion} />
+            {heroPromotion ? (
+              heroPromotion.promotion.purchaseUrl && <PurchaseNote />
+            ) : (
+              <Link href="/opportunities" className={styles.heroArtLink}>
+                Escolha sua cidade para ver promoções reais →
+              </Link>
+            )}
           </div>
         </div>
       </section>

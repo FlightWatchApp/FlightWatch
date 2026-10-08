@@ -73,9 +73,19 @@
 }
 
 .heroArt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   max-width: 30rem;
   justify-self: end;
   width: 100%;
+}
+
+.heroArtLink {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-action);
 }
 
 .section {
