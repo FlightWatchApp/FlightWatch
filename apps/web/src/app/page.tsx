@@ -35,7 +35,13 @@ export default async function HomePage() {
       safeOpportunities(),
       loadHeroPromotion(origin),
     ]);
-    return <Landing opportunities={opportunities} heroPromotion={heroPromotion} />;
+    return (
+      <Landing
+        opportunities={opportunities}
+        heroPromotion={heroPromotion}
+        heroOriginChosen={origin !== null}
+      />
+    );
   }
 
   let watches;

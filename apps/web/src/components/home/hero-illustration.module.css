@@ -126,9 +126,10 @@
 
 .priceRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
 }
 
 .label {
@@ -270,8 +271,9 @@
 
 .tooltip {
   position: absolute;
-  top: 0;
-  transform: translate(-50%, -110%);
+  /* Dentro da área do gráfico: por cima, cobriria o preço do cartão. */
+  top: var(--space-1);
+  transform: translateX(-50%);
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-sm);
   background: var(--color-text-primary);

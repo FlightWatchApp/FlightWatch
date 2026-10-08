@@ -11,8 +11,21 @@ const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
  * pessoal, 1 ano) e na URL, para o link ser compartilhável.
  */
 export async function chooseOriginAction(code: string): Promise<void> {
-  const origin = normalizeOriginCode(code);
+  const origin = await saveOrigin(code);
   if (!origin) return;
+  redirect(`/opportunities?origin=${origin}`);
+}
+
+/** Mesma preferência, escolhida no cartão da página inicial: volta para a página inicial. */
+export async function chooseHomeOriginAction(code: string): Promise<void> {
+  const origin = await saveOrigin(code);
+  if (!origin) return;
+  redirect('/');
+}
+
+async function saveOrigin(code: string): Promise<string | null> {
+  const origin = normalizeOriginCode(code);
+  if (!origin) return null;
   const cookieStore = await cookies();
   cookieStore.set(ORIGIN_COOKIE_NAME, origin, {
     httpOnly: true,
@@ -21,5 +34,5 @@ export async function chooseOriginAction(code: string): Promise<void> {
     path: '/',
     maxAge: ONE_YEAR_SECONDS,
   });
-  redirect(`/opportunities?origin=${origin}`);
+  return origin;
 }

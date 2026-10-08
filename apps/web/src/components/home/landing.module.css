@@ -81,11 +81,11 @@
   width: 100%;
 }
 
-.heroArtLink {
-  align-self: flex-start;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-action);
+/* O 2º cartão de exemplo fica girado e deslocado ~30px para baixo
+   (hero-illustration.module.css, .slot[data-position='back']): o campo
+   precisa desse espaço para não ficar por baixo dele. */
+.heroPicker {
+  margin-top: var(--space-8);
 }
 
 .section {
@@ -256,7 +256,8 @@
 
 @media (max-width: 960px) {
   .heroInner {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): texto que não quebra (preço, selo) não alarga a página. */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-10);
   }
 
