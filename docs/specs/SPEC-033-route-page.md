@@ -1,6 +1,6 @@
 # SPEC-033 — Página da rota (e o mesmo modelo no monitoramento)
 
-Status: draft — escrita por Claude a pedido do owner, aguarda revisão
+Status: approved (owner, 2026-10-08) — escrita por Claude, revisada pelo owner; a página vai evoluir
 Owner: Discovery
 Dependências: SPEC-016 (mapa), SPEC-018/020 (link de compra e afiliado),
 SPEC-025 (rate limit), SPEC-029 (catálogo de lugares), SPEC-031 (calendário),
