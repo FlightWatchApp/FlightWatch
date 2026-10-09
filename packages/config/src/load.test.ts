@@ -172,6 +172,10 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       PROMOTION_FEED_CACHE_TTL_MINUTES: 360,
       PRICE_CALENDAR_CACHE_TTL_MINUTES: 360,
       PROMOTION_DAILY_CALL_BUDGET: 2000,
+      ROUTE_PAGE_ENABLED: false,
+      ROUTE_PAGE_DAILY_CALL_BUDGET: 1000,
+      ROUTE_PAGE_CACHE_TTL_MINUTES: 30,
+      ROUTE_PAGE_MONTHS: 3,
     });
   });
 

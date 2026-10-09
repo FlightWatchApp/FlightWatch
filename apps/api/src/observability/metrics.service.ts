@@ -187,6 +187,26 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  readonly routePageRequestsTotal = new Counter({
+    name: 'route_page_requests_total',
+    help: 'Respostas da página da rota por estado dos preços (ok/no_prices/updating/unavailable) e cache da resposta (hit/miss) (SPEC-033).',
+    labelNames: ['prices', 'cache'],
+    registers: [this.registry],
+  });
+
+  readonly routePageProviderCallsTotal = new Counter({
+    name: 'route_page_provider_calls_total',
+    help: 'Meses da página da rota por origem do dado: cache_hit, ok, error, rate_limited, budget_exhausted (SPEC-033).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
+  readonly routePageBudgetRemaining = new Gauge({
+    name: 'route_page_budget_remaining',
+    help: 'Chamadas à fonte que ainda cabem no orçamento da página da rota hoje (dia UTC) (SPEC-033).',
+    registers: [this.registry],
+  });
+
   readonly promotionFeedDurationSeconds = new Histogram({
     name: 'promotion_feed_duration_seconds',
     help: 'Duração da resposta do feed de promoções, por cache (SPEC-032).',

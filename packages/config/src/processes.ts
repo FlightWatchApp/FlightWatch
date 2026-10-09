@@ -71,6 +71,14 @@ const promotions = {
   PROMOTION_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 2000 }),
 };
 
+/** SPEC-033: página da rota (desligada por padrão), com orçamento próprio para robôs de busca. */
+const routePage = {
+  ROUTE_PAGE_ENABLED: booleanField(false),
+  ROUTE_PAGE_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 1000 }),
+  ROUTE_PAGE_CACHE_TTL_MINUTES: cacheMinutes(30),
+  ROUTE_PAGE_MONTHS: intField({ min: 1, max: 6, default: 3 }),
+};
+
 const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };
 
 export const apiConfig = {
@@ -85,6 +93,7 @@ export const apiConfig = {
     ...flightProvider,
     ...emailProvider,
     ...promotions,
+    ...routePage,
     RATE_LIMIT_WINDOW_MS: durationMsField(60_000),
     RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 10 }),
     // SPEC-025: rotas de autenticação, por rota e por IP do cliente.

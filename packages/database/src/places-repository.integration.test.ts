@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type PrismaClient, createPrismaClient } from './client.js';
 import {
   findPlaceSummaries,
+  findRouteCities,
   findSearchableCities,
   getPlacesLastSyncedAt,
   resolveSearchableCityCode,
@@ -225,5 +226,34 @@ describe('findSearchableCities (SPEC-032)', () => {
 
   it('lista vazia não consulta', async () => {
     expect((await findSearchableCities(prisma, [])).size).toBe(0);
+  });
+});
+
+describe('findRouteCities (SPEC-033)', () => {
+  beforeEach(async () => {
+    await syncPlacesCatalog(prisma, TEST_PLACES, new Date('2026-10-06T00:00:00Z'));
+  });
+
+  it('devolve cidade, país, coordenadas e aeroportos comerciais numa consulta', async () => {
+    const cities = await findRouteCities(prisma, ['SAO', 'LIS']);
+
+    expect(cities.get('SAO')).toEqual({
+      code: 'SAO',
+      name: 'São Paulo',
+      countryCode: 'BR',
+      countryName: 'Brasil',
+      latitude: -23.55,
+      longitude: -46.63,
+      airports: [
+        { code: 'CGH', name: 'Congonhas' },
+        { code: 'GRU', name: 'Guarulhos' },
+      ],
+    });
+    expect(cities.get('LIS')?.countryName).toBe('Portugal');
+  });
+
+  it('código de aeroporto, cidade não pesquisável ou desconhecida ficam de fora', async () => {
+    const cities = await findRouteCities(prisma, ['GRU', 'VSV', 'ZZZ']);
+    expect(cities.size).toBe(0);
   });
 });

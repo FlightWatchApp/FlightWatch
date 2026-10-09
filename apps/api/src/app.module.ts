@@ -7,6 +7,7 @@ import { PlacesModule } from './places/places.module.js';
 import { PricingSourceModule } from './pricing-source/pricing-source.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { PromotionsModule } from './promotions/promotions.module.js';
+import { RoutesModule } from './routes/routes.module.js';
 import { SearchesModule } from './searches/searches.module.js';
 import { ThrottlingModule } from './throttling/throttling.module.js';
 import { WatchesModule } from './watches/watches.module.js';
@@ -24,6 +25,7 @@ import { WatchesModule } from './watches/watches.module.js';
     OpportunitiesModule,
     PlacesModule,
     PromotionsModule,
+    RoutesModule,
   ],
 })
 export class AppModule {}

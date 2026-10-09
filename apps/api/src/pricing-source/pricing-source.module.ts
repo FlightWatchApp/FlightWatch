@@ -4,6 +4,7 @@ import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
 import { KEY_VALUE_STORE, type KeyValueStore, RedisKeyValueStore } from './key-value-store.js';
 import { PriceCalendarCache } from './price-calendar-cache.js';
+import { ProviderCooldown } from './provider-guard.js';
 
 /**
  * Fonte de preços da API: o provedor (ADR-004), o cache reconstruível
@@ -29,8 +30,9 @@ import { PriceCalendarCache } from './price-calendar-cache.js';
       useFactory: (config: ApiConfig) => new RedisKeyValueStore(config.REDIS_URL),
     },
     PriceCalendarCache,
+    ProviderCooldown,
   ],
-  exports: [FLIGHT_PROVIDER, KEY_VALUE_STORE, PriceCalendarCache],
+  exports: [FLIGHT_PROVIDER, KEY_VALUE_STORE, PriceCalendarCache, ProviderCooldown],
 })
 export class PricingSourceModule implements OnModuleDestroy {
   constructor(@Inject(KEY_VALUE_STORE) private readonly store: KeyValueStore) {}

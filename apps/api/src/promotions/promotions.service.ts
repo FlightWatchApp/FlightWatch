@@ -27,6 +27,7 @@ import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
 import { PriceCalendarCache } from '../pricing-source/price-calendar-cache.js';
 import { KEY_VALUE_STORE, type KeyValueStore } from '../pricing-source/key-value-store.js';
+import { DailyCallBudget, ProviderCooldown } from '../pricing-source/provider-guard.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
 import { explainPromotion } from './promotion-explanation.js';
 
@@ -34,10 +35,6 @@ const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 /** Feed vencido continua guardado mais 72 h: serve de reserva se a fonte falhar. */
 const STALE_FEED_RETENTION_MS = 72 * 60 * MINUTE_MS;
-/** 429 sem Retry-After: sem novas chamadas do feed por este tempo. */
-const DEFAULT_RETRY_AFTER_MS = MINUTE_MS;
-const BUDGET_KEY_TTL_MS = 2 * DAY_MS;
-const COOLDOWN_KEY = 'promotions:cooldown:v1';
 /** Candidatos avaliados em paralelo; cada um consulta até 3 meses em sequência. */
 const CANDIDATE_CONCURRENCY = 4;
 
@@ -72,10 +69,6 @@ interface RoundState {
   /** Alguma chamada foi recusada (orçamento ou Retry-After): rodada incompleta. */
   refused: boolean;
   budgetRefused: boolean;
-}
-
-function utcDay(now: Date): string {
-  return now.toISOString().slice(0, 10);
 }
 
 function daysBetween(from: string, to: string): number {
@@ -124,9 +117,8 @@ export class PromotionsService {
   private readonly feedTtlMs: number;
   /** Single-flight: requisições simultâneas da mesma origem fria, um cálculo. */
   private readonly inflight = new Map<string, Promise<FeedOutcome>>();
-  /** Reserva local quando o Redis está fora (orçamento e Retry-After). */
-  private localBudget = { day: '', used: 0 };
-  private localCooldownUntil = 0;
+  /** Orçamento diário só do feed (SPEC-032); o Retry-After é compartilhado. */
+  private readonly budget: DailyCallBudget;
 
   constructor(
     @Inject(FLIGHT_PROVIDER) private readonly provider: FlightProvider,
@@ -135,7 +127,14 @@ export class PromotionsService {
     private readonly calendar: PriceCalendarCache,
     private readonly places: PlacesService,
     private readonly metrics: MetricsService,
+    private readonly cooldown: ProviderCooldown,
   ) {
+    this.budget = new DailyCallBudget(store, {
+      keyPrefix: 'promotions:budget:v1',
+      limit: config.PROMOTION_DAILY_CALL_BUDGET,
+      exhaustedEvent: 'promotion_budget_exhausted',
+      onRemaining: (remaining) => metrics.promotionBudgetRemaining.set(remaining),
+    });
     this.policy = {
       minReferencePoints: config.PROMOTION_MIN_REFERENCE_POINTS,
       minDomesticDiscountBps: config.PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS,
@@ -201,6 +200,25 @@ export class PromotionsService {
       generatedAt: outcome.generatedAt,
       promotions,
     };
+  }
+
+  /**
+   * SPEC-033: promoção da rota **só do feed já em cache** da origem — nunca
+   * dispara o cálculo (a página da rota não consome o orçamento do feed).
+   * Vencida pelo TTL ainda vale; preço com mais de 72 h, não.
+   */
+  async cachedPromotion(
+    origin: string,
+    destination: string,
+    tripType: TripType,
+  ): Promise<StoredPromotion | null> {
+    if (!this.config.PROMOTION_ENGINE_ENABLED) return null;
+    const feed = await this.readFeed(feedKey(origin, tripType));
+    const promotion = feed?.promotions.find((item) => item.destination === destination);
+    if (!promotion || promotionFreshness(promotion.observedAt, new Date()) === 'EXPIRED') {
+      return null;
+    }
+    return promotion;
   }
 
   private record(cache: CacheLabel, result: string, startedAt: number): void {
@@ -484,11 +502,11 @@ export class PromotionsService {
 
   /** Antes de toda chamada do feed à fonte (nunca num acerto de cache). */
   private async beforeCall(round: RoundState): Promise<void> {
-    if (await this.inCooldown()) {
+    if (await this.cooldown.active()) {
       round.refused = true;
       throw new CallRefused('rate_limited');
     }
-    if (!(await this.reserveBudget())) {
+    if (!(await this.budget.reserve())) {
       round.refused = true;
       round.budgetRefused = true;
       throw new CallRefused('budget_exhausted');
@@ -496,52 +514,9 @@ export class PromotionsService {
     round.calls += 1;
   }
 
-  private async inCooldown(): Promise<boolean> {
-    if (this.localCooldownUntil > Date.now()) return true;
-    try {
-      const until = Number(await this.store.get(COOLDOWN_KEY));
-      return Number.isFinite(until) && until > Date.now();
-    } catch {
-      return false;
-    }
-  }
-
-  /** Devolve o rótulo da métrica; 429 suspende as chamadas do feed até o Retry-After. */
-  private async noteProviderError(error: ProviderError): Promise<'error' | 'rate_limited'> {
-    if (error.errorClass !== 'RATE_LIMITED') return 'error';
-    const waitMs = error.retryAfterMs ?? DEFAULT_RETRY_AFTER_MS;
-    const until = Date.now() + waitMs;
-    this.localCooldownUntil = Math.max(this.localCooldownUntil, until);
-    try {
-      await this.store.set(COOLDOWN_KEY, String(until), Math.max(1, waitMs));
-    } catch {
-      // Redis fora: vale a pausa local deste processo.
-    }
-    logEvent({ event: 'promotion_provider_rate_limited', retryAfterMs: waitMs });
-    return 'rate_limited';
-  }
-
-  /** Conta a chamada no orçamento do dia UTC (Redis; local se o Redis cair). */
-  private async reserveBudget(): Promise<boolean> {
-    const now = new Date();
-    const day = utcDay(now);
-    let used: number;
-    try {
-      used = await this.store.increment(budgetKey(day), BUDGET_KEY_TTL_MS);
-    } catch {
-      if (this.localBudget.day !== day) this.localBudget = { day, used: 0 };
-      this.localBudget.used += 1;
-      used = this.localBudget.used;
-    }
-    const budget = this.config.PROMOTION_DAILY_CALL_BUDGET;
-    this.metrics.promotionBudgetRemaining.set(Math.max(0, budget - used));
-    if (used > budget) {
-      if (used === budget + 1) {
-        logEvent({ event: 'promotion_budget_exhausted', day, budget });
-      }
-      return false;
-    }
-    return true;
+  /** Devolve o rótulo da métrica; 429 suspende as chamadas à fonte até o Retry-After. */
+  private noteProviderError(error: ProviderError): Promise<'error' | 'rate_limited'> {
+    return this.cooldown.note(error, 'promotion_provider_rate_limited');
   }
 
   // --- cache do feed ---------------------------------------------------------
@@ -568,10 +543,6 @@ export class PromotionsService {
 
 function feedKey(origin: string, tripType: TripType): string {
   return `promotions:v1:${origin}:${tripType}:${PROMOTION_CURRENCY}:${PROMOTION_MARKET}`;
-}
-
-function budgetKey(day: string): string {
-  return `promotions:budget:v1:${day}`;
 }
 
 function comparator(

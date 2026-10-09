@@ -7,5 +7,6 @@ import { PromotionsService } from './promotions.service.js';
   imports: [PlacesModule],
   controllers: [PromotionsController],
   providers: [PromotionsService],
+  exports: [PromotionsService],
 })
 export class PromotionsModule {}

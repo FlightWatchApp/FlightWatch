@@ -6,6 +6,8 @@ export const SEARCH_ERROR_CODES = {
   FLIGHT_SEARCH_NOT_FOUND: { status: 404, code: 'FLIGHT_SEARCH_NOT_FOUND' },
   // SPEC-031: a fonte do calendário falhou; a tela esconde o bloco.
   PROVIDER_UNAVAILABLE: { status: 502, code: 'PROVIDER_UNAVAILABLE' },
+  // SPEC-033: cidade desconhecida, sem voo comercial, igual nas duas pontas ou página desligada.
+  ROUTE_NOT_FOUND: { status: 404, code: 'ROUTE_NOT_FOUND' },
 } as const;
 
 export type SearchErrorCode = keyof typeof SEARCH_ERROR_CODES;

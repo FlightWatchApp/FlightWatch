@@ -76,6 +76,15 @@ describe('applyAffiliateTracking', () => {
     expect(url.searchParams.get('utm_campaign')).toBe('opportunity');
   });
 
+  it('SPEC-033: clique da página da rota sai com utm_campaign=route', () => {
+    const url = new URL(
+      applyAffiliateTracking(PURCHASE_URL, 'SIMULATED', 'ROUTE', {
+        SIMULATED: { marker: '123456' },
+      }),
+    );
+    expect(url.searchParams.get('utm_campaign')).toBe('route');
+  });
+
   it('returns the URL unchanged when the provider has no configured params', () => {
     expect(applyAffiliateTracking(PURCHASE_URL, 'SIMULATED', 'SEARCH', {})).toBe(PURCHASE_URL);
     expect(
