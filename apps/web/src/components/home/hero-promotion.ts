@@ -3,6 +3,8 @@ import { listPromotions } from '@/lib/api/promotions';
 import { getPriceCalendar } from '@/lib/api/searches';
 import { tripLengthDays } from '@/lib/domain/price-calendar';
 import type { PriceChartDay } from '@/lib/domain/price-chart';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
+import { routePath } from '@/lib/domain/route-url';
 
 /** Promoção real do cartão da página inicial, com os preços por data da rota. */
 export interface HeroPromotion {
@@ -13,6 +15,8 @@ export interface HeroPromotion {
   days: PriceChartDay[];
   /** Instante da renderização no servidor: a idade não muda na hidratação. */
   renderedAt: string;
+  /** Página da rota (SPEC-033); null com a página desligada. */
+  routeHref: string | null;
 }
 
 /**
@@ -63,5 +67,11 @@ export async function loadHeroPromotion(origin: string | null): Promise<HeroProm
     promotion,
     days,
     renderedAt: new Date().toISOString(),
+    routeHref: routePagesEnabled()
+      ? routePath(
+          { code: feed.origin, name: feed.originName },
+          { code: promotion.destination, name: promotion.destinationName },
+        )
+      : null,
   };
 }

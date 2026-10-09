@@ -246,43 +246,11 @@
   font-weight: 600;
 }
 
-.chartWrap {
-  position: relative;
-  border-radius: var(--radius-md);
-}
-
 /* Mediana de referência: a base do "X% abaixo das datas próximas". */
 .referenceLine {
   stroke: var(--color-text-muted);
   stroke-width: 1.5;
   stroke-dasharray: 5 5;
-}
-
-.cursor {
-  stroke: var(--color-border-strong);
-  stroke-width: 1;
-}
-
-.activePoint {
-  fill: var(--color-text-primary);
-  stroke: var(--color-surface);
-  stroke-width: 2;
-}
-
-.tooltip {
-  position: absolute;
-  /* Dentro da área do gráfico: por cima, cobriria o preço do cartão. */
-  top: var(--space-1);
-  transform: translateX(-50%);
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-text-primary);
-  color: var(--color-surface);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .chartCaption {
@@ -308,4 +276,11 @@
 
 .actions form {
   display: contents;
+}
+
+.routeLink {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-action);
 }
