@@ -6,6 +6,17 @@ conjunto de alterações.
 
 ## Ordem de leitura
 
+Para uma pessoa nova no projeto:
+
+1. [`../README.md`](../README.md) — visão geral e caminho rápido.
+2. [`GETTING-STARTED.md`](./GETTING-STARTED.md) — instalar e subir localmente.
+3. [`WEB.md`](./WEB.md) — páginas e jornadas do site.
+4. [`API.md`](./API.md) — endpoints e autenticação.
+5. [`CONTRIBUTING.md`](./CONTRIBUTING.md) — como alterar o projeto.
+6. [`PROJECT-STATUS.md`](./PROJECT-STATUS.md) — o que é real, simulado ou pendente.
+
+Para entender as regras do sistema:
+
 1. [`PRODUCT.md`](./PRODUCT.md) — visão, público, escopo do MVP e limites.
 2. [`DOMAIN.md`](./DOMAIN.md) — entidades, estados, invariantes e glossário.
 3. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — componentes, fluxos, dados e operação.
@@ -33,6 +44,9 @@ legislação e contratos externos, está em `CLAUDE.md` §0.2.
 | Caminho                                      | Conteúdo                                                                                                               |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `PRODUCT.md`, `DOMAIN.md`, `ARCHITECTURE.md` | fundação do produto e do sistema                                                                                       |
+| `GETTING-STARTED.md`, `WEB.md`, `API.md`     | onboarding, site e contratos HTTP                                                                                      |
+| `CONTRIBUTING.md`, `OPERATIONS.md`           | fluxo de contribuição e operação da stack                                                                              |
+| `PROJECT-STATUS.md`                          | retrato atual, limites e decisões antes de produção                                                                    |
 | `EVALS.md`, `QUALITY-GATES.md`               | catálogo de evals de domínio e gates de PR/release                                                                     |
 | `BRAND.md`, `DESIGN-SYSTEM.md`               | marca (logo, cores, voz) e regras de interface verificadas por `pnpm check:design`                                     |
 | `adr/`                                       | ADR-001 a ADR-007                                                                                                      |

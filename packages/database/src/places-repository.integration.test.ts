@@ -86,6 +86,30 @@ describe('syncPlacesCatalog (SPEC-029, Postgres real)', () => {
     expect(result.upserted).toBe(20_000);
     expect(await prisma.place.count()).toBe(20_000);
   }, 120_000);
+
+  // Regressão (CI do PR #3): na mesma conexão, o Postgres reaproveita o
+  // statement preparado. Coordenadas só inteiras numa sincronização e
+  // decimais na seguinte quebravam com 22P03 "improper binary format".
+  it('aceita coordenadas inteiras e decimais em sincronizações seguidas na mesma conexão', async () => {
+    const single = createPrismaClient(`${container.getConnectionUri()}?connection_limit=1`);
+    try {
+      await syncPlacesCatalog(single, [testCity({ code: 'AAA', name: 'Inteira' })], new Date());
+      await syncPlacesCatalog(
+        single,
+        [testCity({ code: 'BBB', name: 'Decimal', latitude: -23.55, longitude: -46.63 })],
+        new Date(),
+      );
+      await syncPlacesCatalog(single, [testCity({ code: 'CCC', name: 'Inteira' })], new Date());
+
+      const decimal = await single.place.findUniqueOrThrow({
+        where: { code_kind: { code: 'BBB', kind: 'CITY' } },
+      });
+      expect(decimal.latitude).toBe(-23.55);
+      expect(decimal.longitude).toBe(-46.63);
+    } finally {
+      await single.$disconnect();
+    }
+  });
 });
 
 describe('searchCities (SPEC-029 AC-5)', () => {

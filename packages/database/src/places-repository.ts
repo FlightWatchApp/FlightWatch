@@ -10,6 +10,16 @@ const UPSERT_BATCH_SIZE = 2000;
 const SYNC_TRANSACTION_TIMEOUT_MS = 120_000;
 const CANDIDATE_LIMIT = 200;
 
+/**
+ * Coordenada vai como texto e vira double precision no SQL. Array de number
+ * tem o tipo deduzido pelos valores (só inteiros vs. decimais), e o Postgres
+ * reaproveita o statement preparado na mesma conexão: tipos alternados
+ * quebravam com 22P03 "improper binary format in array element".
+ */
+function coordinateParam(value: number | null): string | null {
+  return value === null ? null : String(value);
+}
+
 export interface PlacesSyncResult {
   upserted: number;
   disabled: number;
@@ -47,8 +57,8 @@ export async function syncPlacesCatalog(
             ${batch.map((r) => r.countryCode)}::text[],
             ${batch.map((r) => r.countryName)}::text[],
             ${batch.map((r) => r.timeZone)}::text[],
-            ${batch.map((r) => r.latitude)}::double precision[],
-            ${batch.map((r) => r.longitude)}::double precision[],
+            ${batch.map((r) => coordinateParam(r.latitude))}::text[]::double precision[],
+            ${batch.map((r) => coordinateParam(r.longitude))}::text[]::double precision[],
             ${batch.map((r) => r.searchable)}::boolean[],
             ${batch.map((r) => r.searchText)}::text[]
           ) AS u(code, kind, name, city_code, country_code, country_name, time_zone,
