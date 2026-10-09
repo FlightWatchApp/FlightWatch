@@ -8,6 +8,7 @@ import {
   portField,
   secretField,
   urlField,
+  iataListField,
 } from './fields.js';
 
 /**
@@ -80,6 +81,9 @@ const routePage = {
   // Por IP, na mesma janela de RATE_LIMIT_WINDOW_MS. Mais folgado que a busca: o que protege a
   // cota da fonte aqui é o orçamento diário e o cache, e uma visita pré-carrega links.
   ROUTE_PAGE_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 60 }),
+  // Cidades de origem do sitemap; vazio = nenhuma rota no sitemap (antes do domínio próprio).
+  ROUTE_SITEMAP_ORIGIN_CITIES: iataListField(),
+  ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
 };
 
 const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };

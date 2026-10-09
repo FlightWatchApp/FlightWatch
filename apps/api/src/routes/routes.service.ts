@@ -4,6 +4,8 @@ import {
   type GetRouteQuery,
   type GetRouteResponse,
   getRouteResponseSchema,
+  type ListRoutesResponse,
+  listRoutesResponseSchema,
   ROUTE_CURRENCY,
   ROUTE_MARKET,
   type RoutePriceStatus,
@@ -34,6 +36,15 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
 const ROUND_TRIP_LENGTH_DAYS = 7;
 /** Sem preço para escolher a data, o "ver todos os voos" abre daqui a 30 dias. */
 const DEFAULT_LINK_OFFSET_DAYS = 30;
+const SITEMAP_KEY = 'routes:sitemap:v1';
+/**
+ * A página viu a rota sem preço: o sitemap a pula por um dia. "Mais barato por
+ * destino" e a consulta mensal da fonte às vezes discordam (achado na
+ * verificação real); a página é quem decide se há preço para mostrar.
+ */
+const NO_PRICE_TTL_MS = DAY_MS;
+const noPriceKey = (origin: string, destination: string) =>
+  `routes:noprice:v1:${origin}:${destination}`;
 
 /** O mês não foi consultado: orçamento do dia esgotado ou Retry-After em curso. */
 class MonthRefused extends Error {
@@ -202,8 +213,119 @@ export class RoutesService {
     if (status === 'OK' || status === 'NO_PRICES') {
       await this.write(key, stored);
     }
+    if (status === 'NO_PRICES' && query.tripType === 'ONE_WAY') {
+      await this.markNoPrice(originCode, destinationCode);
+    }
     this.metrics.routePageRequestsTotal.inc({ prices: status.toLowerCase(), cache: 'miss' });
     return { ...stored, allFlightsUrl: this.allFlightsUrl(stored) };
+  }
+
+  /**
+   * Rotas do sitemap (SPEC-033 §SEO): para cada cidade de ROUTE_SITEMAP_ORIGIN_CITIES,
+   * os destinos que a fonte devolveu com preço (uma chamada por origem, dentro do
+   * orçamento da página), guardadas por ROUTE_SITEMAP_TTL_MINUTES.
+   */
+  async sitemap(): Promise<ListRoutesResponse> {
+    const empty = { routes: [], generatedAt: new Date().toISOString() };
+    if (!this.config.ROUTE_PAGE_ENABLED || this.config.ROUTE_SITEMAP_ORIGIN_CITIES.length === 0) {
+      return empty;
+    }
+    const cached = await this.readSitemap();
+    if (cached) return cached;
+    if (!this.provider.cheapestByDestination) return empty;
+
+    const origins = await this.places.searchableCities(this.config.ROUTE_SITEMAP_ORIGIN_CITIES);
+    // Só entra preço que a página vai mostrar: dentro dos meses dela e com idade
+    // válida — senão o sitemap apontaria para página sem preço (noindex).
+    const now = new Date();
+    const shownMonths = new Set(routeMonths(now, this.config.ROUTE_PAGE_MONTHS));
+    const today = isoDate(now.getTime());
+    const routes: ListRoutesResponse['routes'] = [];
+    let complete = true;
+    for (const origin of origins.values()) {
+      let fares;
+      try {
+        await this.beforeFetch();
+        fares = await this.provider.cheapestByDestination({
+          originIata: origin.code,
+          tripType: 'ONE_WAY',
+          currency: ROUTE_CURRENCY,
+          market: ROUTE_MARKET,
+        });
+        this.metrics.routePageProviderCallsTotal.inc({ result: 'ok' });
+      } catch (error) {
+        complete = false;
+        if (error instanceof MonthRefused) {
+          this.metrics.routePageProviderCallsTotal.inc({ result: error.reason });
+          break;
+        }
+        if (error instanceof ProviderError) {
+          const result = await this.cooldown.note(error, 'route_page_provider_rate_limited');
+          this.metrics.routePageProviderCallsTotal.inc({ result });
+          continue;
+        }
+        throw error;
+      }
+      const destinations = await this.places.searchableCities(
+        fares.map((fare) => fare.destinationIata),
+      );
+      for (const fare of fares) {
+        const destination = destinations.get(fare.destinationIata);
+        if (!destination || destination.code === origin.code) continue;
+        const showable =
+          shownMonths.has(fare.departureDate.slice(0, 7)) &&
+          fare.departureDate >= today &&
+          promotionFreshness(fare.observedAt, now) !== 'EXPIRED';
+        if (!showable || (await this.seenWithoutPrice(origin.code, destination.code))) continue;
+        routes.push({
+          origin: { code: origin.code, name: origin.name },
+          destination: { code: destination.code, name: destination.name },
+        });
+      }
+    }
+    const result = { routes, generatedAt: new Date().toISOString() };
+    // Rodada incompleta (orçamento, Retry-After, fonte fora) não vai ao cache.
+    if (complete) await this.writeSitemap(result);
+    return result;
+  }
+
+  private async markNoPrice(origin: string, destination: string): Promise<void> {
+    try {
+      await this.store.set(noPriceKey(origin, destination), '1', NO_PRICE_TTL_MS);
+    } catch {
+      // Redis fora: o sitemap só não aprende desta vez.
+    }
+  }
+
+  private async seenWithoutPrice(origin: string, destination: string): Promise<boolean> {
+    try {
+      return (await this.store.get(noPriceKey(origin, destination))) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  private async readSitemap(): Promise<ListRoutesResponse | null> {
+    try {
+      const raw = await this.store.get(SITEMAP_KEY);
+      if (raw === null) return null;
+      const parsed = listRoutesResponseSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async writeSitemap(sitemap: ListRoutesResponse): Promise<void> {
+    try {
+      await this.store.set(
+        SITEMAP_KEY,
+        JSON.stringify(sitemap),
+        this.config.ROUTE_SITEMAP_TTL_MINUTES * MINUTE_MS,
+      );
+    } catch {
+      // Redis fora: calculado sem cache.
+    }
   }
 
   /** Um mês da rota: cache por rota-mês; sem cache, a fonte dentro do orçamento. */

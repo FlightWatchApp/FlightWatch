@@ -53,6 +53,8 @@ class CountingProvider implements FlightProvider {
   private readonly simulated = new SimulatedFlightProvider();
   calendarCalls: string[] = [];
   candidateCalls = 0;
+  /** Destinos em que a consulta mensal volta vazia (discorda dos candidatos). */
+  emptyCalendarFor = new Set<string>();
   failNext: ProviderError | null = null;
 
   search: FlightProvider['search'] = (query, context) => this.simulated.search(query, context);
@@ -73,6 +75,24 @@ class CountingProvider implements FlightProvider {
         stops: 0,
         observedAt: hoursAgo(1),
       },
+      // Preço para daqui a 8 meses: fora da janela que a página mostra.
+      {
+        destinationIata: 'MIA',
+        departureDate: isoDate(240),
+        returnDate: null,
+        amountMinor: 90_000,
+        stops: 0,
+        observedAt: hoursAgo(1),
+      },
+      // Preço visto há 80 h: velho demais.
+      {
+        destinationIata: 'LIS',
+        departureDate: isoDate(20),
+        returnDate: null,
+        amountMinor: 90_000,
+        stops: 0,
+        observedAt: hoursAgo(80),
+      },
     ];
   }
 
@@ -86,7 +106,9 @@ class CountingProvider implements FlightProvider {
     if (query.destinationIata === 'MIA') {
       throw new ProviderError('UNAVAILABLE', 'calendar down');
     }
-    if (query.destinationIata === 'LIS') return [];
+    if (query.destinationIata === 'LIS' || this.emptyCalendarFor.has(query.destinationIata)) {
+      return [];
+    }
     if (query.month !== MONTHS[0]) {
       // Meses seguintes: muitas datas a R$ 1.000 (referência para a promoção).
       return Array.from({ length: 20 }, (_, i) => ({
@@ -361,6 +383,89 @@ describe('GET /v1/routes — rate limit próprio (pages)', () => {
     }
     // Acima do limite da busca (2), dentro do da página (4); a 5ª é recusada.
     expect(statuses).toEqual([200, 200, 200, 200, 429]);
+  });
+});
+
+describe('GET /v1/routes — sitemap (SPEC-033 §SEO)', () => {
+  function sitemap(app: NestFastifyApplication) {
+    return request(app.getHttpServer()).get('/v1/routes').set(freshClient());
+  }
+
+  // AC-10, EVAL-ROUTE-005: só rotas com preço dentro da janela da página (achado na
+  // verificação real: SAO → MUC entrava com preço para daqui a meses e a página saía noindex).
+  it('lista destinos com preço das cidades configuradas e guarda no cache', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      { ROUTE_PAGE_ENABLED: 'true', ROUTE_SITEMAP_ORIGIN_CITIES: 'SAO,ZZZ' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+
+    const first = await sitemap(app);
+    expect(first.status).toBe(200);
+    expect(first.body.routes).toEqual([
+      {
+        origin: { code: 'SAO', name: 'São Paulo' },
+        destination: { code: 'NYC', name: 'Nova Iorque' },
+      },
+    ]);
+    expect(provider.candidateCalls).toBe(1); // ZZZ fora do catálogo: nenhuma chamada
+
+    await sitemap(app);
+    expect(provider.candidateCalls).toBe(1);
+  });
+
+  // Achado na verificação real: "mais barato por destino" e a consulta mensal da
+  // fonte às vezes discordam. Rota aberta e vista sem preço sai do sitemap.
+  it('rota que a página viu sem preço sai do sitemap seguinte', async () => {
+    const provider = new CountingProvider();
+    provider.emptyCalendarFor.add('NYC');
+    const app = await buildApp(
+      {
+        ROUTE_PAGE_ENABLED: 'true',
+        ROUTE_SITEMAP_ORIGIN_CITIES: 'SAO',
+        ROUTE_SITEMAP_TTL_MINUTES: '1',
+      },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    expect((await sitemap(app)).body.routes).toHaveLength(1);
+
+    const page = await route(app, 'SAO', 'NYC');
+    expect(page.body.prices.status).toBe('NO_PRICES');
+
+    const store = app.get(KEY_VALUE_STORE) as MemoryKeyValueStore;
+    await store.set('routes:sitemap:v1', '', 1); // força o sitemap a recalcular
+    expect((await sitemap(app)).body.routes).toEqual([]);
+  });
+
+  it('sem orçamento: vazio e fora do cache (tenta de novo depois)', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      {
+        ROUTE_PAGE_ENABLED: 'true',
+        ROUTE_SITEMAP_ORIGIN_CITIES: 'SAO',
+        ROUTE_PAGE_DAILY_CALL_BUDGET: '0',
+      },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    const response = await sitemap(app);
+    expect(response.body.routes).toEqual([]);
+    expect(provider.candidateCalls).toBe(0);
+  });
+
+  it('sem cidades configuradas ou com a página desligada: vazio', async () => {
+    const provider = new CountingProvider();
+    const on = await buildApp({ ROUTE_PAGE_ENABLED: 'true' }, provider, new MemoryKeyValueStore());
+    expect((await sitemap(on)).body.routes).toEqual([]);
+    const off = await buildApp(
+      { ROUTE_SITEMAP_ORIGIN_CITIES: 'SAO' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    expect((await sitemap(off)).body.routes).toEqual([]);
+    expect(provider.candidateCalls).toBe(0);
   });
 });
 

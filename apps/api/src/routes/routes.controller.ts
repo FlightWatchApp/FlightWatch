@@ -1,6 +1,11 @@
 import { Controller, Get, Param, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { GetRouteParams, GetRouteQuery, GetRouteResponse } from '@flight-watch/contracts';
+import type {
+  GetRouteParams,
+  GetRouteQuery,
+  GetRouteResponse,
+  ListRoutesResponse,
+} from '@flight-watch/contracts';
 import { SearchErrorFilter } from '../searches/search-error.filter.js';
 import { SearchThrottlerGuard } from '../searches/search-throttler.guard.js';
 import { AUTH_THROTTLER, SEARCH_THROTTLER } from '../throttling/throttling.module.js';
@@ -16,6 +21,14 @@ import { RoutesService } from './routes.service.js';
 @UseFilters(SearchErrorFilter)
 export class RoutesController {
   constructor(private readonly routes: RoutesService) {}
+
+  /** Rotas do sitemap (SPEC-033 §SEO). */
+  @Get()
+  @UseGuards(SearchThrottlerGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
+  async list(): Promise<ListRoutesResponse> {
+    return this.routes.sitemap();
+  }
 
   @Get(':origin/:destination')
   @UseGuards(SearchThrottlerGuard)

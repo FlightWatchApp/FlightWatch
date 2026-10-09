@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import type { GetRouteResponse } from '@flight-watch/contracts';
+import type { GetRouteResponse, ListRoutesResponse } from '@flight-watch/contracts';
 import { apiFetch } from './client';
 
 /**
@@ -11,3 +11,8 @@ export const getRoute = cache((origin: string, destination: string): Promise<Get
     `/v1/routes/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`,
   ),
 );
+
+/** SPEC-033 §SEO: rotas do sitemap (cidades configuradas, destinos com preço). */
+export function listSitemapRoutes(): Promise<ListRoutesResponse> {
+  return apiFetch<ListRoutesResponse>('/v1/routes');
+}

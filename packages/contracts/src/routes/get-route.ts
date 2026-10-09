@@ -79,3 +79,19 @@ export const getRouteResponseSchema = z.object({
 
 export type GetRouteResponse = z.infer<typeof getRouteResponseSchema>;
 export type RoutePriceStatus = GetRouteResponse['prices']['status'];
+
+/**
+ * SPEC-033 §SEO: rotas do sitemap — a partir de `ROUTE_SITEMAP_ORIGIN_CITIES`,
+ * destinos que a fonte devolveu com preço. O web monta as URLs canônicas.
+ */
+export const listRoutesResponseSchema = z.object({
+  routes: z.array(
+    z.object({
+      origin: z.object({ code: z.string(), name: z.string() }),
+      destination: z.object({ code: z.string(), name: z.string() }),
+    }),
+  ),
+  generatedAt: z.string(),
+});
+
+export type ListRoutesResponse = z.infer<typeof listRoutesResponseSchema>;

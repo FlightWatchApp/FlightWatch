@@ -20,5 +20,8 @@ export class AuthThrottlerGuard extends ThrottlerGuard {
  * (ex.: GET /me), senão a navegação comum esbarra no limite.
  */
 export function AuthRateLimited(): MethodDecorator & ClassDecorator {
-  return applyDecorators(UseGuards(AuthThrottlerGuard), SkipThrottle({ [SEARCH_THROTTLER]: true, [PAGES_THROTTLER]: true }));
+  return applyDecorators(
+    UseGuards(AuthThrottlerGuard),
+    SkipThrottle({ [SEARCH_THROTTLER]: true, [PAGES_THROTTLER]: true }),
+  );
 }
