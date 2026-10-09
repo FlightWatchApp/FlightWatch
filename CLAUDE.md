@@ -281,8 +281,8 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 │   │   ├── lib/
 │   │   └── styles/
 │   ├── api/src/
-│   │   ├── auth/ watches/ searches/ opportunities/ promotions/ affiliate/
-│   │   ├── pricing-source/       # provedor + cache Redis (rota-mês) compartilhados
+│   │   ├── auth/ watches/ searches/ opportunities/ promotions/ routes/ affiliate/
+│   │   ├── pricing-source/       # provedor, cache Redis (rota-mês) e Retry-After compartilhados
 │   │   ├── observability/
 │   │   ├── prisma/
 │   │   └── main.ts
@@ -377,6 +377,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - Searches/Offers (SPEC-014: busca de descoberta pública e derivação de Watch a partir de uma oferta);
 - Opportunities (SPEC-015: feed público de oportunidades, `Deal` computado em leitura);
 - Promotions (SPEC-032: feed público por origem; provedor e cache vêm do `PricingSourceModule`, global);
+- Routes (SPEC-033: página da rota e sitemap; orçamento e rate limit `pages` próprios);
 - Health;
 - Observability interna.
 

@@ -318,4 +318,53 @@ do domínio próprio, o sitemap não é enviado ao Google.
 
 ## Evidência de implementação
 
-Pendente.
+2026-10-08, branch `feat/route-page` (sobre `feat/hero-promotion` + `main`).
+Fatias 1 a 4 feitas; **5 (monitoramento no mesmo modelo) e 6 (evidência
+final) pendentes**.
+
+**Ajustes ao texto durante a implementação:**
+
+- **Rate limit próprio** (`pages`, `ROUTE_PAGE_RATE_LIMIT_MAX`, padrão 60 por
+  IP na janela de `RATE_LIMIT_WINDOW_MS`) em vez do `default` da busca (10).
+  Achado no navegador: uma visita pré-carrega links; com 5 páginas por minuto
+  a API dava 429 e o site, 500. A cota da fonte continua protegida pelo
+  orçamento diário e pelo cache. Links da página sem pré-carregamento.
+- **Retry-After compartilhado** entre feed de promoções e página
+  (`pricing-source/provider-guard.ts`): um 429 vale para o token inteiro.
+  Orçamentos continuam separados (`DailyCallBudget` por consumidor).
+- **Sitemap só com preço dentro da janela da página** e com idade válida, e
+  **rota vista sem preço sai do sitemap por um dia** — "mais barato por
+  destino" e a consulta mensal da fonte às vezes discordam.
+- Ida e volta na página usa duração de 7 dias (a página não pergunta a volta).
+- Erro da API na página vira tela amigável (`error.tsx`), nunca 500 cru.
+
+**Por fatia:**
+
+1. Domínio: `greatCircleKm`, `estimateDirectFlightMinutes` (6 testes contra
+   distâncias conhecidas). Web: `slugify`, `routeSegment`, `parseRouteSegment`
+   (8 testes, inclusive "Belém do Pará").
+2. API `GET /v1/routes/{o}/{d}`: `findRouteCities` (2 testes de integração),
+   contrato, superfície de afiliado `ROUTE`, config, métricas, kill switch;
+   e2e com Postgres real (normalização, 404/400, estados, cache, orçamento,
+   429 compartilhado, promoção só do cache, rate limit próprio).
+3. Web `/voos/[rota]`: cidades, mapa (arco de grande círculo, OSM), preço
+   por data (componente compartilhado com o cartão da SPEC-032), datas mais
+   baratas, "Ver todos os voos", "Monitorar", "Sobre a rota", estados, 308
+   canônico, metadados, JSON-LD. Lógica em `route-page.ts` (8 testes) e
+   `route-map.ts` (3 testes).
+4. `GET /v1/routes` (sitemap), `/sitemap.xml`, `/robots.txt`,
+   `iataListField` (3 testes).
+
+**Gates:** API 199/199, web 103, lint 14/14, typecheck 22/22, `check:design`.
+
+**Execução real** (Travelpayouts, navegador headless, desktop 1326 px e
+celular 390 px): SAO → DOU (852 km, 1 h 35 estimado; preços reais), SAO →
+LIS (44 datas, mais barato R$ 1.423), DOU → LIS (`NO_PRICES`, `noindex`, sem
+R$ 0); `gru-para-dou` e slug errado → 308; inexistente → 404; mapa com tiles,
+nenhum elemento fora da tela, sem erro no console; clique numa data abre a
+busca. Sitemap com SAO e CGR: todas as URLs abertas — 121 rotas, 0 não
+indexáveis na segunda rodada.
+
+**Não verificado:** página em produção com domínio real (sitemap não foi
+enviado ao Google); calibragem da fórmula do tempo (SAO → DOU dá 1 h 35, a
+FlightConnections diz 1 h 50).
