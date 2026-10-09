@@ -13,3 +13,4 @@ export * from './deal/deal-classification.js';
 export * from './places/place-search.js';
 export * from './pricing/stored-itinerary.js';
 export * from './promotion/promotion.js';
+export * from './route/route-facts.js';
