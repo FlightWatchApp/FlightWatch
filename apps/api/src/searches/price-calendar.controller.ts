@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { PriceCalendarQuery, PriceCalendarResponse } from '@flight-watch/contracts';
-import { AUTH_THROTTLER } from '../throttling/throttling.module.js';
+import { AUTH_THROTTLER, PAGES_THROTTLER } from '../throttling/throttling.module.js';
 import { PriceCalendarValidationPipe } from './price-calendar.pipe.js';
 import { SearchErrorFilter } from './search-error.filter.js';
 import { SearchThrottlerGuard } from './search-throttler.guard.js';
@@ -18,7 +18,7 @@ export class PriceCalendarController {
 
   @Get()
   @UseGuards(SearchThrottlerGuard)
-  @SkipThrottle({ [AUTH_THROTTLER]: true })
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [PAGES_THROTTLER]: true })
   async get(
     @Query(PriceCalendarValidationPipe) query: PriceCalendarQuery,
   ): Promise<PriceCalendarResponse> {

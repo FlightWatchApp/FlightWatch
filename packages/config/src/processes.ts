@@ -77,6 +77,9 @@ const routePage = {
   ROUTE_PAGE_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 1000 }),
   ROUTE_PAGE_CACHE_TTL_MINUTES: cacheMinutes(30),
   ROUTE_PAGE_MONTHS: intField({ min: 1, max: 6, default: 3 }),
+  // Por IP, na mesma janela de RATE_LIMIT_WINDOW_MS. Mais folgado que a busca: o que protege a
+  // cota da fonte aqui é o orçamento diário e o cache, e uma visita pré-carrega links.
+  ROUTE_PAGE_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 60 }),
 };
 
 const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };

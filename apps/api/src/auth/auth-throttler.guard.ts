@@ -1,7 +1,7 @@
 import { Injectable, UseGuards, applyDecorators } from '@nestjs/common';
 import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthError } from '@flight-watch/contracts';
-import { SEARCH_THROTTLER } from '../throttling/throttling.module.js';
+import { PAGES_THROTTLER, SEARCH_THROTTLER } from '../throttling/throttling.module.js';
 
 /**
  * SPEC-025: mesmo padrão do SearchThrottlerGuard (SPEC-014) — o 429 sai no
@@ -20,5 +20,5 @@ export class AuthThrottlerGuard extends ThrottlerGuard {
  * (ex.: GET /me), senão a navegação comum esbarra no limite.
  */
 export function AuthRateLimited(): MethodDecorator & ClassDecorator {
-  return applyDecorators(UseGuards(AuthThrottlerGuard), SkipThrottle({ [SEARCH_THROTTLER]: true }));
+  return applyDecorators(UseGuards(AuthThrottlerGuard), SkipThrottle({ [SEARCH_THROTTLER]: true, [PAGES_THROTTLER]: true }));
 }

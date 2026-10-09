@@ -13,6 +13,8 @@ import { resolveClientIp } from './client-ip.js';
  */
 export const SEARCH_THROTTLER = 'default';
 export const AUTH_THROTTLER = 'auth';
+/** SPEC-033: páginas de conteúdo público (página da rota), mais folgado que a busca. */
+export const PAGES_THROTTLER = 'pages';
 
 interface TrackedRequest {
   headers: Record<string, string | string[] | undefined>;
@@ -34,6 +36,11 @@ interface TrackedRequest {
             name: AUTH_THROTTLER,
             ttl: config.AUTH_RATE_LIMIT_WINDOW_MS,
             limit: config.AUTH_RATE_LIMIT_MAX,
+          },
+          {
+            name: PAGES_THROTTLER,
+            ttl: config.RATE_LIMIT_WINDOW_MS,
+            limit: config.ROUTE_PAGE_RATE_LIMIT_MAX,
           },
         ],
         getTracker: (request: Record<string, unknown>) => {

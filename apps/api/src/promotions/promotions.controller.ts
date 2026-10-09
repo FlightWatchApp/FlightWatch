@@ -3,7 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { ListPromotionsQuery, ListPromotionsResponse } from '@flight-watch/contracts';
 import { SearchErrorFilter } from '../searches/search-error.filter.js';
 import { SearchThrottlerGuard } from '../searches/search-throttler.guard.js';
-import { AUTH_THROTTLER } from '../throttling/throttling.module.js';
+import { AUTH_THROTTLER, PAGES_THROTTLER } from '../throttling/throttling.module.js';
 import { ListPromotionsValidationPipe } from './list-promotions.pipe.js';
 import { PromotionsService } from './promotions.service.js';
 
@@ -18,7 +18,7 @@ export class PromotionsController {
 
   @Get()
   @UseGuards(SearchThrottlerGuard)
-  @SkipThrottle({ [AUTH_THROTTLER]: true })
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [PAGES_THROTTLER]: true })
   async list(
     @Query(ListPromotionsValidationPipe) query: ListPromotionsQuery,
   ): Promise<ListPromotionsResponse> {

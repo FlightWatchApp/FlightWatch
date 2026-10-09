@@ -341,6 +341,29 @@ describe('GET /v1/routes — orçamento e Retry-After', () => {
   });
 });
 
+describe('GET /v1/routes — rate limit próprio (pages)', () => {
+  // Uma visita pré-carrega links: a página tem limite próprio, mais folgado que a busca.
+  it('conta por IP no throttler da página, separado da busca', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      { ROUTE_PAGE_ENABLED: 'true', RATE_LIMIT_MAX: '2', ROUTE_PAGE_RATE_LIMIT_MAX: '4' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    const sameIp = {
+      [CLIENT_IP_HEADER]: '203.0.113.7',
+      [INTERNAL_SECRET_HEADER]: LOCAL_INTERNAL_API_SECRET,
+    };
+    const statuses: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const response = await request(app.getHttpServer()).get('/v1/routes/SAO/DOU').set(sameIp);
+      statuses.push(response.status);
+    }
+    // Acima do limite da busca (2), dentro do da página (4); a 5ª é recusada.
+    expect(statuses).toEqual([200, 200, 200, 200, 429]);
+  });
+});
+
 describe('GET /v1/routes — página desligada (padrão)', () => {
   // Kill switch (SPEC-033 §Rollout)
   it('responde 404 sem consultar nada', async () => {
