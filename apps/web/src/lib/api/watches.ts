@@ -6,9 +6,23 @@ import type {
 import { apiFetch } from './client';
 import type { WatchDetail, WatchSummary } from './types';
 
+// A UI mostra todos os monitoramentos do usuário; a API pagina (checklist
+// pré-lançamento #2), então seguimos o cursor com teto para não girar sem fim.
+const MAX_LIST_PAGES = 20;
+
 export async function listWatches(): Promise<WatchSummary[]> {
-  const response = await apiFetch<ListWatchesResponse>('/v1/watches');
-  return response.watches;
+  const watches: WatchSummary[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+    const query: string = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const response: ListWatchesResponse = await apiFetch<ListWatchesResponse>(
+      `/v1/watches${query}`,
+    );
+    watches.push(...response.watches);
+    cursor = response.nextCursor;
+    if (!cursor) break;
+  }
+  return watches;
 }
 
 export async function getWatch(id: string): Promise<WatchDetail> {

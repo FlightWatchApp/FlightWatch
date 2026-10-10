@@ -18,7 +18,7 @@ afiliado, privacidade, testes de ponta a ponta e o escopo final dos alertas.
 | #   | Item                                                                                        | Depende de                       | Status   |
 | --- | ------------------------------------------------------------------------------------------- | -------------------------------- | -------- |
 | 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | pendente |
-| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | pendente |
+| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito    |
 | 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente |
 | 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente |
 | 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | pendente |
