@@ -15,16 +15,16 @@ afiliado, privacidade, testes de ponta a ponta e o escopo final dos alertas.
 
 ## Fila de execução (ordem por dependência)
 
-| #   | Item                                                                                        | Depende de                       | Status   |
-| --- | ------------------------------------------------------------------------------------------- | -------------------------------- | -------- |
-| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | pendente |
-| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito    |
-| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente |
-| 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente |
-| 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | pendente |
-| 6   | Marker de afiliado, teste de atribuição e revisão dos termos da Travelpayouts               | site no ar                       | pendente |
-| 7   | Política de Privacidade, Termos de Uso, retenção e exclusão definitiva                      | texto do owner/jurídico          | pendente |
-| 8   | Revisão manual de acessibilidade (teclado, leitor de tela) e rodada limpa de todos os gates | itens anteriores                 | pendente |
+| #   | Item                                                                                        | Depende de                       | Status                                   |
+| --- | ------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------- |
+| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | D1 feito (SPEC-035); D2 aguarda SPEC-032 |
+| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito                                    |
+| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente                                 |
+| 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente                                 |
+| 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | pendente                                 |
+| 6   | Marker de afiliado, teste de atribuição e revisão dos termos da Travelpayouts               | site no ar                       | pendente                                 |
+| 7   | Política de Privacidade, Termos de Uso, retenção e exclusão definitiva                      | texto do owner/jurídico          | pendente                                 |
+| 8   | Revisão manual de acessibilidade (teclado, leitor de tela) e rodada limpa de todos os gates | itens anteriores                 | pendente                                 |
 
 Itens 1 a 3 não dependem de nada externo. A partir do 4, dependem de
 decisões ou contas do owner.

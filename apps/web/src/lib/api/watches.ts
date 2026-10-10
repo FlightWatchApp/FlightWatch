@@ -3,6 +3,7 @@ import type {
   WatchDetailResponse,
   WatchListItem,
 } from '@flight-watch/contracts';
+import { buildLaunchAlertRules } from '@/lib/domain/alert-rules';
 import { apiFetch } from './client';
 import type { WatchDetail, WatchSummary } from './types';
 
@@ -63,11 +64,7 @@ export interface CreateWatchInput {
   notificationChannelId: string;
 }
 
-/**
- * Só cobre a regra TARGET_PRICE por enquanto — a API já suporta as outras 3
- * (percentage_drop/absolute_drop/new_observed_low) desde a Fase 2, essa
- * primeira versão do formulário só não expõe seletor de tipo de regra ainda.
- */
+/** Regras do escopo de lançamento — ver `buildLaunchAlertRules`. */
 export async function createWatch(input: CreateWatchInput): Promise<{ id: string }> {
   return apiFetch<{ id: string }>('/v1/watches', {
     method: 'POST',
@@ -81,9 +78,7 @@ export async function createWatch(input: CreateWatchInput): Promise<{ id: string
       adults: 1,
       currency: input.currency,
       market: input.market,
-      alertRules: [
-        { type: 'TARGET_PRICE', amountMinor: input.targetAmountMinor, cooldownSeconds: 43_200 },
-      ],
+      alertRules: buildLaunchAlertRules(input.targetAmountMinor),
       notificationChannelId: input.notificationChannelId,
     }),
   });

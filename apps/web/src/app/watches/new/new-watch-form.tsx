@@ -184,7 +184,7 @@ export function NewWatchForm() {
             </FormField>
             <FormField
               label="Preço desejado"
-              hint="Avisamos quando o preço atingir esse valor ou menos."
+              hint="Avisamos por e-mail quando o preço atingir esse valor ou menos, e também quando surgir um novo menor preço que observamos."
               required
             >
               {(field) => (
