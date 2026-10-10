@@ -23,7 +23,10 @@ densidade de informação controlada.
    técnica para ofertas, promoções, pacotes e Watches.
 6. `05-roadmap.md` — execução por fases, com entregas pequenas e verificáveis.
 7. `06-spec-backlog.md` — índice das próximas specs e dependências.
-8. `rascunhos/` — rascunhos de spec, incluindo o escopo completo das fatias já
+8. `07-pre-launch-checklist.md` — fila de correções antes do lançamento
+   público (e-mail real, operação, afiliado, privacidade, E2E, escopo dos
+   alertas), em ordem de dependência.
+9. `rascunhos/` — rascunhos de spec, incluindo o escopo completo das fatias já
    implementadas e a SPEC-017 (adiada). A numeração começa
    em SPEC-014: a Fase 0 (Reliability Hardening) ocupou SPEC-011/012/013 na
    sequência canônica antes desta pasta ser desenvolvida — os rascunhos foram
