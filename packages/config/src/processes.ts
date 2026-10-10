@@ -4,6 +4,7 @@ import {
   hostField,
   intField,
   optionalSecretField,
+  optionalTextField,
   portField,
   secretField,
   urlField,
@@ -16,7 +17,7 @@ import {
 
 /** Adapters disponíveis. Um adapter real entra aqui e na factory do pacote dele. */
 export const FLIGHT_PROVIDERS = ['simulated', 'travelpayouts'] as const;
-export const EMAIL_PROVIDERS = ['simulated'] as const;
+export const EMAIL_PROVIDERS = ['simulated', 'resend'] as const;
 
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
 const LOCAL_REDIS_URL = 'redis://localhost:6379';
@@ -52,7 +53,30 @@ function requireProviderCredentials(values: {
     ? [{ key: 'TRAVELPAYOUTS_TOKEN', message: 'obrigatória com FLIGHT_PROVIDER=travelpayouts' }]
     : [];
 }
-const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };
+const emailProvider = {
+  EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated'),
+  // Obrigatórios com EMAIL_PROVIDER=resend (regra abaixo).
+  RESEND_API_KEY: optionalSecretField(16),
+  EMAIL_FROM: optionalTextField(3),
+  EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+};
+
+/** Mesmo princípio de `requireProviderCredentials`: provedor real sem credencial não sobe. */
+function requireEmailCredentials(values: {
+  EMAIL_PROVIDER: (typeof EMAIL_PROVIDERS)[number];
+  RESEND_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+}) {
+  if (values.EMAIL_PROVIDER !== 'resend') return [];
+  return [
+    ...(values.RESEND_API_KEY
+      ? []
+      : [{ key: 'RESEND_API_KEY', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+    ...(values.EMAIL_FROM
+      ? []
+      : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+  ];
+}
 
 export const apiConfig = {
   service: 'api',
@@ -75,7 +99,10 @@ export const apiConfig = {
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
-  rules: requireProviderCredentials,
+  rules: (
+    values: Parameters<typeof requireProviderCredentials>[0] &
+      Parameters<typeof requireEmailCredentials>[0],
+  ) => [...requireProviderCredentials(values), ...requireEmailCredentials(values)],
 };
 
 export const schedulerConfig = {
@@ -134,6 +161,7 @@ export const notificationWorkerConfig = {
     REDIS_URL: LOCAL_REDIS_URL,
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
   },
+  rules: requireEmailCredentials,
 };
 
 export const ALL_CONFIG_DEFINITIONS = {

@@ -68,6 +68,43 @@ describe('SPEC-024 AC-1 — valor inválido impede o startup', () => {
   });
 });
 
+describe('E-mail real (checklist pré-lançamento #5) — EMAIL_PROVIDER=resend', () => {
+  const RESEND = { ...PRODUCTION_BASE, EMAIL_PROVIDER: 'resend' };
+
+  it('exige RESEND_API_KEY e EMAIL_FROM', () => {
+    const error = configErrorOf(() => loadConfig(notificationWorkerConfig, RESEND));
+    expect(keysOf(error).sort()).toEqual(['EMAIL_FROM', 'RESEND_API_KEY']);
+  });
+
+  it('exige as mesmas chaves na API, que também envia e-mail', () => {
+    const keys = keysOf(configErrorOf(() => loadConfig(apiConfig, RESEND)));
+    expect(keys).toContain('RESEND_API_KEY');
+    expect(keys).toContain('EMAIL_FROM');
+  });
+
+  it('é aceito em produção com credenciais, sem ecoar o valor da chave', () => {
+    const config = loadConfig(notificationWorkerConfig, {
+      ...RESEND,
+      RESEND_API_KEY: 're_0123456789abcdef',
+      EMAIL_FROM: 'Flight Watch <alertas@exemplo.com.br>',
+    });
+    expect(config.EMAIL_PROVIDER).toBe('resend');
+    expect(config.EMAIL_FROM).toBe('Flight Watch <alertas@exemplo.com.br>');
+  });
+
+  it('rejeita chave curta demais sem revelar o valor', () => {
+    const error = configErrorOf(() =>
+      loadConfig(notificationWorkerConfig, {
+        ...RESEND,
+        RESEND_API_KEY: 'curta',
+        EMAIL_FROM: 'a@b.com',
+      }),
+    );
+    expect(keysOf(error)).toEqual(['RESEND_API_KEY']);
+    expect(error.message).not.toContain('curta');
+  });
+});
+
 describe('SPEC-024 AC-2 — trava de produção para adapters simulados', () => {
   it('rejeita FLIGHT_PROVIDER e EMAIL_PROVIDER simulados em produção', () => {
     const error = configErrorOf(() => loadConfig(apiConfig, { ...PRODUCTION_BASE }));
@@ -160,6 +197,7 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       AUTH_RATE_LIMIT_MAX: 20,
       INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
       FLIGHT_PROVIDER_TIMEOUT_MS: 10_000,
+      EMAIL_PROVIDER_TIMEOUT_MS: 10_000,
     });
   });
 
