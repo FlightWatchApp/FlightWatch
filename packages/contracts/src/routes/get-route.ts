@@ -78,6 +78,20 @@ export const getRouteResponseSchema = z.object({
 });
 
 export type GetRouteResponse = z.infer<typeof getRouteResponseSchema>;
+
+/**
+ * `GET /v1/routes/{origin}/{destination}/facts` — só o que vem do catálogo
+ * (lugares, distância e tempo estimado). Sem preço e sem chamada à fonte: serve
+ * a página do monitoramento (SPEC-033 §Monitoramento), que tem preço próprio.
+ */
+export const getRouteFactsResponseSchema = getRouteResponseSchema.pick({
+  origin: true,
+  destination: true,
+  distanceKm: true,
+  estimatedDirectFlightMinutes: true,
+});
+
+export type GetRouteFactsResponse = z.infer<typeof getRouteFactsResponseSchema>;
 export type RoutePriceStatus = GetRouteResponse['prices']['status'];
 
 /**

@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type {
+  GetRouteFactsResponse,
   GetRouteParams,
   GetRouteQuery,
   GetRouteResponse,
@@ -28,6 +29,14 @@ export class RoutesController {
   @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
   async list(): Promise<ListRoutesResponse> {
     return this.routes.sitemap();
+  }
+
+  /** Fatos do catálogo (lugares, distância, tempo estimado), sem preço nem fonte. */
+  @Get(':origin/:destination/facts')
+  @UseGuards(SearchThrottlerGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
+  async facts(@Param(GetRouteParamsPipe) params: GetRouteParams): Promise<GetRouteFactsResponse> {
+    return this.routes.facts(params.origin, params.destination);
   }
 
   @Get(':origin/:destination')

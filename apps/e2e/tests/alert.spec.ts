@@ -23,10 +23,7 @@ test('preço desejado alto: o sistema consulta, detecta e envia o e-mail de aler
 
   // O monitoramento mostra o preço atual observado e a meta atingida.
   await page.goto('/watches');
-  await page
-    .getByRole('link', { name: /São Paulo|SAO/ })
-    .first()
-    .click();
+  await page.getByRole('link', { name: 'Ver detalhes e histórico' }).first().click();
   await expect(page.getByText('Monitorando').first()).toBeVisible();
 
   // Clique de compra: abre o parceiro em outra aba, sem sair do Flight Watch.

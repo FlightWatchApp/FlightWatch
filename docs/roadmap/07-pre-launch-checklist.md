@@ -123,8 +123,8 @@ visual; rodada completa e limpa de format, lint, typecheck, todos os testes
 - **Token da Travelpayouts:** trocar (o atual passou por uma conversa).
 - **Tempo de voo estimado (SPEC-033):** calibrar a fórmula com rotas reais
   (SAO → DOU dá 1 h 35; a FlightConnections informa 1 h 50).
-- **SPEC-033 fatias 5 e 6:** monitoramento no mesmo modelo da página da rota
-  e evidência final.
+- **SPEC-033 fatia 5:** feita em 2026-10-11 (monitoramento no mesmo modelo da
+  página da rota). Falta só a verificação em produção.
 
 ## Melhorias de interface apontadas
 

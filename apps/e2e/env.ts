@@ -34,4 +34,5 @@ export const SHARED_ENV: Record<string, string> = {
   AUTH_RATE_LIMIT_MAX: '1000',
   ROUTE_PAGE_RATE_LIMIT_MAX: '1000',
   PROMOTION_ENGINE_ENABLED: 'true',
+  ROUTE_PAGE_ENABLED: 'true',
 };
