@@ -26,6 +26,9 @@ export default defineConfig({
     // SPEC-025: as suítes de auth criam muitas contas do mesmo IP; o limite de
     // auth fica alto aqui e rate-limit.e2e.spec.ts monta um app próprio com
     // limites baixos.
-    env: { RATE_LIMIT_MAX: '15', AUTH_RATE_LIMIT_MAX: '1000' },
+    // SPEC-032: a API passou a usar Redis (cache). Porta 1 é inalcançável: um
+    // e2e nunca lê nem grava no Redis de desenvolvimento; quem precisa de
+    // cache sobrescreve KEY_VALUE_STORE com o store em memória.
+    env: { RATE_LIMIT_MAX: '15', AUTH_RATE_LIMIT_MAX: '1000', REDIS_URL: 'redis://127.0.0.1:1' },
   },
 });

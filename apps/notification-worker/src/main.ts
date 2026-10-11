@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const notificationQueue = createNotificationQueue(connection);
   // Canal real (SMTP/SES/Resend/etc.) entra atrás da mesma porta EmailSender,
   // escolhido por EMAIL_PROVIDER — nada mais neste arquivo muda.
-  const emailSender = createEmailSender(config.EMAIL_PROVIDER);
+  const emailSender = createEmailSender(config);
 
   const worker = new Worker(
     QUEUE_NAMES.NOTIFICATION,

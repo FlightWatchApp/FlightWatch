@@ -227,11 +227,11 @@ async function benchmarkWatchListing(prisma: ReturnType<typeof createPrismaClien
     });
 
     const start = performance.now();
-    const result = await listWatchesForUser(prisma, user.id);
+    const result = await listWatchesForUser(prisma, user.id, { limit: 100 });
     const ms = performance.now() - start;
 
     console.log(
-      `N=${n.toString().padStart(4)}: ${formatMs(ms).padStart(8)} | ${result.length} Watches retornados`,
+      `N=${n.toString().padStart(4)}: ${formatMs(ms).padStart(8)} | ${result.items.length} Watches retornados`,
     );
 
     await cleanup(prisma, { userId: user.id, targetId: target.id });

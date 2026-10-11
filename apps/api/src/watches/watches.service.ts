@@ -279,8 +279,11 @@ export class WatchesService {
 
   // PRODUCT.md §7.3, sem SPEC-00X própria — ver nota em
   // packages/contracts/src/watches/list-watches.ts.
-  async listWatches(userId: string): Promise<ListWatchesResponse> {
-    const items = await listWatchesForUser(this.prisma.client, userId);
+  async listWatches(
+    userId: string,
+    query: { limit?: number | undefined; cursor?: string | undefined } = {},
+  ): Promise<ListWatchesResponse> {
+    const { items, nextCursor } = await listWatchesForUser(this.prisma.client, userId, query);
     const watches = await this.places.withRouteNames(items.map(toWatchListItem));
     // SPEC-018 §8: mede cobertura real do CTA de compra — "existe preço" mas
     // "não existe link mostrável" é um dado operacional distinto de "sem
@@ -294,7 +297,7 @@ export class WatchesService {
         });
       }
     }
-    return { watches };
+    return { watches, nextCursor };
   }
 
   /** SPEC-018 §8: `watch_purchase_link_click_total{provider,status}`. */

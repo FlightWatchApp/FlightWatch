@@ -3,6 +3,8 @@ import type { FlightOffer } from '@flight-watch/domain';
 import { ProviderError } from '../errors.js';
 import type {
   CalendarDay,
+  CheapestByDestinationQuery,
+  DestinationFare,
   FlightProvider,
   FlightSearchQuery,
   PriceCalendarQuery,
@@ -158,14 +160,58 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     return buildAviasalesSearchUrl(query);
   }
 
-  private async fetchMonth(request: MonthRequest): Promise<Entry[]> {
-    const params = new URLSearchParams({
+  /**
+   * SPEC-032: a mesma consulta só com a origem devolve o menor preço por
+   * destino que o cache tem (sondagem de 2026-10-07: 338 destinos para SAO,
+   * 21 para CGR). Mesmas regras da SPEC-030; fica o mais barato por destino.
+   */
+  async cheapestByDestination(query: CheapestByDestinationQuery): Promise<DestinationFare[]> {
+    const oneWay = query.tripType === 'ONE_WAY';
+    const entries = await this.fetchLatest({
+      origin: query.originIata,
+      currency: query.currency.toLowerCase(),
+      period_type: 'year',
+      one_way: String(oneWay),
+      sorting: 'price',
+    });
+    const now = this.now();
+    const byDestination = new Map<string, DestinationFare>();
+    for (const entry of entries) {
+      if (!this.isUsable(entry) || entry.destination === query.originIata) continue;
+      const back = entry.return_date ? entry.return_date : null;
+      if (oneWay ? back !== null : back === null) continue;
+      const observedAt = this.observedAtOf(entry, now);
+      if (now.getTime() - observedAt.getTime() > CACHED_PRICE_TTL_MS) continue;
+      const amountMinor = Math.round(entry.value * 100);
+      const current = byDestination.get(entry.destination);
+      if (!current || amountMinor < current.amountMinor) {
+        byDestination.set(entry.destination, {
+          destinationIata: entry.destination,
+          departureDate: entry.depart_date,
+          returnDate: back,
+          amountMinor,
+          stops: entry.number_of_changes ?? 0,
+          observedAt: observedAt.toISOString(),
+        });
+      }
+    }
+    return [...byDestination.values()].sort((a, b) => a.amountMinor - b.amountMinor);
+  }
+
+  private fetchMonth(request: MonthRequest): Promise<Entry[]> {
+    return this.fetchLatest({
       origin: request.originIata,
       destination: request.destinationIata,
       currency: request.currency.toLowerCase(),
       period_type: 'month',
       beginning_of_period: `${request.month}-01`,
       one_way: String(request.oneWay),
+    });
+  }
+
+  private async fetchLatest(query: Record<string, string>): Promise<Entry[]> {
+    const params = new URLSearchParams({
+      ...query,
       limit: '1000',
       show_to_affiliates: 'true',
     });

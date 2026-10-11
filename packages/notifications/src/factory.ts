@@ -1,12 +1,40 @@
 import type { EmailSender } from './email/port.js';
+import { createResendEmailSender } from './resend/resend-email-sender.js';
+import { FileOutboxEmailSender } from './simulated/file-outbox-email-sender.js';
 import { InMemoryEmailSender } from './simulated/in-memory-email-sender.js';
 
-/** Valores aceitos por `EMAIL_PROVIDER` (SPEC-024). Adapter real entra aqui. */
-export type EmailProviderKind = 'simulated';
+/** Valores aceitos por `EMAIL_PROVIDER` (SPEC-024). Adapter novo entra aqui. */
+export type EmailProviderKind = 'simulated' | 'resend';
 
-export function createEmailSender(kind: EmailProviderKind): EmailSender {
-  switch (kind) {
+/** Subconjunto da configuração dos processos que a fábrica precisa (SPEC-024). */
+export interface EmailSenderConfig {
+  EMAIL_PROVIDER: EmailProviderKind;
+  RESEND_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+  EMAIL_PROVIDER_TIMEOUT_MS?: number | undefined;
+  /** Só com `simulated`: pasta onde cada e-mail enviado vira um arquivo (E2E). */
+  EMAIL_OUTBOX_DIR?: string | undefined;
+}
+
+export function createEmailSender(config: EmailSenderConfig): EmailSender {
+  switch (config.EMAIL_PROVIDER) {
     case 'simulated':
-      return new InMemoryEmailSender();
+      return config.EMAIL_OUTBOX_DIR
+        ? new FileOutboxEmailSender(config.EMAIL_OUTBOX_DIR)
+        : new InMemoryEmailSender();
+    case 'resend': {
+      // A config já exige as duas chaves com este provedor; isto protege quem
+      // chamar a fábrica sem passar por `loadConfig`.
+      if (!config.RESEND_API_KEY || !config.EMAIL_FROM) {
+        throw new Error('EMAIL_PROVIDER=resend requires RESEND_API_KEY and EMAIL_FROM');
+      }
+      return createResendEmailSender({
+        apiKey: config.RESEND_API_KEY,
+        from: config.EMAIL_FROM,
+        ...(config.EMAIL_PROVIDER_TIMEOUT_MS
+          ? { timeoutMs: config.EMAIL_PROVIDER_TIMEOUT_MS }
+          : {}),
+      });
+    }
   }
 }

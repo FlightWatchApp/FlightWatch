@@ -3,6 +3,8 @@ import type { FlightOffer } from '@flight-watch/domain';
 import { ProviderError } from '../errors.js';
 import type {
   CalendarDay,
+  CheapestByDestinationQuery,
+  DestinationFare,
   FlightProvider,
   FlightSearchQuery,
   PriceCalendarQuery,
@@ -89,10 +91,52 @@ export function sequenceScenario(results: SimulatedScenario[]): SimulatedScenari
   };
 }
 
+/**
+ * SPEC-032: destinos do simulado — cidades comuns do catálogo, nacionais e
+ * internacionais. Nenhuma lista dessas existe fora do simulado (SPEC-029).
+ */
+const SIMULATED_DESTINATIONS = [
+  'SAO',
+  'RIO',
+  'BSB',
+  'SSA',
+  'REC',
+  'FOR',
+  'POA',
+  'CWB',
+  'FLN',
+  'MAO',
+  'BEL',
+  'NAT',
+  'CGR',
+  'DOU',
+  'LIS',
+  'MIA',
+  'NYC',
+  'MAD',
+  'PAR',
+  'BUE',
+  'SCL',
+  'LIM',
+  'ORL',
+  'LON',
+] as const;
+/** Janela de datas do simulado: de amanhã até 60 dias. */
+const SIMULATED_WINDOW_DAYS = 60;
+const SIMULATED_TRIP_LENGTH_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
 export class SimulatedFlightProvider implements FlightProvider {
   readonly strategy = 'SIMULATED';
 
-  constructor(private readonly scenario: SimulatedScenario = defaultScenario) {}
+  constructor(
+    private readonly scenario: SimulatedScenario = defaultScenario,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   // `async` aqui não é estilo: garante que um `throw` síncrono dentro do cenário
   // (ex.: failingScenario) sempre vire rejeição de Promise, nunca um throw direto
@@ -108,7 +152,7 @@ export class SimulatedFlightProvider implements FlightProvider {
   async priceCalendar(query: PriceCalendarQuery): Promise<CalendarDay[]> {
     const [year, month] = query.month.split('-').map(Number);
     const daysInMonth = new Date(Date.UTC(year ?? 0, month ?? 1, 0)).getUTCDate();
-    const observedAt = new Date().toISOString();
+    const observedAt = this.now().toISOString();
     return Array.from({ length: daysInMonth }, (_, index) => {
       const date = `${query.month}-${String(index + 1).padStart(2, '0')}`;
       return {
@@ -120,6 +164,41 @@ export class SimulatedFlightProvider implements FlightProvider {
         observedAt,
       };
     });
+  }
+
+  /**
+   * SPEC-032: o dia mais barato da janela, por destino, com a mesma semente
+   * do calendário — a promoção simulada confere com o calendário simulado.
+   */
+  async cheapestByDestination(query: CheapestByDestinationQuery): Promise<DestinationFare[]> {
+    const now = this.now();
+    const today = now.toISOString().slice(0, 10);
+    const fares = SIMULATED_DESTINATIONS.filter((code) => code !== query.originIata).map(
+      (destinationIata) => {
+        let best: DestinationFare | null = null;
+        for (let offset = 1; offset <= SIMULATED_WINDOW_DAYS; offset += 1) {
+          const departureDate = addDays(today, offset);
+          const amountMinor = deterministicPriceMinor(
+            `${query.originIata}|${destinationIata}|${departureDate}`,
+          );
+          if (!best || amountMinor < best.amountMinor) {
+            best = {
+              destinationIata,
+              departureDate,
+              returnDate:
+                query.tripType === 'ROUND_TRIP'
+                  ? addDays(departureDate, SIMULATED_TRIP_LENGTH_DAYS)
+                  : null,
+              amountMinor,
+              stops: 0,
+              observedAt: now.toISOString(),
+            };
+          }
+        }
+        return best as DestinationFare;
+      },
+    );
+    return fares.sort((a, b) => a.amountMinor - b.amountMinor);
   }
 
   allFlightsUrl(query: FlightSearchQuery): string {

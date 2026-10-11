@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { RouteLine } from '@/components/brand/route-line';
+import { RouteFacts } from '@/components/route/route-facts';
+import { RouteSummary } from '@/components/route/route-summary';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { Card } from '@/components/ui/card';
@@ -10,12 +13,18 @@ import { StatusTag } from '@/components/ui/status-tag';
 import { PriceHistoryChart } from '@/components/watches/price-history-chart';
 import { WatchLifecycleActions } from '@/components/watches/watch-lifecycle-actions';
 import { ApiError } from '@/lib/api/client';
+import { getRouteFacts } from '@/lib/api/routes';
 import { getWatch } from '@/lib/api/watches';
 import { formatDate, formatRelativeTime, isStale } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
 import { isAtLowestObservedPrice, isTargetReached } from '@/lib/domain/watch-price';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
+import { routePath } from '@/lib/domain/route-url';
 import { WATCH_STATUS_PRESENTATION } from '@/lib/domain/watch-status';
 import styles from './page.module.css';
+
+/** SPEC-033: página privada, fora do Google. */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function WatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +41,10 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
     }
     throw error;
   }
+
+  // Mesmo cabeçalho de rota da página pública (SPEC-033 fatia 5). Fatos do catálogo, sem
+  // preço: se falhar, o monitoramento continua útil sem o mapa.
+  const routeFacts = await getRouteFacts(watch.origin, watch.destination).catch(() => null);
 
   const status = WATCH_STATUS_PRESENTATION[watch.status];
   const hasLifecycleActions = watch.status === 'ACTIVE' || watch.status === 'PAUSED';
@@ -69,6 +82,19 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
         </div>
         <StatusTag tone={status.tone} label={status.label} />
       </div>
+
+      {routeFacts && (
+        <>
+          <RouteSummary origin={routeFacts.origin} destination={routeFacts.destination} />
+          {routePagesEnabled() && (
+            <p className={styles.subtitle}>
+              <Link href={routePath(routeFacts.origin, routeFacts.destination)} prefetch={false}>
+                Ver a página da rota
+              </Link>
+            </p>
+          )}
+        </>
+      )}
 
       <Card>
         <div className={styles.priceRow}>
@@ -152,6 +178,7 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
           targetAmountMinor={watch.targetAmountMinor}
         />
       </Card>
+      {routeFacts && <RouteFacts {...routeFacts} />}
     </div>
   );
 }

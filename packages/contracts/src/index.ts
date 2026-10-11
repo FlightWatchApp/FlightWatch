@@ -19,3 +19,5 @@ export * from './searches/errors.js';
 export * from './searches/price-calendar.js';
 export * from './opportunities/list-opportunities.js';
 export * from './places/places.js';
+export * from './promotions/list-promotions.js';
+export * from './routes/get-route.js';

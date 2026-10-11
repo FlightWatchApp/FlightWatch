@@ -37,6 +37,47 @@ export function intField(options: { min: number; max: number; default?: number |
     });
 }
 
+/** Liga/desliga: só "true" ou "false". */
+export function booleanField(defaultValue: boolean) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined) {
+        return defaultValue;
+      }
+      if (raw !== 'true' && raw !== 'false') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'deve ser true ou false' });
+        return z.NEVER;
+      }
+      return raw === 'true';
+    });
+}
+
+/**
+ * Lista de códigos IATA de 3 letras separados por vírgula ("SAO,RIO");
+ * ausente ou vazia vira lista vazia. Códigos em maiúsculas, sem repetição.
+ */
+export function iataListField() {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined || raw.trim() === '') {
+        return [] as string[];
+      }
+      const codes = raw.split(',').map((code) => code.trim().toUpperCase());
+      if (codes.some((code) => !/^[A-Z]{3}$/.test(code))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'deve ser uma lista de códigos de 3 letras separados por vírgula',
+        });
+        return z.NEVER;
+      }
+      return [...new Set(codes)];
+    });
+}
+
 export function portField(defaultPort?: number) {
   return intField({ min: 1, max: 65_535, default: defaultPort });
 }
@@ -113,6 +154,23 @@ export function secretField(minLength: number) {
 
 /** Segredo opcional; quando informado, mesmo tamanho mínimo (e nunca ecoado). */
 export function optionalSecretField(minLength: number) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw !== undefined && raw.length < minLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `deve ter pelo menos ${minLength} caracteres`,
+        });
+        return z.NEVER;
+      }
+      return raw;
+    });
+}
+
+/** Texto livre opcional (ex.: remetente de e-mail); tamanho mínimo quando informado. */
+export function optionalTextField(minLength: number) {
   return z
     .string()
     .optional()

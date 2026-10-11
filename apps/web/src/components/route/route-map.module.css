@@ -1,0 +1,41 @@
+.wrapper {
+  height: 18rem;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+  background: var(--color-surface-sunken);
+}
+
+.markerOrigin {
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-text-muted);
+}
+
+/* PG-03: destino na cor da rota, igual ao símbolo da marca. */
+.markerDestination {
+  border-radius: 50%;
+  background: var(--color-route);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-route);
+}
+
+/* Arco da rota: classe aplicada pelo Leaflet ao <path> SVG da linha. */
+.arc {
+  stroke: var(--color-brand);
+  stroke-width: 3;
+  stroke-dasharray: 8 6;
+  fill: none;
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}

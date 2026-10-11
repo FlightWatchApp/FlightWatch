@@ -212,6 +212,85 @@ export async function resolveSearchableCityCode(
   return airportCity?.searchable ? airport.cityCode : null;
 }
 
+export interface SearchableCity {
+  code: string;
+  name: string;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/**
+ * SPEC-032: cidades pesquisáveis entre os códigos, numa consulta só. Código
+ * fora do catálogo ou sem voo comercial fica de fora.
+ */
+export async function findSearchableCities(
+  prisma: PrismaClient,
+  codes: readonly string[],
+): Promise<Map<string, SearchableCity>> {
+  const unique = [...new Set(codes)];
+  if (unique.length === 0) {
+    return new Map();
+  }
+  const cities = await prisma.place.findMany({
+    where: { kind: 'CITY', searchable: true, code: { in: unique } },
+    select: { code: true, name: true, countryCode: true, latitude: true, longitude: true },
+  });
+  return new Map(cities.map((city) => [city.code, city]));
+}
+
+export interface RouteCity {
+  code: string;
+  name: string;
+  countryCode: string;
+  countryName: string;
+  latitude: number | null;
+  longitude: number | null;
+  airports: { code: string; name: string }[];
+}
+
+/**
+ * SPEC-033: o que a página da rota mostra de cada cidade, em duas consultas
+ * para as duas pontas. Só cidade pesquisável; código de aeroporto não entra
+ * (a normalização para cidade vem antes, em `resolveSearchableCityCode`).
+ */
+export async function findRouteCities(
+  prisma: PrismaClient,
+  codes: readonly string[],
+): Promise<Map<string, RouteCity>> {
+  const unique = [...new Set(codes)];
+  if (unique.length === 0) {
+    return new Map();
+  }
+  const cities = await prisma.place.findMany({
+    where: { kind: 'CITY', searchable: true, code: { in: unique } },
+    select: {
+      code: true,
+      name: true,
+      countryCode: true,
+      countryName: true,
+      latitude: true,
+      longitude: true,
+    },
+  });
+  const airports = await prisma.place.findMany({
+    where: { kind: 'AIRPORT', searchable: true, cityCode: { in: cities.map((city) => city.code) } },
+    orderBy: { code: 'asc' },
+    select: { code: true, name: true, cityCode: true },
+  });
+  return new Map(
+    cities.map((city) => [
+      city.code,
+      {
+        ...city,
+        airports: airports
+          .filter((airport) => airport.cityCode === city.code)
+          .map((airport) => ({ code: airport.code, name: airport.name })),
+      },
+    ]),
+  );
+}
+
 export interface PlaceSummary {
   name: string;
   lat: number | null;

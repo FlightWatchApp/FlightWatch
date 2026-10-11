@@ -55,7 +55,15 @@ export const watchListItemSchema = z.object({
 
 export const listWatchesResponseSchema = z.object({
   watches: z.array(watchListItemSchema),
+  // Checklist pré-lançamento #2: paginação por cursor; null = última página.
+  nextCursor: z.string().nullable(),
 });
+
+export const listWatchesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(1).max(64).optional(),
+});
+export type ListWatchesQuery = z.infer<typeof listWatchesQuerySchema>;
 
 export type CurrentOffer = z.infer<typeof currentOfferSchema>;
 export type WatchListItem = z.infer<typeof watchListItemSchema>;

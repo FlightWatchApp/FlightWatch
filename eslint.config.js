@@ -32,6 +32,11 @@ export default tseslint.config(
     },
   },
   {
+    // apps/e2e/scripts: script Node puro (.mjs), fora do TypeScript.
+    files: ['apps/e2e/scripts/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+  },
+  {
     // apps/web: componentes React (JSX) precisam de regras de acessibilidade e de hooks,
     // que não se aplicam ao resto do monorepo (backend puro, sem JSX).
     files: ['apps/web/src/**/*.{ts,tsx}'],

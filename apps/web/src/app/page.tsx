@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { EmailVerificationBanner } from '@/components/account/email-verification-banner';
+import { loadHomePromotions } from '@/components/home/hero-promotion';
 import { Landing } from '@/components/home/landing';
 import { MemberHome } from '@/components/home/member-home';
 import { getCurrentUser } from '@/lib/api/auth';
@@ -7,6 +9,7 @@ import { ApiError } from '@/lib/api/client';
 import { listOpportunities } from '@/lib/api/opportunities';
 import type { OpportunityItem } from '@/lib/api/types';
 import { listWatches } from '@/lib/api/watches';
+import { ORIGIN_COOKIE_NAME, normalizeOriginCode } from './opportunities/origin';
 
 /** PG-01/PG-02: promoções são um complemento da home — se o feed falhar, a página continua. */
 async function safeOpportunities(): Promise<OpportunityItem[]> {
@@ -24,7 +27,18 @@ async function safeOpportunities(): Promise<OpportunityItem[]> {
 export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) {
-    return <Landing opportunities={await safeOpportunities()} />;
+    // SPEC-032: o cartão do topo e a seção "Promoções agora" vêm da origem
+    // que a pessoa escolheu (cookie); sem origem, o cartão é o exemplo rotulado.
+    const cookieStore = await cookies();
+    const origin = normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
+    const promotions = await loadHomePromotions(origin);
+    return (
+      <Landing
+        heroPromotion={promotions?.hero ?? null}
+        morePromotions={promotions?.more ?? []}
+        heroOriginChosen={origin !== null}
+      />
+    );
   }
 
   let watches;

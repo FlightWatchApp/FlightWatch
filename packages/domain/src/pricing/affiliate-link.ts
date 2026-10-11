@@ -12,7 +12,7 @@
  */
 
 /** Onde a pessoa clicou — vira `utm_campaign`, baixa cardinalidade. */
-export type PurchaseSurface = 'WATCH' | 'SEARCH' | 'OPPORTUNITY';
+export type PurchaseSurface = 'WATCH' | 'SEARCH' | 'OPPORTUNITY' | 'ROUTE';
 
 /** Parâmetros de afiliado por `providerStrategy`, ex.: `{ SIMULATED: { marker: '123' } }`. */
 export type AffiliateTrackingConfig = Record<string, Record<string, string>>;

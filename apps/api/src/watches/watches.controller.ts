@@ -6,11 +6,13 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import type {
   CreateWatchRequest,
+  ListWatchesQuery,
   CreateWatchResponse,
   ListWatchesResponse,
   WatchDetailResponse,
@@ -20,6 +22,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
 import { CreateWatchErrorFilter } from './create-watch-error.filter.js';
+import { ListWatchesQueryPipe } from './list-watches-query.pipe.js';
 import { CreateWatchValidationPipe } from './create-watch.pipe.js';
 import { WatchIdValidationPipe } from './watch-id.pipe.js';
 import { WatchLifecycleErrorFilter } from './watch-lifecycle-error.filter.js';
@@ -32,8 +35,11 @@ export class WatchesController {
   constructor(private readonly watchesService: WatchesService) {}
 
   @Get()
-  async list(@CurrentUser() userId: string): Promise<ListWatchesResponse> {
-    return this.watchesService.listWatches(userId);
+  async list(
+    @CurrentUser() userId: string,
+    @Query(ListWatchesQueryPipe) query: ListWatchesQuery,
+  ): Promise<ListWatchesResponse> {
+    return this.watchesService.listWatches(userId, query);
   }
 
   // SPEC-009

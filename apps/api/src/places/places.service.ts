@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import {
   type CitySearchResult,
   findPlaceSummaries,
+  findRouteCities,
+  findSearchableCities,
   resolveSearchableCityCode,
+  type RouteCity,
+  type SearchableCity,
   searchCities,
 } from '@flight-watch/database';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -38,6 +42,16 @@ export class PlacesService {
   /** Cidade pesquisável para o código (cidade ou aeroporto); null se não houver. */
   resolveCity(code: string): Promise<string | null> {
     return resolveSearchableCityCode(this.prisma.client, code);
+  }
+
+  /** SPEC-032: cidades pesquisáveis com país, numa consulta só. */
+  searchableCities(codes: readonly string[]): Promise<Map<string, SearchableCity>> {
+    return findSearchableCities(this.prisma.client, codes);
+  }
+
+  /** SPEC-033: cidade, país, coordenadas e aeroportos das duas pontas da rota. */
+  routeCities(codes: readonly string[]): Promise<Map<string, RouteCity>> {
+    return findRouteCities(this.prisma.client, codes);
   }
 
   async withRouteNames<T extends Route>(items: readonly T[]): Promise<(T & RouteNames)[]> {

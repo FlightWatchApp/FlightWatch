@@ -17,7 +17,7 @@ import { SessionAuthGuard } from './session-auth.guard.js';
     {
       provide: EMAIL_SENDER,
       inject: [API_CONFIG],
-      useFactory: (config: ApiConfig) => createEmailSender(config.EMAIL_PROVIDER),
+      useFactory: (config: ApiConfig) => createEmailSender(config),
     },
   ],
   exports: [AuthService, SessionAuthGuard],

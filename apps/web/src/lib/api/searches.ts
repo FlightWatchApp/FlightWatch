@@ -1,6 +1,7 @@
 import type { FlightSearchResponse, PriceCalendarResponse } from '@flight-watch/contracts';
+import { buildLaunchAlertRules } from '@/lib/domain/alert-rules';
 import { apiFetch } from './client';
-import type { AlertRuleType, FlightSearchResult } from './types';
+import type { FlightSearchResult } from './types';
 
 export interface SearchFlightsInput {
   origin: string;
@@ -68,11 +69,7 @@ export interface DeriveWatchFromOfferInput {
   notificationChannelId: string;
 }
 
-/**
- * Só cobre TARGET_PRICE, mesmo recorte de `createWatch()` em
- * apps/web/src/lib/api/watches.ts — o formulário ainda não expõe as outras
- * 3 regras.
- */
+/** Regras do escopo de lançamento — ver `buildLaunchAlertRules`. */
 export async function deriveWatchFromOffer(
   offerId: string,
   input: DeriveWatchFromOfferInput,
@@ -80,13 +77,7 @@ export async function deriveWatchFromOffer(
   return apiFetch<{ id: string }>(`/v1/offers/${offerId}/watch`, {
     method: 'POST',
     body: JSON.stringify({
-      alertRules: [
-        {
-          type: 'TARGET_PRICE' satisfies AlertRuleType,
-          amountMinor: input.targetAmountMinor,
-          cooldownSeconds: 43_200,
-        },
-      ],
+      alertRules: buildLaunchAlertRules(input.targetAmountMinor),
       notificationChannelId: input.notificationChannelId,
     }),
   });

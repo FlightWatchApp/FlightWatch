@@ -1,12 +1,15 @@
 import {
+  booleanField,
   durationMsField,
   enumField,
   hostField,
   intField,
   optionalSecretField,
+  optionalTextField,
   portField,
   secretField,
   urlField,
+  iataListField,
 } from './fields.js';
 
 /**
@@ -16,7 +19,7 @@ import {
 
 /** Adapters disponíveis. Um adapter real entra aqui e na factory do pacote dele. */
 export const FLIGHT_PROVIDERS = ['simulated', 'travelpayouts'] as const;
-export const EMAIL_PROVIDERS = ['simulated'] as const;
+export const EMAIL_PROVIDERS = ['simulated', 'resend'] as const;
 
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
 const LOCAL_REDIS_URL = 'redis://localhost:6379';
@@ -52,7 +55,64 @@ function requireProviderCredentials(values: {
     ? [{ key: 'TRAVELPAYOUTS_TOKEN', message: 'obrigatória com FLIGHT_PROVIDER=travelpayouts' }]
     : [];
 }
-const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };
+const emailProvider = {
+  EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated'),
+  // Obrigatórios com EMAIL_PROVIDER=resend (regra abaixo).
+  RESEND_API_KEY: optionalSecretField(16),
+  EMAIL_FROM: optionalTextField(3),
+  EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+  // Só com EMAIL_PROVIDER=simulated: cada e-mail "enviado" vira um arquivo JSON
+  // nesta pasta, para o E2E ler links de confirmação e redefinição.
+  EMAIL_OUTBOX_DIR: optionalTextField(1),
+};
+
+/** Mesmo princípio de `requireProviderCredentials`: provedor real sem credencial não sobe. */
+function requireEmailCredentials(values: {
+  EMAIL_PROVIDER: (typeof EMAIL_PROVIDERS)[number];
+  RESEND_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+}) {
+  if (values.EMAIL_PROVIDER !== 'resend') return [];
+  return [
+    ...(values.RESEND_API_KEY
+      ? []
+      : [{ key: 'RESEND_API_KEY', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+    ...(values.EMAIL_FROM
+      ? []
+      : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+  ];
+}
+const basisPoints = (defaultBps: number) => intField({ min: 1, max: 10_000, default: defaultBps });
+const cacheMinutes = (defaultMinutes: number) =>
+  intField({ min: 1, max: 7 * 24 * 60, default: defaultMinutes });
+
+/** SPEC-032: motor de promoções (desligado por padrão) e caches na API. */
+const promotions = {
+  PROMOTION_ENGINE_ENABLED: booleanField(false),
+  PROMOTION_CANDIDATES_PER_ORIGIN: intField({ min: 1, max: 50, default: 10 }),
+  PROMOTION_MIN_REFERENCE_POINTS: intField({ min: 1, max: 100, default: 8 }),
+  PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS: basisPoints(1500),
+  PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS: basisPoints(2000),
+  PROMOTION_SUSPECT_DISCOUNT_BPS: basisPoints(7000),
+  PROMOTION_SAVING_SCORE_CAP_MINOR: intField({ min: 1, max: 100_000_000, default: 100_000 }),
+  PROMOTION_FEED_CACHE_TTL_MINUTES: cacheMinutes(360),
+  PRICE_CALENDAR_CACHE_TTL_MINUTES: cacheMinutes(360),
+  PROMOTION_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 2000 }),
+};
+
+/** SPEC-033: página da rota (desligada por padrão), com orçamento próprio para robôs de busca. */
+const routePage = {
+  ROUTE_PAGE_ENABLED: booleanField(false),
+  ROUTE_PAGE_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 1000 }),
+  ROUTE_PAGE_CACHE_TTL_MINUTES: cacheMinutes(30),
+  ROUTE_PAGE_MONTHS: intField({ min: 1, max: 6, default: 3 }),
+  // Por IP, na mesma janela de RATE_LIMIT_WINDOW_MS. Mais folgado que a busca: o que protege a
+  // cota da fonte aqui é o orçamento diário e o cache, e uma visita pré-carrega links.
+  ROUTE_PAGE_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 60 }),
+  // Cidades de origem do sitemap; vazio = nenhuma rota no sitemap (antes do domínio próprio).
+  ROUTE_SITEMAP_ORIGIN_CITIES: iataListField(),
+  ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
+};
 
 export const apiConfig = {
   service: 'api',
@@ -60,9 +120,13 @@ export const apiConfig = {
     PORT: portField(3000),
     ...metrics(9100),
     ...database,
+    // SPEC-032: cache reconstruível das promoções e do calendário.
+    ...redis,
     ...webBaseUrl,
     ...flightProvider,
     ...emailProvider,
+    ...promotions,
+    ...routePage,
     RATE_LIMIT_WINDOW_MS: durationMsField(60_000),
     RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 10 }),
     // SPEC-025: rotas de autenticação, por rota e por IP do cliente.
@@ -72,10 +136,14 @@ export const apiConfig = {
   },
   localDefaults: {
     DATABASE_URL: LOCAL_DATABASE_URL,
+    REDIS_URL: LOCAL_REDIS_URL,
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
-  rules: requireProviderCredentials,
+  rules: (
+    values: Parameters<typeof requireProviderCredentials>[0] &
+      Parameters<typeof requireEmailCredentials>[0],
+  ) => [...requireProviderCredentials(values), ...requireEmailCredentials(values)],
 };
 
 export const schedulerConfig = {
@@ -134,6 +202,7 @@ export const notificationWorkerConfig = {
     REDIS_URL: LOCAL_REDIS_URL,
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
   },
+  rules: requireEmailCredentials,
 };
 
 export const ALL_CONFIG_DEFINITIONS = {

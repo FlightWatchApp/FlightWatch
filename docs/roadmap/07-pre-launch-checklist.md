@@ -15,16 +15,16 @@ afiliado, privacidade, testes de ponta a ponta e o escopo final dos alertas.
 
 ## Fila de execução (ordem por dependência)
 
-| #   | Item                                                                                        | Depende de                       | Status   |
-| --- | ------------------------------------------------------------------------------------------- | -------------------------------- | -------- |
-| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | pendente |
-| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | pendente |
-| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente |
-| 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente |
-| 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | pendente |
-| 6   | Marker de afiliado, teste de atribuição e revisão dos termos da Travelpayouts               | site no ar                       | pendente |
-| 7   | Política de Privacidade, Termos de Uso, retenção e exclusão definitiva                      | texto do owner/jurídico          | pendente |
-| 8   | Revisão manual de acessibilidade (teclado, leitor de tela) e rodada limpa de todos os gates | itens anteriores                 | pendente |
+| #   | Item                                                                                        | Depende de                       | Status                                      |
+| --- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------- |
+| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | D1 feito (SPEC-035); D2 feito (SPEC-032)    |
+| 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito                                       |
+| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | feito (`pnpm test:e2e`, 8 testes)           |
+| 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente                                    |
+| 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | código pronto; falta domínio + conta Resend |
+| 6   | Marker de afiliado, teste de atribuição e revisão dos termos da Travelpayouts               | site no ar                       | pendente                                    |
+| 7   | Política de Privacidade, Termos de Uso, retenção e exclusão definitiva                      | texto do owner/jurídico          | pendente                                    |
+| 8   | Revisão manual de acessibilidade (teclado, leitor de tela) e rodada limpa de todos os gates | itens anteriores                 | pendente                                    |
 
 Itens 1 a 3 não dependem de nada externo. A partir do 4, dependem de
 decisões ou contas do owner.
@@ -40,7 +40,8 @@ decisões ou contas do owner.
   e **novo menor preço observado** (o que se espera de um monitor de preço;
   o domínio já suporta). Quedas absoluta/percentual depois. Registrar em spec
   para a interface não prometer menos ou mais que o backend.
-- **D2 (owner):** a seção "Promoções agora" da página inicial ainda usa o
+- **D2 (owner) — decidido em 2026-10-11: feed por origem (SPEC-032), com a
+  origem escolhida pela pessoa.** Texto original: a seção "Promoções agora" da página inicial ainda usa o
   feed antigo (SPEC-015), que exibe cartões "preço expirado, confirme no
   parceiro". Recomendação: trocar a fonte pelo feed por origem (SPEC-032) ou
   pela vitrine (SPEC-034), com só preço fresco — em vez de remendo editorial
@@ -61,6 +62,17 @@ pausa/reativação, cancelamento, recuperação de senha, clique de compra e
 recebimento de alerta. Os testes visuais (overflow, tamanho de texto e
 controles, console, 320/390/1440 px, movimento reduzido) já passam.
 
+**Feito em 2026-10-11** (`apps/e2e`, `pnpm test:e2e`): sobe API, scheduler,
+workers e web de verdade, com banco (`flight_watch_e2e`) e Redis (db 9)
+próprios, provedores simulados e e-mails gravados em arquivo
+(`EMAIL_OUTBOX_DIR`, só com `EMAIL_PROVIDER=simulated`). Cobre cadastro e
+confirmação de e-mail, saída/entrada, busca, criação, pausa, reativação e
+encerramento do monitoramento, recuperação de senha, exclusão de conta,
+alerta por e-mail, clique de compra e promoções por origem. O primeiro
+resultado foi um bug real: **Pausar/Reativar/Encerrar falhavam** porque o web
+mandava `content-type: application/json` sem corpo e o Fastify devolvia 400
+(corrigido em `apps/web/src/lib/api/client.ts`). No CI é o job `e2e`.
+
 ### 4. Ambiente de produção
 
 Hospedagem, domínio, HTTPS, Postgres e Redis gerenciados, secrets, deploy dos
@@ -70,7 +82,13 @@ existem (SPEC-028); o CI valida código, não operação.
 
 ### 5. E-mail real
 
-Hoje `InMemoryEmailSender` (`packages/notifications/src/factory.ts`):
+**Código pronto (2026-10-10):** `EMAIL_PROVIDER=resend` com `RESEND_API_KEY` e
+`EMAIL_FROM` (`packages/notifications/src/resend/`), erros classificados
+(429/5xx/409 retentáveis, demais permanentes), idempotência pela
+`Idempotency-Key` da Resend. **Falta do owner:** domínio com SPF/DKIM
+verificado na Resend, chave de API e teste de entrega real em staging.
+
+Antes (`InMemoryEmailSender`, `packages/notifications/src/factory.ts`):
 confirmação de cadastro, recuperação de senha e alertas não chegam a
 ninguém, e `APP_ENV=production` rejeita o adapter simulado. Principal
 bloqueador do produto.
@@ -96,19 +114,17 @@ visual; rodada completa e limpa de format, lint, typecheck, todos os testes
 
 ## Itens adicionais (não estavam na análise)
 
-- **Limite de requisições do cartão da página inicial:** cada visita com
-  cidade usa 4 requisições do limite da busca (feed + 3 meses de
-  calendário). Com CGNAT das operadoras (muitos usuários num IP), o gráfico
-  some. Recomendação: `/v1/promotions` devolver os preços da referência.
-  O mesmo vale para a busca (10/min por IP).
-- **Rate limit em memória por processo:** com mais de uma réplica da API,
-  cada uma conta separado — mover o storage do throttler para o Redis antes
-  de escalar.
+- **Limite de requisições do cartão da página inicial:** **resolvido em
+  2026-10-11** — `/v1/promotions` devolve `reference.days` e a home gasta 1
+  requisição (antes 4). A busca continua em 10/min por IP.
+- **Rate limit em memória por processo:** **resolvido em 2026-10-11** —
+  o storage do throttler é o Redis (`RedisThrottlerStorage`), compartilhado
+  entre réplicas; Redis fora volta a contar em memória por processo.
 - **Token da Travelpayouts:** trocar (o atual passou por uma conversa).
 - **Tempo de voo estimado (SPEC-033):** calibrar a fórmula com rotas reais
   (SAO → DOU dá 1 h 35; a FlightConnections informa 1 h 50).
-- **SPEC-033 fatias 5 e 6:** monitoramento no mesmo modelo da página da rota
-  e evidência final.
+- **SPEC-033 fatia 5:** feita em 2026-10-11 (monitoramento no mesmo modelo da
+  página da rota). Falta só a verificação em produção.
 
 ## Melhorias de interface apontadas
 
