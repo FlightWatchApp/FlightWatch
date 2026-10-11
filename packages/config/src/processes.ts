@@ -111,7 +111,6 @@ const routePage = {
   ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
 };
 
-
 export const apiConfig = {
   service: 'api',
   shape: {

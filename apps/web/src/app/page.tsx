@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { EmailVerificationBanner } from '@/components/account/email-verification-banner';
-import { loadHeroPromotion } from '@/components/home/hero-promotion';
+import { loadHomePromotions } from '@/components/home/hero-promotion';
 import { Landing } from '@/components/home/landing';
 import { MemberHome } from '@/components/home/member-home';
 import { getCurrentUser } from '@/lib/api/auth';
@@ -27,18 +27,15 @@ async function safeOpportunities(): Promise<OpportunityItem[]> {
 export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) {
-    // SPEC-032: o cartão do topo mostra a melhor promoção da origem escolhida
-    // em /opportunities (cookie); sem origem, continua o exemplo rotulado.
+    // SPEC-032: o cartão do topo e a seção "Promoções agora" vêm da origem
+    // que a pessoa escolheu (cookie); sem origem, o cartão é o exemplo rotulado.
     const cookieStore = await cookies();
     const origin = normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
-    const [opportunities, heroPromotion] = await Promise.all([
-      safeOpportunities(),
-      loadHeroPromotion(origin),
-    ]);
+    const promotions = await loadHomePromotions(origin);
     return (
       <Landing
-        opportunities={opportunities}
-        heroPromotion={heroPromotion}
+        heroPromotion={promotions?.hero ?? null}
+        morePromotions={promotions?.more ?? []}
         heroOriginChosen={origin !== null}
       />
     );

@@ -1,7 +1,7 @@
 # SPEC-032 — Promoções por origem, calculadas sob demanda
 
-Status: implementada (ver "Evidência de implementação") — D3 segue em aberto
-sem bloquear esta versão
+Status: implementada e **aprovada pelo owner em 2026-10-11** (ver "Evidência
+de implementação") — D3 segue em aberto sem bloquear esta versão
 Owner: Pricing / Discovery
 Dependências: ADR-004, ADR-008, SPEC-015, SPEC-016, SPEC-020, SPEC-025,
 SPEC-029, SPEC-030, SPEC-031
@@ -460,3 +460,16 @@ meses que contribuíram com preço; a explicação traz o ano; rótulos `none` e
   `docs/evals/EVALS-032-promotions.md`); limite real de
   `PROMOTION_DAILY_CALL_BUDGET`. Sobre `PROMOTION_CANDIDATES_PER_ORIGIN = 10`:
   em SAO 6 de 10 qualificaram; em CGR o limite não é o gargalo, a cobertura é.
+
+### Aprovação e ajustes de 2026-10-11
+
+- **Aprovada pelo owner**, incluindo: a pessoa escolhe a cidade de origem (D4,
+  sem lista fixa no site); critério de promoção como descrito (mediana das
+  datas próximas, 15% nacional / 20% internacional, suspeito a partir de 70%).
+- **Fonte de "Promoções agora" na home (D2 do checklist):** passa a ser este
+  feed, pela origem do cookie `fw_origin`. Sem origem a seção pede a cidade
+  (nunca inventa uma); o feed antigo (SPEC-015) sai da home de visitante.
+- **Contrato:** `reference.days` — o menor preço por data que formou a mediana
+  (sem a data da promoção). O gráfico do cartão da home usa esses pontos e
+  deixa de consultar o calendário (a home gasta 1 requisição do limite por IP,
+  não 4). Campo com `default([])` para tolerar cache anterior à mudança.

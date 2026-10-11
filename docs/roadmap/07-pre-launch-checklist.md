@@ -17,7 +17,7 @@ afiliado, privacidade, testes de ponta a ponta e o escopo final dos alertas.
 
 | #   | Item                                                                                        | Depende de                       | Status                                      |
 | --- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------- |
-| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | D1 feito (SPEC-035); D2 aguarda SPEC-032    |
+| 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | D1 feito (SPEC-035); D2 feito (SPEC-032)    |
 | 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito                                       |
 | 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente                                    |
 | 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente                                    |
@@ -40,7 +40,8 @@ decisões ou contas do owner.
   e **novo menor preço observado** (o que se espera de um monitor de preço;
   o domínio já suporta). Quedas absoluta/percentual depois. Registrar em spec
   para a interface não prometer menos ou mais que o backend.
-- **D2 (owner):** a seção "Promoções agora" da página inicial ainda usa o
+- **D2 (owner) — decidido em 2026-10-11: feed por origem (SPEC-032), com a
+  origem escolhida pela pessoa.** Texto original: a seção "Promoções agora" da página inicial ainda usa o
   feed antigo (SPEC-015), que exibe cartões "preço expirado, confirme no
   parceiro". Recomendação: trocar a fonte pelo feed por origem (SPEC-032) ou
   pela vitrine (SPEC-034), com só preço fresco — em vez de remendo editorial
@@ -102,11 +103,9 @@ visual; rodada completa e limpa de format, lint, typecheck, todos os testes
 
 ## Itens adicionais (não estavam na análise)
 
-- **Limite de requisições do cartão da página inicial:** cada visita com
-  cidade usa 4 requisições do limite da busca (feed + 3 meses de
-  calendário). Com CGNAT das operadoras (muitos usuários num IP), o gráfico
-  some. Recomendação: `/v1/promotions` devolver os preços da referência.
-  O mesmo vale para a busca (10/min por IP).
+- **Limite de requisições do cartão da página inicial:** **resolvido em
+  2026-10-11** — `/v1/promotions` devolve `reference.days` e a home gasta 1
+  requisição (antes 4). A busca continua em 10/min por IP.
 - **Rate limit em memória por processo:** com mais de uma réplica da API,
   cada uma conta separado — mover o storage do throttler para o Redis antes
   de escalar.

@@ -74,6 +74,8 @@ export interface PromotionView {
   referencePointCount: number;
   /** Meses (AAAA-MM) que contribuíram com preço para a referência, em ordem. */
   referenceMonths: string[];
+  /** Os preços que formaram a mediana (um por data), em ordem de data. */
+  referenceDays: { date: string; amountMinor: number }[];
   score: number;
   scoreVersion: typeof PROMOTION_SCORE_VERSION;
 }
@@ -179,6 +181,20 @@ export function promotionScore(input: {
   return Math.floor((50 * discount + 20 * saving + 30 * freshness) / 100);
 }
 
+/** Menor preço por data entre os pontos da referência, em ordem de data. */
+function referenceDays(points: readonly PromotionPrice[]): { date: string; amountMinor: number }[] {
+  const cheapest = new Map<string, number>();
+  for (const price of points) {
+    const current = cheapest.get(price.departureDate);
+    if (current === undefined || price.amountMinor < current) {
+      cheapest.set(price.departureDate, price.amountMinor);
+    }
+  }
+  return [...cheapest]
+    .map(([date, amountMinor]) => ({ date, amountMinor }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function evaluatePromotion(
   input: PromotionInput,
   policy: PromotionPolicy,
@@ -220,6 +236,7 @@ export function evaluatePromotion(
       referenceAmountMinor,
       referencePointCount: points.length,
       referenceMonths: [...new Set(points.map((price) => price.departureDate.slice(0, 7)))].sort(),
+      referenceDays: referenceDays(points),
       score: promotionScore({
         discountBps,
         thresholdBps,

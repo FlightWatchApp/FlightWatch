@@ -306,4 +306,25 @@ describe('promotionScore (AC-5)', () => {
     expect(result.promotion.score).toBeGreaterThan(0);
     expect(result.promotion.score).toBeLessThanOrEqual(100);
   });
+
+  it('devolve o menor preço por data que formou a mediana, em ordem, sem a data da promoção', () => {
+    const result = evaluatePromotion(
+      input({
+        referencePrices: [
+          price('2026-11-03', 120_000),
+          price('2026-11-03', 100_000),
+          ...references(100_000, 7).filter((p) => p.departureDate !== '2026-11-03'),
+          price('2026-11-20', 10_000),
+        ],
+      }),
+      DEFAULT_PROMOTION_POLICY,
+      NOW,
+    );
+    expect(result.result).toBe('QUALIFIES');
+    if (result.result !== 'QUALIFIES') return;
+    const days = result.promotion.referenceDays;
+    expect(days.map((day) => day.date)).toEqual([...days.map((day) => day.date)].sort());
+    expect(days.find((day) => day.date === '2026-11-03')?.amountMinor).toBe(100_000);
+    expect(days.some((day) => day.date === '2026-11-20')).toBe(false);
+  });
 });
