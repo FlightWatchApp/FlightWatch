@@ -116,6 +116,9 @@ Bloqueia merge/release: sim.
 
 ### G10 — E2E crítico
 
+Implementação: `apps/e2e` (Playwright), `pnpm test:e2e`, job `e2e` do CI. Provedores
+simulados, banco e Redis próprios, e-mails lidos da caixa de saída em arquivo.
+
 Jornadas mínimas:
 
 1. autenticar;

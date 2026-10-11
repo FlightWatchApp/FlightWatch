@@ -1,5 +1,6 @@
 import type { EmailSender } from './email/port.js';
 import { createResendEmailSender } from './resend/resend-email-sender.js';
+import { FileOutboxEmailSender } from './simulated/file-outbox-email-sender.js';
 import { InMemoryEmailSender } from './simulated/in-memory-email-sender.js';
 
 /** Valores aceitos por `EMAIL_PROVIDER` (SPEC-024). Adapter novo entra aqui. */
@@ -11,12 +12,16 @@ export interface EmailSenderConfig {
   RESEND_API_KEY?: string | undefined;
   EMAIL_FROM?: string | undefined;
   EMAIL_PROVIDER_TIMEOUT_MS?: number | undefined;
+  /** Só com `simulated`: pasta onde cada e-mail enviado vira um arquivo (E2E). */
+  EMAIL_OUTBOX_DIR?: string | undefined;
 }
 
 export function createEmailSender(config: EmailSenderConfig): EmailSender {
   switch (config.EMAIL_PROVIDER) {
     case 'simulated':
-      return new InMemoryEmailSender();
+      return config.EMAIL_OUTBOX_DIR
+        ? new FileOutboxEmailSender(config.EMAIL_OUTBOX_DIR)
+        : new InMemoryEmailSender();
     case 'resend': {
       // A config já exige as duas chaves com este provedor; isto protege quem
       // chamar a fábrica sem passar por `loadConfig`.

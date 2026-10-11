@@ -61,6 +61,9 @@ const emailProvider = {
   RESEND_API_KEY: optionalSecretField(16),
   EMAIL_FROM: optionalTextField(3),
   EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+  // Só com EMAIL_PROVIDER=simulated: cada e-mail "enviado" vira um arquivo JSON
+  // nesta pasta, para o E2E ler links de confirmação e redefinição.
+  EMAIL_OUTBOX_DIR: optionalTextField(1),
 };
 
 /** Mesmo princípio de `requireProviderCredentials`: provedor real sem credencial não sobe. */

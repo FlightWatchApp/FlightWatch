@@ -289,7 +289,8 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 │   ├── scheduler/src/
 │   ├── price-worker/src/
 │   ├── alert-worker/src/
-│   └── notification-worker/src/
+│   ├── notification-worker/src/
+│   └── e2e/                      # Playwright: stack completa simulada (`pnpm test:e2e`)
 ├── packages/
 │   ├── domain/ contracts/ database/ queue/
 │   ├── providers/ notifications/ observability/ config/

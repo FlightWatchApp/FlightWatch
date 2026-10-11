@@ -238,7 +238,9 @@ describe('GET /v1/promotions — motor ligado', () => {
     // Os preços que formaram a mediana (gráfico da home): um por data, sem a data da promoção.
     expect(rio.reference.days.length).toBeGreaterThan(0);
     expect(rio.reference.days.length).toBeLessThanOrEqual(rio.reference.pointCount);
-    expect(rio.reference.days.some((day: { date: string }) => day.date === rio.departureDate)).toBe(false);
+    expect(rio.reference.days.some((day: { date: string }) => day.date === rio.departureDate)).toBe(
+      false,
+    );
     expect(Date.parse(rio.observedAt)).toBeLessThanOrEqual(Date.now());
     expect(rio.score).toBeGreaterThan(0);
     expect(rio.purchaseUrl).toMatch(/^https:\/\/booking\.simulated-provider\.flightwatch\.dev\//);

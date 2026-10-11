@@ -19,7 +19,7 @@ afiliado, privacidade, testes de ponta a ponta e o escopo final dos alertas.
 | --- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------- |
 | 1   | Escopo das regras de alerta na interface + fonte da seção "Promoções agora"                 | decisão do owner (D1, D2 abaixo) | D1 feito (SPEC-035); D2 feito (SPEC-032)    |
 | 2   | Listagem de monitoramentos: consulta agregada e paginação                                   | nada                             | feito                                       |
-| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | pendente                                    |
+| 3   | E2E no navegador dos fluxos principais                                                      | nada (Playwright já roda local)  | feito (`pnpm test:e2e`, 8 testes)           |
 | 4   | Domínio, hospedagem, HTTPS e staging separado                                               | escolha de hospedagem pelo owner | pendente                                    |
 | 5   | E-mail real (adapter, recomendado Resend)                                                   | domínio                          | código pronto; falta domínio + conta Resend |
 | 6   | Marker de afiliado, teste de atribuição e revisão dos termos da Travelpayouts               | site no ar                       | pendente                                    |
@@ -61,6 +61,17 @@ Cadastro, confirmação de e-mail, login, busca, criação de monitoramento,
 pausa/reativação, cancelamento, recuperação de senha, clique de compra e
 recebimento de alerta. Os testes visuais (overflow, tamanho de texto e
 controles, console, 320/390/1440 px, movimento reduzido) já passam.
+
+**Feito em 2026-10-11** (`apps/e2e`, `pnpm test:e2e`): sobe API, scheduler,
+workers e web de verdade, com banco (`flight_watch_e2e`) e Redis (db 9)
+próprios, provedores simulados e e-mails gravados em arquivo
+(`EMAIL_OUTBOX_DIR`, só com `EMAIL_PROVIDER=simulated`). Cobre cadastro e
+confirmação de e-mail, saída/entrada, busca, criação, pausa, reativação e
+encerramento do monitoramento, recuperação de senha, exclusão de conta,
+alerta por e-mail, clique de compra e promoções por origem. O primeiro
+resultado foi um bug real: **Pausar/Reativar/Encerrar falhavam** porque o web
+mandava `content-type: application/json` sem corpo e o Fastify devolvia 400
+(corrigido em `apps/web/src/lib/api/client.ts`). No CI é o job `e2e`.
 
 ### 4. Ambiente de produção
 

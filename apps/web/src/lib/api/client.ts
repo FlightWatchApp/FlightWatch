@@ -32,7 +32,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      'content-type': 'application/json',
+      // Sem corpo, o Fastify rejeita um content-type JSON (400): só declara quando há corpo.
+      ...(init.body === undefined || init.body === null
+        ? {}
+        : { 'content-type': 'application/json' }),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       // SPEC-025: IP do cliente para o rate limit da API, autenticado pelo
       // segredo interno.
