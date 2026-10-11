@@ -126,9 +126,10 @@
 
 .priceRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
 }
 
 .label {
@@ -196,6 +197,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
@@ -224,4 +226,61 @@
   .plane {
     display: none;
   }
+}
+
+/* SPEC-032: cartão com promoção real. */
+.routeNames {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.age {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.aging {
+  color: var(--color-warning-soft-text);
+  font-weight: 600;
+}
+
+/* Mediana de referência: a base do "X% abaixo das datas próximas". */
+.referenceLine {
+  stroke: var(--color-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+.chartCaption {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.watchButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actions form {
+  display: contents;
+}
+
+.routeLink {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-action);
 }

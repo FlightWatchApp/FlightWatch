@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { HeroLiveCard } from './hero-live-card';
+import type { HeroPromotion } from './hero-promotion';
 import styles from './hero-illustration.module.css';
 
 export interface ExampleDeal {
@@ -14,18 +16,18 @@ export interface ExampleDeal {
 
 /**
  * CP-14: não é dado real, por isso toda entrada é rotulada "Exemplo" de forma
- * visível (não só no `aria-label`). Dois exemplos ilustram os dois tipos de
- * promoção que o sistema realmente calcula (`HISTORICAL_LOW` e
- * `PERCENTAGE_BELOW_REFERENCE`, packages/domain/src/deal/deal-classification.ts)
- * — nenhum dos dois é puxado da API; os números são fixos.
+ * visível (não só no `aria-label`). Aparece quando a pessoa ainda não
+ * escolheu a origem (ou o feed falhou) e nas telas de conta. Os textos seguem
+ * o que a SPEC-032 calcula — "abaixo das datas próximas", nunca histórico —
+ * e o gráfico é "preço por data" com a mediana tracejada, como no cartão real.
  */
 const EXAMPLES: ExampleDeal[] = [
   {
     origin: 'GRU',
     destination: 'MIA',
     price: 'R$ 1.212,00',
-    dropLabel: '↘ 18% em 14 dias',
-    badge: 'Menor preço já observado',
+    dropLabel: '↓ 18% abaixo das datas próximas',
+    badge: 'Promoção identificada',
     points: [
       [0, 52],
       [34, 44],
@@ -42,8 +44,8 @@ const EXAMPLES: ExampleDeal[] = [
     origin: 'GRU',
     destination: 'JFK',
     price: 'R$ 2.030,00',
-    dropLabel: '↘ 21% abaixo da média',
-    badge: 'Abaixo da média observada',
+    dropLabel: '↓ 21% abaixo das datas próximas',
+    badge: 'Promoção identificada',
     points: [
       [0, 30],
       [34, 48],
@@ -63,18 +65,31 @@ const EXAMPLES: ExampleDeal[] = [
 // movimento reduzido (MO-01): só o primeiro exemplo fica visível, parado.
 const CYCLE_MS = 5000;
 
-export function HeroIllustration() {
+export interface HeroIllustrationProps {
+  /** SPEC-032: promoção real da origem da pessoa; sem ela, os exemplos. */
+  live?: HeroPromotion | null;
+}
+
+export function HeroIllustration({ live = null }: HeroIllustrationProps) {
   const [frontIndex, setFrontIndex] = useState(0);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (live || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       return;
     }
     const id = window.setInterval(() => {
       setFrontIndex((index) => (index + 1) % EXAMPLES.length);
     }, CYCLE_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [live]);
+
+  if (live) {
+    return (
+      <figure className={styles.figure}>
+        <HeroLiveCard live={live} />
+      </figure>
+    );
+  }
 
   return (
     <figure className={styles.figure} aria-label="Exemplos de promoções identificadas pelo sistema">
@@ -127,7 +142,7 @@ function DealSlot({ deal, front }: { deal: ExampleDeal; front: boolean }) {
 
         <div className={styles.priceRow}>
           <div>
-            <span className={styles.label}>Preço observado agora</span>
+            <span className={styles.label}>Menor preço observado</span>
             <span className={styles.price}>{deal.price}</span>
           </div>
           <span className={styles.drop}>{deal.dropLabel}</span>
@@ -141,6 +156,7 @@ function DealSlot({ deal, front }: { deal: ExampleDeal; front: boolean }) {
             </linearGradient>
           </defs>
           <path d={area} fill={`url(#${gradientId})`} className={styles.area} />
+          <line x1="0" x2="272" y1="62" y2="62" className={styles.referenceLine} />
           <path d={line} pathLength={1} className={styles.line} />
           <circle cx={last[0]} cy={last[1]} r="6" className={styles.lastPoint} />
           <circle cx={last[0]} cy={last[1]} r="6" className={styles.lastRing} />

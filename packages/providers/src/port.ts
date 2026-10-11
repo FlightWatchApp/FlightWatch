@@ -45,6 +45,26 @@ export interface CalendarDay {
   observedAt: string;
 }
 
+/** SPEC-032: o mais barato por destino a partir de uma origem (candidatos a promoção). */
+export interface CheapestByDestinationQuery {
+  /** Código de cidade (SPEC-029). */
+  originIata: string;
+  tripType: 'ONE_WAY' | 'ROUND_TRIP';
+  currency: string;
+  market: string;
+}
+
+export interface DestinationFare {
+  destinationIata: string;
+  /** AAAA-MM-DD */
+  departureDate: string;
+  returnDate: string | null;
+  amountMinor: number;
+  stops: number;
+  /** Hora em que a fonte viu o preço (SPEC-030), nunca no futuro. */
+  observedAt: string;
+}
+
 export interface FlightProvider {
   readonly strategy: string;
   search(query: FlightSearchQuery, context: ProviderContext): Promise<ProviderSearchResult>;
@@ -52,4 +72,6 @@ export interface FlightProvider {
   priceCalendar?(query: PriceCalendarQuery): Promise<CalendarDay[]>;
   /** SPEC-031 (opcional): busca completa no site parceiro ("ver todos os voos"). */
   allFlightsUrl?(query: FlightSearchQuery): string;
+  /** SPEC-032 (opcional): um preço por destino; sem a capacidade, o feed fica vazio. */
+  cheapestByDestination?(query: CheapestByDestinationQuery): Promise<DestinationFare[]>;
 }

@@ -198,6 +198,25 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
       FLIGHT_PROVIDER_TIMEOUT_MS: 10_000,
       EMAIL_PROVIDER_TIMEOUT_MS: 10_000,
+      // SPEC-032: chaves novas, com os padrões da spec.
+      REDIS_URL: 'redis://localhost:6379',
+      PROMOTION_ENGINE_ENABLED: false,
+      PROMOTION_CANDIDATES_PER_ORIGIN: 10,
+      PROMOTION_MIN_REFERENCE_POINTS: 8,
+      PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS: 1500,
+      PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS: 2000,
+      PROMOTION_SUSPECT_DISCOUNT_BPS: 7000,
+      PROMOTION_SAVING_SCORE_CAP_MINOR: 100_000,
+      PROMOTION_FEED_CACHE_TTL_MINUTES: 360,
+      PRICE_CALENDAR_CACHE_TTL_MINUTES: 360,
+      PROMOTION_DAILY_CALL_BUDGET: 2000,
+      ROUTE_PAGE_ENABLED: false,
+      ROUTE_PAGE_DAILY_CALL_BUDGET: 1000,
+      ROUTE_PAGE_CACHE_TTL_MINUTES: 30,
+      ROUTE_PAGE_MONTHS: 3,
+      ROUTE_PAGE_RATE_LIMIT_MAX: 60,
+      ROUTE_SITEMAP_ORIGIN_CITIES: [],
+      ROUTE_SITEMAP_TTL_MINUTES: 360,
     });
   });
 
@@ -361,5 +380,51 @@ describe('SPEC-030 AC-8 — provedor Travelpayouts', () => {
     };
     expect(loadConfig(priceWorkerConfig, env).FLIGHT_PROVIDER).toBe('travelpayouts');
     expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual(['EMAIL_PROVIDER']);
+  });
+});
+
+describe('SPEC-032 — motor de promoções na API', () => {
+  it('desligado por padrão, com os valores iniciais da spec e Redis local', () => {
+    const config = loadConfig(apiConfig, {});
+    expect(config).toMatchObject({
+      REDIS_URL: 'redis://localhost:6379',
+      PROMOTION_ENGINE_ENABLED: false,
+      PROMOTION_CANDIDATES_PER_ORIGIN: 10,
+      PROMOTION_MIN_REFERENCE_POINTS: 8,
+      PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS: 1500,
+      PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS: 2000,
+      PROMOTION_SUSPECT_DISCOUNT_BPS: 7000,
+      PROMOTION_SAVING_SCORE_CAP_MINOR: 100_000,
+      PROMOTION_FEED_CACHE_TTL_MINUTES: 360,
+      PRICE_CALENDAR_CACHE_TTL_MINUTES: 360,
+      PROMOTION_DAILY_CALL_BUDGET: 2000,
+    });
+  });
+
+  it('liga com "true" e recusa outro texto', () => {
+    expect(
+      loadConfig(apiConfig, { PROMOTION_ENGINE_ENABLED: 'true' }).PROMOTION_ENGINE_ENABLED,
+    ).toBe(true);
+    const error = configErrorOf(() => loadConfig(apiConfig, { PROMOTION_ENGINE_ENABLED: 'sim' }));
+    expect(keysOf(error)).toEqual(['PROMOTION_ENGINE_ENABLED']);
+  });
+
+  it('desconto em pontos-base fica entre 1 e 10000', () => {
+    const error = configErrorOf(() =>
+      loadConfig(apiConfig, { PROMOTION_SUSPECT_DISCOUNT_BPS: '10001' }),
+    );
+    expect(keysOf(error)).toEqual(['PROMOTION_SUSPECT_DISCOUNT_BPS']);
+  });
+
+  it('em produção a API exige REDIS_URL', () => {
+    const error = configErrorOf(() =>
+      loadConfig(apiConfig, {
+        ...PRODUCTION_BASE,
+        REDIS_URL: undefined,
+        FLIGHT_PROVIDER: 'travelpayouts',
+        TRAVELPAYOUTS_TOKEN: 'token-de-producao-0123456789',
+      }),
+    );
+    expect(keysOf(error)).toContain('REDIS_URL');
   });
 });

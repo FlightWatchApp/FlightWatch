@@ -6,6 +6,8 @@ import buttonStyles from '@/components/ui/button.module.css';
 import { IconBell, IconExternalLink, IconSearch, IconShield } from '@/components/ui/icon';
 import type { OpportunityItem } from '@/lib/api/types';
 import { HeroIllustration } from './hero-illustration';
+import { HeroOriginPicker } from './hero-origin-picker';
+import type { HeroPromotion } from './hero-promotion';
 import styles from './landing.module.css';
 
 const primaryLg = [buttonStyles.button, buttonStyles.primary, buttonStyles.lg].join(' ');
@@ -15,6 +17,10 @@ const delay = (ms: number) => ({ '--reveal-delay': `${ms}ms` }) as CSSProperties
 
 export interface LandingProps {
   opportunities: OpportunityItem[];
+  /** SPEC-032: promoção real do cartão do topo; null mostra o exemplo. */
+  heroPromotion?: HeroPromotion | null;
+  /** Há cidade escolhida (cookie), mesmo que sem promoção agora. */
+  heroOriginChosen?: boolean;
 }
 
 /**
@@ -23,7 +29,11 @@ export interface LandingProps {
  * página não decide isso, só mostra o estado vazio quando a lista é []
  * (falha ou ausência de dado são o mesmo estado aqui, de propósito).
  */
-export function Landing({ opportunities }: LandingProps) {
+export function Landing({
+  opportunities,
+  heroPromotion = null,
+  heroOriginChosen = false,
+}: LandingProps) {
   const featured = opportunities.slice(0, 3);
 
   return (
@@ -34,8 +44,8 @@ export function Landing({ opportunities }: LandingProps) {
             <p className={styles.eyebrow}>Monitoramento de passagens aéreas</p>
             <h1 className={styles.heroTitle}>Passagens observadas de perto.</h1>
             <p className={styles.heroLead}>
-              O Flight Watch acompanha o preço das rotas, aponta as promoções de verdade com base no
-              histórico e leva você direto ao site parceiro para comprar.
+              O Flight Watch acompanha o preço das rotas, aponta as promoções comparando cada preço
+              com as outras datas da mesma rota e leva você direto ao site parceiro para comprar.
             </p>
             <div className={styles.heroActions}>
               <Link href="/opportunities" className={primaryLg}>
@@ -51,7 +61,17 @@ export function Landing({ opportunities }: LandingProps) {
             </p>
           </div>
           <div className={styles.heroArt}>
-            <HeroIllustration />
+            <HeroIllustration live={heroPromotion} />
+            <HeroOriginPicker
+              key={heroPromotion?.origin ?? 'none'}
+              origin={
+                heroPromotion
+                  ? { code: heroPromotion.origin, name: heroPromotion.originName }
+                  : null
+              }
+              noPromotion={heroOriginChosen && !heroPromotion}
+            />
+            {heroPromotion?.promotion.purchaseUrl && <PurchaseNote />}
           </div>
         </div>
       </section>

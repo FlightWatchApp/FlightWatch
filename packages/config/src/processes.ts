@@ -1,4 +1,5 @@
 import {
+  booleanField,
   durationMsField,
   enumField,
   hostField,
@@ -8,6 +9,7 @@ import {
   portField,
   secretField,
   urlField,
+  iataListField,
 } from './fields.js';
 
 /**
@@ -77,6 +79,38 @@ function requireEmailCredentials(values: {
       : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
   ];
 }
+const basisPoints = (defaultBps: number) => intField({ min: 1, max: 10_000, default: defaultBps });
+const cacheMinutes = (defaultMinutes: number) =>
+  intField({ min: 1, max: 7 * 24 * 60, default: defaultMinutes });
+
+/** SPEC-032: motor de promoções (desligado por padrão) e caches na API. */
+const promotions = {
+  PROMOTION_ENGINE_ENABLED: booleanField(false),
+  PROMOTION_CANDIDATES_PER_ORIGIN: intField({ min: 1, max: 50, default: 10 }),
+  PROMOTION_MIN_REFERENCE_POINTS: intField({ min: 1, max: 100, default: 8 }),
+  PROMOTION_MIN_DOMESTIC_DISCOUNT_BPS: basisPoints(1500),
+  PROMOTION_MIN_INTERNATIONAL_DISCOUNT_BPS: basisPoints(2000),
+  PROMOTION_SUSPECT_DISCOUNT_BPS: basisPoints(7000),
+  PROMOTION_SAVING_SCORE_CAP_MINOR: intField({ min: 1, max: 100_000_000, default: 100_000 }),
+  PROMOTION_FEED_CACHE_TTL_MINUTES: cacheMinutes(360),
+  PRICE_CALENDAR_CACHE_TTL_MINUTES: cacheMinutes(360),
+  PROMOTION_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 2000 }),
+};
+
+/** SPEC-033: página da rota (desligada por padrão), com orçamento próprio para robôs de busca. */
+const routePage = {
+  ROUTE_PAGE_ENABLED: booleanField(false),
+  ROUTE_PAGE_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 1000 }),
+  ROUTE_PAGE_CACHE_TTL_MINUTES: cacheMinutes(30),
+  ROUTE_PAGE_MONTHS: intField({ min: 1, max: 6, default: 3 }),
+  // Por IP, na mesma janela de RATE_LIMIT_WINDOW_MS. Mais folgado que a busca: o que protege a
+  // cota da fonte aqui é o orçamento diário e o cache, e uma visita pré-carrega links.
+  ROUTE_PAGE_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 60 }),
+  // Cidades de origem do sitemap; vazio = nenhuma rota no sitemap (antes do domínio próprio).
+  ROUTE_SITEMAP_ORIGIN_CITIES: iataListField(),
+  ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
+};
+
 
 export const apiConfig = {
   service: 'api',
@@ -84,9 +118,13 @@ export const apiConfig = {
     PORT: portField(3000),
     ...metrics(9100),
     ...database,
+    // SPEC-032: cache reconstruível das promoções e do calendário.
+    ...redis,
     ...webBaseUrl,
     ...flightProvider,
     ...emailProvider,
+    ...promotions,
+    ...routePage,
     RATE_LIMIT_WINDOW_MS: durationMsField(60_000),
     RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 10 }),
     // SPEC-025: rotas de autenticação, por rota e por IP do cliente.
@@ -96,6 +134,7 @@ export const apiConfig = {
   },
   localDefaults: {
     DATABASE_URL: LOCAL_DATABASE_URL,
+    REDIS_URL: LOCAL_REDIS_URL,
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
