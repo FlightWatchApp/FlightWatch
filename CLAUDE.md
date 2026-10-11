@@ -683,8 +683,8 @@ Regras transversais:
 - rate limit por IP do **cliente**: a API só vê o IP do web (BFF), então o web
   repassa `x-fw-client-ip` autenticado por `INTERNAL_API_SECRET` (SPEC-025).
   Throttlers `default` (busca) e `auth` (rotas públicas de autenticação), com
-  storage em memória, por processo — não escala sob múltiplas réplicas sem
-  storage compartilhado;
+  storage no Redis, compartilhado entre réplicas (`RedisThrottlerStorage`);
+  com o Redis fora, cada processo conta em memória até ele voltar;
 - a API usa `REDIS_URL` desde a SPEC-032 (cache de promoções e do calendário,
   orçamento diário do feed); Redis fora é falta de cache, nunca erro. Os e2e
   da API apontam para `redis://127.0.0.1:1` e usam `MemoryKeyValueStore`;

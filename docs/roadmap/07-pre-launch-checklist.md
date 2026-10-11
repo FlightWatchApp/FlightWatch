@@ -106,9 +106,9 @@ visual; rodada completa e limpa de format, lint, typecheck, todos os testes
 - **Limite de requisições do cartão da página inicial:** **resolvido em
   2026-10-11** — `/v1/promotions` devolve `reference.days` e a home gasta 1
   requisição (antes 4). A busca continua em 10/min por IP.
-- **Rate limit em memória por processo:** com mais de uma réplica da API,
-  cada uma conta separado — mover o storage do throttler para o Redis antes
-  de escalar.
+- **Rate limit em memória por processo:** **resolvido em 2026-10-11** —
+  o storage do throttler é o Redis (`RedisThrottlerStorage`), compartilhado
+  entre réplicas; Redis fora volta a contar em memória por processo.
 - **Token da Travelpayouts:** trocar (o atual passou por uma conversa).
 - **Tempo de voo estimado (SPEC-033):** calibrar a fórmula com rotas reais
   (SAO → DOU dá 1 h 35; a FlightConnections informa 1 h 50).
