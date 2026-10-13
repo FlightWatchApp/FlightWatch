@@ -19,7 +19,7 @@
     "@flight-watch/observability": "workspace:*",
     "@flight-watch/providers": "workspace:*",
     "@flight-watch/queue": "workspace:*",
-    "bullmq": "^5.28.1"
+    "bullmq": "^6.3.12"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
