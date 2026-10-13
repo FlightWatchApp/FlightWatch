@@ -1,0 +1,26 @@
+# Atualizações automáticas de dependências (PRs semanais). Patch e minor
+# chegam agrupados num PR só; major vem separado, para revisar com calma.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Campo_Grande
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Campo_Grande
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

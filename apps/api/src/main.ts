@@ -6,6 +6,7 @@ import { ConfigError, apiConfig, loadConfig } from '@flight-watch/config';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
 import { AppModule } from './app.module.js';
 import { registerCorrelationHook } from './observability/correlation.js';
+import { registerSecurityHeaders } from './security-headers.js';
 import { MetricsService } from './observability/metrics.service.js';
 
 async function closeMetricsServer(server: Server | undefined): Promise<void> {
@@ -25,6 +26,7 @@ async function bootstrap(): Promise<void> {
   let metricsServer: Server | undefined;
 
   registerCorrelationHook(app);
+  registerSecurityHeaders(app);
 
   // ADR-007 (revisado): /metrics numa porta dedicada isolada, não na porta
   // pública do tráfego real — mesma postura dos workers, corrigindo a
