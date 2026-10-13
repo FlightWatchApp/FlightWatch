@@ -75,18 +75,50 @@ describe('createResendEmailSender', () => {
     },
   );
 
-  it.each([400, 401, 403, 422])(
-    'classifica %i como PERMANENT_BOUNCE (não retentável)',
-    async (status) => {
-      const error = await errorOf(
-        senderWith((async () => jsonResponse(status, { message: 'invalid' })) as typeof fetch).send(
-          message,
-        ),
-      );
-      expect(error.errorClass).toBe('PERMANENT_BOUNCE');
-      expect(error.retryable).toBe(false);
-    },
-  );
+  // SPEC-036: 401/403 é configuração nossa (chave, domínio não verificado, modo de
+  // teste) — retenta, para não perder o alerta enquanto alguém corrige.
+  it.each([
+    [401, 'missing_api_key'],
+    [403, 'validation_error'],
+    [403, 'suspended_api_key'],
+  ])('classifica %i %s como PROVIDER_CONFIGURATION (retentável)', async (status, name) => {
+    const error = await errorOf(
+      senderWith((async () => jsonResponse(status, { name })) as typeof fetch).send(message),
+    );
+    expect(error.errorClass).toBe('PROVIDER_CONFIGURATION');
+    expect(error.retryable).toBe(true);
+  });
+
+  it.each([400, 422])('classifica %i como REJECTED (não retentável)', async (status) => {
+    const error = await errorOf(
+      senderWith((async () => jsonResponse(status, { message: 'invalid' })) as typeof fetch).send(
+        message,
+      ),
+    );
+    expect(error.errorClass).toBe('REJECTED');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('409 com a mesma chave e outro corpo é REJECTED (repetir não resolve)', async () => {
+    const error = await errorOf(
+      senderWith((async () =>
+        jsonResponse(409, { name: 'invalid_idempotent_request' })) as typeof fetch).send(message),
+    );
+    expect(error.errorClass).toBe('REJECTED');
+  });
+
+  it('chave de idempotência acima de 256 caracteres vira SHA-256 estável', async () => {
+    const keys: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      keys.push(new Headers(init?.headers).get('idempotency-key') ?? '');
+      return jsonResponse(200, { id: 'x' });
+    }) as typeof fetch;
+    const long = { ...message, idempotencyKey: 'k'.repeat(300) };
+    await senderWith(fetchImpl).send(long);
+    await senderWith(fetchImpl).send(long);
+    expect(keys[0]).toMatch(/^[0-9a-f]{64}$/);
+    expect(keys[1]).toBe(keys[0]);
+  });
 
   it('trata 409 (idempotência em andamento) como temporário', async () => {
     const error = await errorOf(
