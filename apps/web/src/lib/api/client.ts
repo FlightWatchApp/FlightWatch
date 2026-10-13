@@ -1,5 +1,6 @@
 import { headers as requestHeaders } from 'next/headers';
 import { readSessionToken } from '@/lib/auth/session';
+import { contentTypeFor } from './content-type';
 import { clientIpFrom, internalApiHeaders, resolveInternalApiSecret } from './internal-headers';
 
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
@@ -32,7 +33,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      'content-type': 'application/json',
+      ...contentTypeFor(init),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       // SPEC-025: IP do cliente para o rate limit da API, autenticado pelo
       // segredo interno.
