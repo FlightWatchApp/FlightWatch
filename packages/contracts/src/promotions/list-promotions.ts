@@ -72,3 +72,32 @@ export const listPromotionsResponseSchema = z.object({
 
 export type ListPromotionsResponse = z.infer<typeof listPromotionsResponseSchema>;
 export type PromotionFeedStatus = ListPromotionsResponse['status'];
+
+/**
+ * SPEC-034: `GET /v1/promotions/highlights` — vitrine com as melhores
+ * promoções das cidades configuradas, só do cache; cada item diz a origem.
+ */
+export const PROMOTION_HIGHLIGHTS_MAX_LIMIT = 30;
+
+export const listPromotionHighlightsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(PROMOTION_HIGHLIGHTS_MAX_LIMIT).default(12),
+  })
+  .strict();
+
+export type ListPromotionHighlightsQuery = z.infer<typeof listPromotionHighlightsQuerySchema>;
+
+export const promotionHighlightSchema = promotionItemSchema.extend({
+  origin: z.string(),
+  originName: z.string(),
+});
+
+export type PromotionHighlight = z.infer<typeof promotionHighlightSchema>;
+
+export const listPromotionHighlightsResponseSchema = z.object({
+  status: z.enum(['OK', 'DISABLED']),
+  generatedAt: z.string(),
+  promotions: z.array(promotionHighlightSchema),
+});
+
+export type ListPromotionHighlightsResponse = z.infer<typeof listPromotionHighlightsResponseSchema>;

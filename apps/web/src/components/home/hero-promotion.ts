@@ -1,5 +1,5 @@
-import type { PromotionItem } from '@flight-watch/contracts';
-import { listPromotions } from '@/lib/api/promotions';
+import type { PromotionHighlight, PromotionItem } from '@flight-watch/contracts';
+import { listPromotionHighlights, listPromotions } from '@/lib/api/promotions';
 import type { PriceChartDay } from '@/lib/domain/price-chart';
 import { routePagesEnabled } from '@/lib/domain/route-flag';
 import { routePath } from '@/lib/domain/route-url';
@@ -51,21 +51,42 @@ export async function loadHomePromotions(origin: string | null): Promise<HomePro
   }
   const [promotion, ...more] = feed.promotions;
   if (feed.status !== 'OK' || !promotion) return null;
+  return { hero: heroFrom(feed.origin, feed.originName, promotion), more };
+}
 
+/** Cartão do topo para uma promoção (de uma origem escolhida ou da vitrine). */
+export function heroFrom(
+  origin: string,
+  originName: string,
+  promotion: PromotionItem,
+): HeroPromotion {
   return {
-    hero: {
-      origin: feed.origin,
-      originName: feed.originName,
-      promotion,
-      days: chartDays(promotion),
-      renderedAt: new Date().toISOString(),
-      routeHref: routePagesEnabled()
-        ? routePath(
-            { code: feed.origin, name: feed.originName },
-            { code: promotion.destination, name: promotion.destinationName },
-          )
-        : null,
-    },
-    more,
+    origin,
+    originName,
+    promotion,
+    days: chartDays(promotion),
+    renderedAt: new Date().toISOString(),
+    routeHref: routePagesEnabled()
+      ? routePath(
+          { code: origin, name: originName },
+          { code: promotion.destination, name: promotion.destinationName },
+        )
+      : null,
   };
+}
+
+/** Quantas promoções a vitrine pede (o cartão do topo pode usar a primeira). */
+const SHOWCASE_LIMIT = 9;
+
+/**
+ * SPEC-034: vitrine das cidades mais usadas do Brasil, cada promoção com a
+ * sua origem. Qualquer falha devolve []: a página inicial nunca quebra.
+ */
+export async function loadShowcase(): Promise<PromotionHighlight[]> {
+  try {
+    const response = await listPromotionHighlights(SHOWCASE_LIMIT);
+    return response.status === 'OK' ? response.promotions : [];
+  } catch {
+    return [];
+  }
 }

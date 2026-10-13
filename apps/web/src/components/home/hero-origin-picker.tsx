@@ -15,10 +15,13 @@ import styles from './landing.module.css';
 export function HeroOriginPicker({
   origin,
   noPromotion,
+  suggested = false,
 }: {
   origin: SelectedPlace | null;
   /** Cidade escolhida, mas sem promoção saindo dela agora (ou feed fora). */
   noPromotion: boolean;
+  /** SPEC-034: a cidade veio do acesso (não foi escolhida nem gravada). */
+  suggested?: boolean;
 }) {
   const [value, setValue] = useState<SelectedPlace | null>(origin);
   const [isPending, startTransition] = useTransition();
@@ -30,11 +33,15 @@ export function HeroOriginPicker({
     }
   }
 
-  const hint = noPromotion
-    ? 'Nenhuma promoção saindo da sua cidade agora; o cartão mostra um exemplo.'
-    : origin
-      ? 'Troque a cidade para ver as promoções saindo de outro lugar.'
-      : 'Escolha de onde você sai para ver promoções reais no cartão.';
+  const hint = suggested
+    ? noPromotion
+      ? 'Sugerida pelo seu acesso, mas sem promoção saindo dela agora. Troque se quiser.'
+      : 'Sugerida pelo seu acesso — troque se quiser.'
+    : noPromotion
+      ? 'Nenhuma promoção saindo da sua cidade agora; o cartão mostra um exemplo.'
+      : origin
+        ? 'Troque a cidade para ver as promoções saindo de outro lugar.'
+        : 'Escolha de onde você sai para ver as promoções a partir da sua cidade.';
 
   return (
     <div className={styles.heroPicker} aria-busy={isPending}>

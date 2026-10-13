@@ -98,6 +98,9 @@ const promotions = {
   PROMOTION_FEED_CACHE_TTL_MINUTES: cacheMinutes(360),
   PRICE_CALENDAR_CACHE_TTL_MINUTES: cacheMinutes(360),
   PROMOTION_DAILY_CALL_BUDGET: intField({ min: 0, max: 1_000_000, default: 2000 }),
+  // SPEC-034: cidades da vitrine (vazia = vitrine desligada) e intervalo do aquecimento.
+  PROMOTION_SHOWCASE_ORIGIN_CITIES: iataListField(),
+  PROMOTION_SHOWCASE_REFRESH_MINUTES: cacheMinutes(180),
 };
 
 /** SPEC-033: página da rota (desligada por padrão), com orçamento próprio para robôs de busca. */
