@@ -78,29 +78,6 @@ export function iataListField() {
     });
 }
 
-/**
- * Remetente de e-mail opcional: "nome@dominio" ou "Nome <nome@dominio>".
- * Obrigatoriedade vem das regras do processo (SPEC-035).
- */
-export function emailFromField() {
-  return z
-    .string()
-    .optional()
-    .transform((raw, ctx) => {
-      if (raw === undefined || raw.trim() === '') return undefined;
-      const value = raw.trim();
-      const address = /^[^<>]*<([^<>]+)>$/.exec(value)?.[1] ?? value;
-      if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'deve ser "nome@dominio" ou "Nome <nome@dominio>"',
-        });
-        return z.NEVER;
-      }
-      return value;
-    });
-}
-
 export function portField(defaultPort?: number) {
   return intField({ min: 1, max: 65_535, default: defaultPort });
 }
@@ -177,6 +154,23 @@ export function secretField(minLength: number) {
 
 /** Segredo opcional; quando informado, mesmo tamanho mínimo (e nunca ecoado). */
 export function optionalSecretField(minLength: number) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw !== undefined && raw.length < minLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `deve ter pelo menos ${minLength} caracteres`,
+        });
+        return z.NEVER;
+      }
+      return raw;
+    });
+}
+
+/** Texto livre opcional (ex.: remetente de e-mail); tamanho mínimo quando informado. */
+export function optionalTextField(minLength: number) {
   return z
     .string()
     .optional()

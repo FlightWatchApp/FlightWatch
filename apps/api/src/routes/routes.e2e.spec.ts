@@ -480,3 +480,31 @@ describe('GET /v1/routes — página desligada (padrão)', () => {
     expect(provider.calendarCalls).toHaveLength(0);
   });
 });
+
+describe('GET /v1/routes/.../facts — só catálogo (SPEC-033 fatia 5)', () => {
+  function facts(app: NestFastifyApplication, origin: string, destination: string) {
+    return request(app.getHttpServer())
+      .get(`/v1/routes/${origin}/${destination}/facts`)
+      .set(freshClient());
+  }
+
+  it('devolve lugares, distância e tempo estimado sem consultar a fonte, mesmo com a página desligada', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp({}, provider, new MemoryKeyValueStore());
+    const response = await facts(app, 'gru', 'dou');
+    expect(response.status).toBe(200);
+    expect(response.body.origin.code).toBe('SAO');
+    expect(response.body.destination.code).toBe('DOU');
+    expect(response.body.distanceKm).toBeGreaterThan(0);
+    expect(response.body.estimatedDirectFlightMinutes).toBeGreaterThan(0);
+    expect(response.body.prices).toBeUndefined();
+    expect(provider.calendarCalls).toHaveLength(0);
+  });
+
+  it('cidade igual ou desconhecida → 404; código inválido → 400', async () => {
+    const app = await buildApp({}, new CountingProvider(), new MemoryKeyValueStore());
+    expect((await facts(app, 'SAO', 'GRU')).status).toBe(404);
+    expect((await facts(app, 'SAO', 'ZZZ')).status).toBe(404);
+    expect((await facts(app, 'SAO', '1')).status).toBe(400);
+  });
+});

@@ -198,7 +198,7 @@ export async function processNotificationJob(
       }
     });
     recordDelivery(deliveryError.retryable ? 'retryable_failure' : 'permanent_failure');
-    // SPEC-035: erro de configuração do provedor (chave, domínio) é nosso, não do
+    // SPEC-036: erro de configuração do provedor (chave, domínio) é nosso, não do
     // destinatário — evento próprio para alguém olhar. Sem e-mail no log.
     logEvent({
       event:

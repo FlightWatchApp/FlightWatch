@@ -70,3 +70,7 @@ Desktop.ini
 # (os relatórios .md dos evals são versionados; as imagens são reproduzíveis)
 *.zip
 docs/design-refactor/**/*.png
+
+# E2E (apps/e2e)
+apps/e2e/.mailbox/
+apps/e2e/test-results/

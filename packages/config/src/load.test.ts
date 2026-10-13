@@ -68,6 +68,43 @@ describe('SPEC-024 AC-1 — valor inválido impede o startup', () => {
   });
 });
 
+describe('E-mail real (checklist pré-lançamento #5) — EMAIL_PROVIDER=resend', () => {
+  const RESEND = { ...PRODUCTION_BASE, EMAIL_PROVIDER: 'resend' };
+
+  it('exige RESEND_API_KEY e EMAIL_FROM', () => {
+    const error = configErrorOf(() => loadConfig(notificationWorkerConfig, RESEND));
+    expect(keysOf(error).sort()).toEqual(['EMAIL_FROM', 'RESEND_API_KEY']);
+  });
+
+  it('exige as mesmas chaves na API, que também envia e-mail', () => {
+    const keys = keysOf(configErrorOf(() => loadConfig(apiConfig, RESEND)));
+    expect(keys).toContain('RESEND_API_KEY');
+    expect(keys).toContain('EMAIL_FROM');
+  });
+
+  it('é aceito em produção com credenciais, sem ecoar o valor da chave', () => {
+    const config = loadConfig(notificationWorkerConfig, {
+      ...RESEND,
+      RESEND_API_KEY: 're_0123456789abcdef',
+      EMAIL_FROM: 'Flight Watch <alertas@exemplo.com.br>',
+    });
+    expect(config.EMAIL_PROVIDER).toBe('resend');
+    expect(config.EMAIL_FROM).toBe('Flight Watch <alertas@exemplo.com.br>');
+  });
+
+  it('rejeita chave curta demais sem revelar o valor', () => {
+    const error = configErrorOf(() =>
+      loadConfig(notificationWorkerConfig, {
+        ...RESEND,
+        RESEND_API_KEY: 'curta',
+        EMAIL_FROM: 'a@b.com',
+      }),
+    );
+    expect(keysOf(error)).toEqual(['RESEND_API_KEY']);
+    expect(error.message).not.toContain('curta');
+  });
+});
+
 describe('SPEC-024 AC-2 — trava de produção para adapters simulados', () => {
   it('rejeita FLIGHT_PROVIDER e EMAIL_PROVIDER simulados em produção', () => {
     const error = configErrorOf(() => loadConfig(apiConfig, { ...PRODUCTION_BASE }));
@@ -160,6 +197,7 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       AUTH_RATE_LIMIT_MAX: 20,
       INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
       FLIGHT_PROVIDER_TIMEOUT_MS: 10_000,
+      EMAIL_PROVIDER_TIMEOUT_MS: 10_000,
       // SPEC-032: chaves novas, com os padrões da spec.
       REDIS_URL: 'redis://localhost:6379',
       PROMOTION_ENGINE_ENABLED: false,
@@ -179,7 +217,6 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       ROUTE_PAGE_RATE_LIMIT_MAX: 60,
       ROUTE_SITEMAP_ORIGIN_CITIES: [],
       ROUTE_SITEMAP_TTL_MINUTES: 360,
-      EMAIL_PROVIDER_TIMEOUT_MS: 10_000,
     });
   });
 
@@ -389,57 +426,5 @@ describe('SPEC-032 — motor de promoções na API', () => {
       }),
     );
     expect(keysOf(error)).toContain('REDIS_URL');
-  });
-});
-
-describe('SPEC-035 AC-1 — e-mail real pelo Resend', () => {
-  const resend = {
-    EMAIL_PROVIDER: 'resend',
-    RESEND_API_KEY: 're_chave_de_teste_0123456789',
-    EMAIL_FROM: 'Flight Watch <onboarding@resend.dev>',
-  };
-
-  it('aceita resend com chave e remetente, na API e no notification-worker', () => {
-    const api = loadConfig(apiConfig, resend);
-    expect(api.EMAIL_PROVIDER).toBe('resend');
-    expect(api.EMAIL_FROM).toBe('Flight Watch <onboarding@resend.dev>');
-    expect(api.EMAIL_PROVIDER_TIMEOUT_MS).toBe(10_000);
-    expect(loadConfig(notificationWorkerConfig, resend).RESEND_API_KEY).toBe(
-      're_chave_de_teste_0123456789',
-    );
-  });
-
-  it('resend sem chave ou sem remetente impede o startup', () => {
-    const env = { EMAIL_PROVIDER: 'resend' };
-    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env))).sort()).toEqual([
-      'EMAIL_FROM',
-      'RESEND_API_KEY',
-    ]);
-    expect(
-      keysOf(
-        configErrorOf(() =>
-          loadConfig(notificationWorkerConfig, { ...env, EMAIL_FROM: resend.EMAIL_FROM }),
-        ),
-      ),
-    ).toEqual(['RESEND_API_KEY']);
-  });
-
-  it('simulated não exige chave nem remetente', () => {
-    expect(loadConfig(notificationWorkerConfig, {}).EMAIL_FROM).toBeUndefined();
-  });
-
-  it('remetente fora do formato é recusado sem ecoar o valor', () => {
-    const error = configErrorOf(() =>
-      loadConfig(apiConfig, { ...resend, EMAIL_FROM: 'Flight Watch sem-endereco' }),
-    );
-    expect(keysOf(error)).toEqual(['EMAIL_FROM']);
-    expect(error.message).not.toContain('sem-endereco');
-  });
-
-  it('aceita o endereço sem nome', () => {
-    expect(
-      loadConfig(apiConfig, { ...resend, EMAIL_FROM: 'avisos@avisos.flightwatch.com.br' })
-        .EMAIL_FROM,
-    ).toBe('avisos@avisos.flightwatch.com.br');
   });
 });

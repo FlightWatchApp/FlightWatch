@@ -3,14 +3,14 @@ export type EmailDeliveryErrorClass =
   | 'RATE_LIMITED'
   | 'TEMPORARY_UNAVAILABLE'
   | 'PERMANENT_BOUNCE'
-  // SPEC-035: o provedor recusou por configuração nossa (chave, domínio não
+  // SPEC-036: o provedor recusou por configuração nossa (chave, domínio não
   // verificado, modo de teste) — não é culpa do destinatário.
   | 'PROVIDER_CONFIGURATION'
-  // SPEC-035: o provedor recusou o pedido em si; repetir não resolve.
+  // SPEC-036: o provedor recusou o pedido em si; repetir não resolve.
   | 'REJECTED';
 
 // SPEC-006 §7: só timeout/rate-limit/indisponibilidade temporária são retentáveis.
-// SPEC-035: erro de configuração também retenta — dá tempo de corrigir sem perder o alerta.
+// SPEC-036: erro de configuração também retenta — dá tempo de corrigir sem perder o alerta.
 const RETRYABLE_CLASSES = new Set<EmailDeliveryErrorClass>([
   'TIMEOUT',
   'RATE_LIMITED',

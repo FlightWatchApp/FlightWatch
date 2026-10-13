@@ -1,8 +1,7 @@
 # SPEC-027 — Exclusão de conta pelo próprio usuário
 
-Status: implementada — **política de dados aguardando aprovação do owner**
-(`CLAUDE.md` §21: exclusão de dados e política de retenção exigem aprovação
-humana explícita)
+Status: implementada — **política de dados aprovada pelo owner em 2026-10-11**
+(anonimizar em vez de apagar, conforme "Decisão de política")
 Owner: Identity
 Dependências: SPEC-007, SPEC-008, SPEC-025, SPEC-026, EVAL-NOTIFY-004
 Fase: lançamento — Frente B, bloqueador 5 (parte técnica da LGPD)
@@ -96,7 +95,9 @@ rollback do código só impede novas exclusões.
 ## Evidência de implementação
 
 2026-10-06, branch `feat/account-deletion`. Política de dados implementada
-como proposta acima; **aprovação do owner pendente** antes do merge.
+como proposta acima; **aprovada pelo owner em 2026-10-11**. A política de
+expurgo definitiva (por quanto tempo guardar o dado anonimizado) continua sendo
+tema da Política de Privacidade (checklist, item 7).
 
 - Contrato: `deleteAccountRequestSchema`.
 - API: `POST /v1/auth/delete-account` (`SessionAuthGuard` + rate limit `auth`);

@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import { DealCard } from '@/components/deals/deal-card';
+import type { PromotionItem } from '@flight-watch/contracts';
+import { PromotionCard } from '@/components/promotions/promotion-card';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import buttonStyles from '@/components/ui/button.module.css';
 import { IconBell, IconExternalLink, IconSearch, IconShield } from '@/components/ui/icon';
-import type { OpportunityItem } from '@/lib/api/types';
 import { HeroIllustration } from './hero-illustration';
 import { HeroOriginPicker } from './hero-origin-picker';
 import type { HeroPromotion } from './hero-promotion';
@@ -16,7 +16,8 @@ const secondaryLg = [buttonStyles.button, buttonStyles.secondary, buttonStyles.l
 const delay = (ms: number) => ({ '--reveal-delay': `${ms}ms` }) as CSSProperties;
 
 export interface LandingProps {
-  opportunities: OpportunityItem[];
+  /** SPEC-032: promoções seguintes à do cartão, da mesma origem; [] sem origem ou sem promoção. */
+  morePromotions?: PromotionItem[];
   /** SPEC-032: promoção real do cartão do topo; null mostra o exemplo. */
   heroPromotion?: HeroPromotion | null;
   /** Há cidade escolhida (cookie), mesmo que sem promoção agora. */
@@ -24,17 +25,16 @@ export interface LandingProps {
 }
 
 /**
- * PG-01: início para visitante. `opportunities` já vem resolvido pelo
- * chamador (`app/page.tsx`), que também absorve a falha do feed — esta
- * página não decide isso, só mostra o estado vazio quando a lista é []
- * (falha ou ausência de dado são o mesmo estado aqui, de propósito).
+ * PG-01: início para visitante. As promoções já vêm resolvidas pelo chamador
+ * (`app/page.tsx`), que também absorve a falha do feed; sem origem escolhida
+ * a seção pede a cidade, nunca inventa uma.
  */
 export function Landing({
-  opportunities,
+  morePromotions = [],
   heroPromotion = null,
   heroOriginChosen = false,
 }: LandingProps) {
-  const featured = opportunities.slice(0, 3);
+  const promotions = heroPromotion ? [heroPromotion.promotion, ...morePromotions] : [];
 
   return (
     <>
@@ -87,26 +87,37 @@ export function Landing({
               Promoções agora
             </h2>
             <p className={styles.sectionLead}>
-              Rotas em que o preço observado está no menor valor já visto ou bem abaixo da média.
+              Datas em que o preço observado está bem abaixo das outras datas próximas da mesma
+              rota.
             </p>
           </div>
           <Link href="/opportunities" className={styles.sectionLink}>
             Ver todas →
           </Link>
         </div>
-        {featured.length > 0 ? (
+        {heroPromotion && promotions.length > 0 ? (
           <>
             <div className={styles.dealGrid}>
-              {featured.map((opportunity) => (
-                <DealCard key={opportunity.searchTargetId} opportunity={opportunity} compact />
+              {promotions.slice(0, 3).map((promotion) => (
+                <PromotionCard
+                  key={promotion.destination}
+                  origin={heroPromotion.origin}
+                  originName={heroPromotion.originName}
+                  promotion={promotion}
+                  renderedAt={heroPromotion.renderedAt}
+                />
               ))}
             </div>
             <PurchaseNote />
           </>
+        ) : heroOriginChosen ? (
+          <p className={styles.emptyDeals}>
+            Nenhuma promoção saindo desta cidade neste momento. Escolha outra cidade de origem ou
+            monitore a sua viagem para ser avisado quando o preço cair.
+          </p>
         ) : (
           <p className={styles.emptyDeals}>
-            Nenhuma rota está abaixo do padrão neste momento. O sistema compara cada novo preço com
-            o histórico; volte mais tarde ou monitore a sua viagem.
+            Escolha a cidade de onde você sai, no cartão acima, para ver as promoções a partir dela.
           </p>
         )}
       </section>

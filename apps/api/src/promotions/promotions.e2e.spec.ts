@@ -235,6 +235,12 @@ describe('GET /v1/promotions — motor ligado', () => {
     expect(rio.reference.months).toContain(DEPARTURE.slice(0, 7));
     expect(rio.reference.explanation).toContain('R$ 500 está 50% abaixo da mediana de');
     expect(rio.reference.explanation).toContain('São Paulo → Rio de Janeiro');
+    // Os preços que formaram a mediana (gráfico da home): um por data, sem a data da promoção.
+    expect(rio.reference.days.length).toBeGreaterThan(0);
+    expect(rio.reference.days.length).toBeLessThanOrEqual(rio.reference.pointCount);
+    expect(rio.reference.days.some((day: { date: string }) => day.date === rio.departureDate)).toBe(
+      false,
+    );
     expect(Date.parse(rio.observedAt)).toBeLessThanOrEqual(Date.now());
     expect(rio.score).toBeGreaterThan(0);
     expect(rio.purchaseUrl).toMatch(/^https:\/\/booking\.simulated-provider\.flightwatch\.dev\//);

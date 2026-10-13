@@ -48,6 +48,46 @@ jobs:
       - name: G9 - Build
         run: pnpm build
 
+  # E2E no navegador (apps/e2e): stack completa com provedores simulados, banco e
+  # Redis próprios. O catálogo de lugares é baixado da fonte pública no startup do
+  # scheduler (precisa de rede).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flight_watch
+          POSTGRES_PASSWORD: flight_watch
+          POSTGRES_DB: flight_watch
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U flight_watch" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @flight-watch/e2e exec playwright install --with-deps chromium
+      - name: E2E
+        run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: apps/e2e/test-results
+
   # SPEC-028: garante que o Dockerfile continua construindo. Sem push — a
   # publicação da imagem entra com a escolha da plataforma.
   docker:

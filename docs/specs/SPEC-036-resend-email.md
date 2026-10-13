@@ -1,4 +1,4 @@
-# SPEC-035 — E-mail real pelo Resend
+# SPEC-036 — E-mail real pelo Resend
 
 Status: approved (owner, 2026-10-13) — passo 4 do `MVP-CHECKLIST.md`
 Owner: Notifications
@@ -6,7 +6,15 @@ Dependências: SPEC-006 (entrega de alertas), SPEC-012 (idempotência do
 canal), SPEC-024 (configuração e trava de produção), SPEC-026 (recuperação
 de senha)
 
-> Numeração: a SPEC-034 está reservada para a vitrine de promoções.
+> Numeração: SPEC-034 reservada para a vitrine; SPEC-035 é o escopo das regras
+> de alerta (`SPEC-035-launch-alert-rules-scope.md`).
+>
+> **Histórico:** o adapter-base (`createResendEmailSender`, configuração,
+> fábrica e `EMAIL_OUTBOX_DIR` para E2E) entrou pela `main` no PR #6
+> (`feat/launch-pending`). Uma implementação paralela desta branch foi
+> descartada no merge; ficou daqui o que a base não tinha: a classificação de
+> erros abaixo (401/403 não perde mais o alerta), a chave de idempotência
+> longa, o log de falha no notification-worker e a execução real (AC-7).
 
 ## Objetivo
 
@@ -37,7 +45,7 @@ Valem para a API (cadastro e senha) e para o notification-worker (alertas).
 `Flight Watch <onboarding@resend.dev>` e o Resend só entrega para o e-mail
 da própria conta; qualquer outro destino é recusado (ver "Erros").
 
-## Comportamento do adapter (`ResendEmailSender`)
+## Comportamento do adapter (`createResendEmailSender`)
 
 - `POST https://api.resend.com/emails` com `Authorization: Bearer`,
   corpo `{ from, to, subject, text }` e a chave da porta no header
@@ -105,13 +113,14 @@ Sem migração. Liga com `EMAIL_PROVIDER=resend`; volta com
 
 ## Evidência de implementação
 
-2026-10-13, branch `feat/resend-email` (sobre `feat/route-page`).
+2026-10-13, branch `feat/resend-email`, rebaseada sobre a `main` (PR #6).
 
-- Adapter `ResendEmailSender` (17 testes com `fetch` falso: corpo, headers,
-  idempotência, cada linha da tabela de erros, timeout, falha de rede, sem
-  chave/destinatário nas mensagens), factory (3), config (5: obrigatoriedade
-  com `resend`, formato do remetente sem ecoar o valor). Notifications 37,
-  config 46, notification-worker 13; lint 14/14, typecheck 22/22.
+- Sobre o adapter da `main`: classificação 401/403 → `PROVIDER_CONFIGURATION`
+  (retentável), 400/422 e 409 `invalid_idempotent_request` → `REJECTED`, 409
+  em curso → `TEMPORARY_UNAVAILABLE`; chave > 256 → SHA-256. 7 testes novos
+  sobre os 9 da `main` (16 no adapter); notifications 38.
+- notification-worker registra a falha (`notification_delivery_failed` /
+  `email_provider_configuration_error`), sem e-mail no log.
 - Documentação do Resend conferida antes do código: endpoint, `Idempotency-Key`
   (24 h, até 256 caracteres; mesma chave devolve o envio já feito), erros e
   limite de 10 req/s por time.

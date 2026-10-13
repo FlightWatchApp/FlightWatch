@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import {
+  type GetRouteFactsResponse,
   type GetRouteQuery,
   type GetRouteResponse,
   getRouteResponseSchema,
@@ -141,24 +142,11 @@ export class RoutesService {
       return { ...cached, allFlightsUrl: this.allFlightsUrl(cached) };
     }
 
-    const cities = await this.places.routeCities([originCode, destinationCode]);
-    const origin = cities.get(originCode);
-    const destination = cities.get(destinationCode);
-    if (!origin || !destination) {
-      throw new SearchError('ROUTE_NOT_FOUND', 'route not found');
-    }
-
     const now = new Date();
-    const distanceKm =
-      origin.latitude !== null &&
-      origin.longitude !== null &&
-      destination.latitude !== null &&
-      destination.longitude !== null
-        ? greatCircleKm(
-            { latitude: origin.latitude, longitude: origin.longitude },
-            { latitude: destination.latitude, longitude: destination.longitude },
-          )
-        : null;
+    const { origin, destination, distanceKm } = await this.catalogFacts(
+      originCode,
+      destinationCode,
+    );
 
     const months = routeMonths(now, this.config.ROUTE_PAGE_MONTHS);
     const results = await Promise.all(
@@ -218,6 +206,51 @@ export class RoutesService {
     }
     this.metrics.routePageRequestsTotal.inc({ prices: status.toLowerCase(), cache: 'miss' });
     return { ...stored, allFlightsUrl: this.allFlightsUrl(stored) };
+  }
+
+  /** Lugares, distância e tempo estimado: só catálogo, sem fonte de preços nem orçamento. */
+  async facts(originParam: string, destinationParam: string): Promise<GetRouteFactsResponse> {
+    const [originCode, destinationCode] = await Promise.all([
+      this.places.resolveCity(originParam),
+      this.places.resolveCity(destinationParam),
+    ]);
+    if (!originCode || !destinationCode || originCode === destinationCode) {
+      throw new SearchError('ROUTE_NOT_FOUND', 'route not found');
+    }
+    const { origin, destination, distanceKm } = await this.catalogFacts(
+      originCode,
+      destinationCode,
+    );
+    return {
+      origin: toPlace(origin),
+      destination: toPlace(destination),
+      distanceKm,
+      estimatedDirectFlightMinutes:
+        distanceKm === null ? null : estimateDirectFlightMinutes(distanceKm),
+    };
+  }
+
+  private async catalogFacts(
+    originCode: string,
+    destinationCode: string,
+  ): Promise<{ origin: RouteCity; destination: RouteCity; distanceKm: number | null }> {
+    const cities = await this.places.routeCities([originCode, destinationCode]);
+    const origin = cities.get(originCode);
+    const destination = cities.get(destinationCode);
+    if (!origin || !destination) {
+      throw new SearchError('ROUTE_NOT_FOUND', 'route not found');
+    }
+    const distanceKm =
+      origin.latitude !== null &&
+      origin.longitude !== null &&
+      destination.latitude !== null &&
+      destination.longitude !== null
+        ? greatCircleKm(
+            { latitude: origin.latitude, longitude: origin.longitude },
+            { latitude: destination.latitude, longitude: destination.longitude },
+          )
+        : null;
+    return { origin, destination, distanceKm };
   }
 
   /**

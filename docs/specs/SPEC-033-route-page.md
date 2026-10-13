@@ -319,8 +319,8 @@ do domínio próprio, o sitemap não é enviado ao Google.
 ## Evidência de implementação
 
 2026-10-08, branch `feat/route-page` (sobre `feat/hero-promotion` + `main`).
-Fatias 1 a 4 feitas; **5 (monitoramento no mesmo modelo) e 6 (evidência
-final) pendentes**.
+Fatias 1 a 4 feitas; **5 (monitoramento no mesmo modelo) feita em
+2026-10-11**; 6 (evidência final) parcial — falta só a verificação em produção.
 
 **Ajustes ao texto durante a implementação:**
 
@@ -368,3 +368,20 @@ indexáveis na segunda rodada.
 **Não verificado:** página em produção com domínio real (sitemap não foi
 enviado ao Google); calibragem da fórmula do tempo (SAO → DOU dá 1 h 35, a
 FlightConnections diz 1 h 50).
+
+### Fatia 5 — monitoramento no mesmo modelo (2026-10-11)
+
+- API: `GET /v1/routes/{o}/{d}/facts` — só catálogo (lugares, distância, tempo
+  estimado), **sem preço, sem chamada à fonte e sem orçamento**; funciona com a
+  página da rota desligada. 2 testes e2e (inclusive "0 chamadas à fonte").
+- Web: `RouteSummary` (lugares + mapa) e `RouteFacts` ("Sobre a rota")
+  extraídos e usados pela página pública e por `/watches/[id]`; o monitoramento
+  mantém histórico, regras, estado e ações, ganha o link "Ver a página da rota"
+  (com a página ligada) e `noindex`. Se os fatos falharem, o monitoramento
+  segue sem o mapa.
+- Verificado no navegador (E2E em `apps/e2e` + captura a 1326 e 390 px): sem
+  rolagem horizontal; asserções no E2E para lugares, "Sobre a rota", link e
+  `meta robots noindex`. Também há E2E da página pública (308 canônico, 404).
+- **Tempo estimado:** a fórmula não foi recalibrada — sem fonte confiável de
+  durações reais não há dado para ajustar sem inventar. Segue rotulada
+  "estimado". Pendente do owner: 5 rotas com duração de referência.

@@ -462,6 +462,7 @@ export class PromotionsService {
         amountMinor: promotion.referenceAmountMinor,
         pointCount: promotion.referencePointCount,
         months: promotion.referenceMonths,
+        days: promotion.referenceDays,
         explanation: explainPromotion({
           amountMinor: fare.amountMinor,
           currency: PROMOTION_CURRENCY,

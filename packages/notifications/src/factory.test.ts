@@ -1,28 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { createEmailSender } from './factory.js';
-import { ResendEmailSender } from './resend/resend-email-sender.js';
 import { InMemoryEmailSender } from './simulated/in-memory-email-sender.js';
 
-describe('createEmailSender (SPEC-035)', () => {
-  it('simulated continua o carteiro em memória', () => {
-    expect(createEmailSender({ kind: 'simulated', timeoutMs: 1000 })).toBeInstanceOf(
-      InMemoryEmailSender,
-    );
+describe('createEmailSender', () => {
+  it('devolve o remetente simulado por padrão', () => {
+    expect(createEmailSender({ EMAIL_PROVIDER: 'simulated' })).toBeInstanceOf(InMemoryEmailSender);
   });
 
-  it('resend com chave e remetente', () => {
+  it('cria o adapter real com credenciais', () => {
     const sender = createEmailSender({
-      kind: 'resend',
-      resendApiKey: 're_chave_de_teste_0123456789',
-      from: 'Flight Watch <onboarding@resend.dev>',
-      timeoutMs: 1000,
+      EMAIL_PROVIDER: 'resend',
+      RESEND_API_KEY: 're_0123456789abcdef',
+      EMAIL_FROM: 'a@exemplo.com.br',
     });
-    expect(sender).toBeInstanceOf(ResendEmailSender);
+    expect(sender).not.toBeInstanceOf(InMemoryEmailSender);
   });
 
-  it('resend sem chave falha sem ecoar segredo', () => {
-    expect(() => createEmailSender({ kind: 'resend', from: 'a@b.co', timeoutMs: 1000 })).toThrow(
-      /RESEND_API_KEY/,
-    );
+  it('recusa resend sem credenciais, sem ecoar valores', () => {
+    expect(() => createEmailSender({ EMAIL_PROVIDER: 'resend' })).toThrow(/RESEND_API_KEY/);
   });
 });

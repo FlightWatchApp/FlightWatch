@@ -2,19 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import type { GetRouteResponse } from '@flight-watch/contracts';
-import { RouteMapLoader } from '@/components/route/route-map-loader';
+import { RouteFacts } from '@/components/route/route-facts';
 import { RoutePrices } from '@/components/route/route-prices';
+import { RouteSummary } from '@/components/route/route-summary';
 import styles from '@/components/route/route-page.module.css';
 import { ApiError } from '@/lib/api/client';
 import { getRoute } from '@/lib/api/routes';
 import { routePagesEnabled } from '@/lib/domain/route-flag';
-import {
-  formatDistanceKm,
-  formatEstimatedDuration,
-  routeIndexable,
-  routeMetaDescription,
-  routeTitle,
-} from '@/lib/domain/route-page';
+import { routeIndexable, routeMetaDescription, routeTitle } from '@/lib/domain/route-page';
 import { parseRouteSegment, routePath, routeSegment } from '@/lib/domain/route-url';
 
 type Params = { params: Promise<{ rota: string }> };
@@ -109,70 +104,11 @@ export default async function RoutePage({ params }: Params) {
         </p>
       </header>
 
-      <div className={styles.top}>
-        <section className={styles.places} aria-label="Rota">
-          {[origin, destination].map((place, index) => (
-            <div key={place.code} className={styles.place}>
-              <p className={styles.placeRole}>{index === 0 ? 'Saindo de' : 'Chegando em'}</p>
-              <p className={styles.placeName}>
-                {place.name} <span className="iata">{place.code}</span>
-              </p>
-              <p className={styles.placeMeta}>{place.countryName}</p>
-              {place.airports.length > 0 && (
-                <p className={styles.placeMeta}>
-                  Aeroportos: {place.airports.map((airport) => airport.code).join(' · ')}
-                </p>
-              )}
-            </div>
-          ))}
-        </section>
-        {origin.coordinates && destination.coordinates && (
-          <RouteMapLoader
-            origin={{ ...origin.coordinates, code: origin.code, name: origin.name }}
-            destination={{
-              ...destination.coordinates,
-              code: destination.code,
-              name: destination.name,
-            }}
-          />
-        )}
-      </div>
+      <RouteSummary origin={origin} destination={destination} />
 
       <RoutePrices route={route} renderedAt={renderedAt} />
 
-      <section className={styles.facts} aria-labelledby="route-facts">
-        <h2 id="route-facts" className={styles.sectionTitle}>
-          Sobre a rota
-        </h2>
-        <dl>
-          {route.distanceKm !== null && (
-            <div>
-              <dt>Distância</dt>
-              <dd>{formatDistanceKm(route.distanceKm)} (calculada entre as cidades)</dd>
-            </div>
-          )}
-          {route.estimatedDirectFlightMinutes !== null && (
-            <div>
-              <dt>Tempo de voo direto</dt>
-              <dd>{formatEstimatedDuration(route.estimatedDirectFlightMinutes)}</dd>
-            </div>
-          )}
-          {[origin, destination].map((place) =>
-            place.airports.length > 0 ? (
-              <div key={place.code}>
-                <dt>Aeroportos de {place.name}</dt>
-                <dd>
-                  {place.airports.map((airport) => `${airport.name} (${airport.code})`).join(', ')}
-                </dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
-        <p className={styles.factsNote}>
-          Distância e tempo são calculados a partir da posição das cidades; a duração de cada voo
-          depende da companhia e das escalas.
-        </p>
-      </section>
+      <RouteFacts {...route} />
     </div>
   );
 }

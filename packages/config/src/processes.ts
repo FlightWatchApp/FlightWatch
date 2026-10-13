@@ -5,11 +5,11 @@ import {
   hostField,
   intField,
   optionalSecretField,
+  optionalTextField,
   portField,
   secretField,
   urlField,
   iataListField,
-  emailFromField,
 } from './fields.js';
 
 /**
@@ -55,12 +55,32 @@ function requireProviderCredentials(values: {
     ? [{ key: 'TRAVELPAYOUTS_TOKEN', message: 'obrigatória com FLIGHT_PROVIDER=travelpayouts' }]
     : [];
 }
-/** A API usa as duas fontes externas: voos (busca) e e-mail (cadastro, senha). */
-function requireApiCredentials(
-  values: Parameters<typeof requireProviderCredentials>[0] &
-    Parameters<typeof requireEmailCredentials>[0],
-) {
-  return [...requireProviderCredentials(values), ...requireEmailCredentials(values)];
+const emailProvider = {
+  EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated'),
+  // Obrigatórios com EMAIL_PROVIDER=resend (regra abaixo).
+  RESEND_API_KEY: optionalSecretField(16),
+  EMAIL_FROM: optionalTextField(3),
+  EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+  // Só com EMAIL_PROVIDER=simulated: cada e-mail "enviado" vira um arquivo JSON
+  // nesta pasta, para o E2E ler links de confirmação e redefinição.
+  EMAIL_OUTBOX_DIR: optionalTextField(1),
+};
+
+/** Mesmo princípio de `requireProviderCredentials`: provedor real sem credencial não sobe. */
+function requireEmailCredentials(values: {
+  EMAIL_PROVIDER: (typeof EMAIL_PROVIDERS)[number];
+  RESEND_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+}) {
+  if (values.EMAIL_PROVIDER !== 'resend') return [];
+  return [
+    ...(values.RESEND_API_KEY
+      ? []
+      : [{ key: 'RESEND_API_KEY', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+    ...(values.EMAIL_FROM
+      ? []
+      : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+  ];
 }
 const basisPoints = (defaultBps: number) => intField({ min: 1, max: 10_000, default: defaultBps });
 const cacheMinutes = (defaultMinutes: number) =>
@@ -94,31 +114,6 @@ const routePage = {
   ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
 };
 
-const emailProvider = {
-  EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated'),
-  // SPEC-035: obrigatórios com EMAIL_PROVIDER=resend (regra abaixo).
-  RESEND_API_KEY: optionalSecretField(16),
-  EMAIL_FROM: emailFromField(),
-  EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
-};
-
-/** SPEC-035 AC-1: e-mail real sem credencial ou sem remetente não sobe. */
-function requireEmailCredentials(values: {
-  EMAIL_PROVIDER: (typeof EMAIL_PROVIDERS)[number];
-  RESEND_API_KEY?: string | undefined;
-  EMAIL_FROM?: string | undefined;
-}) {
-  if (values.EMAIL_PROVIDER !== 'resend') return [];
-  return [
-    ...(values.RESEND_API_KEY
-      ? []
-      : [{ key: 'RESEND_API_KEY', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
-    ...(values.EMAIL_FROM
-      ? []
-      : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
-  ];
-}
-
 export const apiConfig = {
   service: 'api',
   shape: {
@@ -145,7 +140,10 @@ export const apiConfig = {
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
-  rules: requireApiCredentials,
+  rules: (
+    values: Parameters<typeof requireProviderCredentials>[0] &
+      Parameters<typeof requireEmailCredentials>[0],
+  ) => [...requireProviderCredentials(values), ...requireEmailCredentials(values)],
 };
 
 export const schedulerConfig = {

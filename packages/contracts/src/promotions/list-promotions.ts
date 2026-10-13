@@ -40,6 +40,8 @@ export const promotionItemSchema = z.object({
     pointCount: z.number().int(),
     /** Meses (AAAA-MM) que entraram na referência. */
     months: z.array(z.string()),
+    /** Preço por data que formou a mediana (gráfico da home, sem nova consulta ao calendário). */
+    days: z.array(z.object({ date: z.string(), amountMinor: z.number().int() })).default([]),
     /** Texto pronto em pt-BR, conferível à mão contra o calendário da rota. */
     explanation: z.string(),
   }),
