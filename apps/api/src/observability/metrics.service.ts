@@ -160,6 +160,13 @@ export class MetricsService {
   });
 
   /** SPEC-032 §Observabilidade. Origem nunca vira label (cardinalidade). */
+  readonly promotionHighlightsRequestsTotal = new Counter({
+    name: 'promotion_highlights_requests_total',
+    help: 'Respostas da vitrine de promoções por resultado (ok/empty/disabled) (SPEC-034).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
   readonly promotionFeedRequestsTotal = new Counter({
     name: 'promotion_feed_requests_total',
     help: 'Requisições ao feed de promoções, por cache (hit/miss/stale/none) e resultado (ok/budget_exhausted/provider_unavailable/disabled) (SPEC-032).',

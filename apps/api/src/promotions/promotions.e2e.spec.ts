@@ -27,6 +27,7 @@ import {
   MemoryKeyValueStore,
 } from '../pricing-source/key-value-store.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
+import { PromotionsService } from './promotions.service.js';
 
 /** SPEC-032 — GET /v1/promotions, Postgres real e provedor com chamadas contadas. */
 
@@ -496,5 +497,78 @@ describe('GET /v1/promotions — Redis fora', () => {
     expect(
       response.body.promotions.map((item: { destination: string }) => item.destination),
     ).toEqual(['RIO']);
+  });
+});
+
+describe('GET /v1/promotions/highlights — vitrine (SPEC-034)', () => {
+  function highlights(app: NestFastifyApplication, query: Record<string, string | number> = {}) {
+    return request(app.getHttpServer())
+      .get('/v1/promotions/highlights')
+      .query(query)
+      .set(freshClient());
+  }
+
+  // AC-1, AC-2
+  it('aquece os feeds das cidades da vitrine e serve só do cache, com a origem', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      { PROMOTION_ENGINE_ENABLED: 'true', PROMOTION_SHOWCASE_ORIGIN_CITIES: 'SAO,BSB,ZZZ' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    const service = app.get(PromotionsService);
+
+    const warmed = await service.warmShowcase();
+    expect(warmed.cities).toBe(2); // ZZZ fora do catálogo
+    expect(provider.candidateCalls.sort()).toEqual(['BSB', 'SAO']);
+
+    provider.reset();
+    const response = await highlights(app);
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('OK');
+    // Uma promoção por destino (RIO): de SAO e de BSB, fica uma só.
+    const destinations = response.body.promotions.map(
+      (item: { destination: string }) => item.destination,
+    );
+    expect(destinations).toEqual(['RIO']);
+    expect(response.body.promotions[0]).toMatchObject({
+      destination: 'RIO',
+      originName: expect.any(String),
+      price: { amountMinor: 50_000, currency: 'BRL' },
+    });
+    expect(['SAO', 'BSB']).toContain(response.body.promotions[0].origin);
+    expect(response.body.promotions[0].purchaseUrl).toMatch(/^https:\/\//);
+    // Só leitura do cache: nenhuma chamada à fonte.
+    expect(provider.candidateCalls).toHaveLength(0);
+    expect(provider.calendarCalls).toHaveLength(0);
+
+    // Cache fresco: o aquecimento seguinte não chama a fonte.
+    await service.warmShowcase();
+    expect(provider.candidateCalls).toHaveLength(0);
+  });
+
+  it('sem feed em cache, a vitrine vem vazia sem chamar a fonte', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      { PROMOTION_ENGINE_ENABLED: 'true' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    const response = await highlights(app, { limit: 5 });
+    expect(response.body).toMatchObject({ status: 'OK', promotions: [] });
+    expect(provider.candidateCalls).toHaveLength(0);
+  });
+
+  // AC-5
+  it('motor desligado: DISABLED e lista vazia', async () => {
+    const provider = new CountingProvider();
+    const app = await buildApp(
+      { PROMOTION_SHOWCASE_ORIGIN_CITIES: 'SAO' },
+      provider,
+      new MemoryKeyValueStore(),
+    );
+    const response = await highlights(app);
+    expect(response.body).toMatchObject({ status: 'DISABLED', promotions: [] });
+    expect((await highlights(app, { limit: 99 })).status).toBe(400);
   });
 });

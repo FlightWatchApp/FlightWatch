@@ -1,6 +1,13 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { z } from 'zod';
 import {
+  type ListPromotionHighlightsQuery,
+  type ListPromotionHighlightsResponse,
   type ListPromotionsQuery,
   type ListPromotionsResponse,
   PROMOTION_CURRENCY,
@@ -17,6 +24,7 @@ import {
   promotionScope,
   referenceMonths,
   resolvePurchaseUrl,
+  selectHighlights,
 } from '@flight-watch/domain';
 import type { SearchableCity } from '@flight-watch/database';
 import { logEvent } from '@flight-watch/observability';
@@ -112,11 +120,14 @@ async function mapWithConcurrency<T, R>(
  * o mesmo do calendário) avaliados pela função pura do domínio.
  */
 @Injectable()
-export class PromotionsService {
+export class PromotionsService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly policy: PromotionPolicy;
   private readonly feedTtlMs: number;
   /** Single-flight: requisições simultâneas da mesma origem fria, um cálculo. */
   private readonly inflight = new Map<string, Promise<FeedOutcome>>();
+  /** SPEC-034: aquecimento periódico da vitrine. */
+  private warmStart: NodeJS.Timeout | undefined;
+  private warmTimer: NodeJS.Timeout | undefined;
   /** Orçamento diário só do feed (SPEC-032); o Retry-After é compartilhado. */
   private readonly budget: DailyCallBudget;
 
@@ -200,6 +211,92 @@ export class PromotionsService {
       generatedAt: outcome.generatedAt,
       promotions,
     };
+  }
+
+  /**
+   * SPEC-034: vitrine — melhores promoções das cidades da vitrine, **só do
+   * cache** (nunca chama a fonte), uma por destino. Cada item diz a origem.
+   */
+  async highlights(query: ListPromotionHighlightsQuery): Promise<ListPromotionHighlightsResponse> {
+    const now = new Date();
+    if (!this.config.PROMOTION_ENGINE_ENABLED) {
+      this.metrics.promotionHighlightsRequestsTotal.inc({ result: 'disabled' });
+      return { status: 'DISABLED', generatedAt: now.toISOString(), promotions: [] };
+    }
+    const origins = await this.places.searchableCities(
+      this.config.PROMOTION_SHOWCASE_ORIGIN_CITIES,
+    );
+    const feeds = await Promise.all(
+      [...origins.values()].map(async (origin) => ({
+        origin,
+        feed: await this.readFeed(feedKey(origin.code, 'ONE_WAY')),
+      })),
+    );
+    const candidates = feeds.flatMap(({ origin, feed }) =>
+      (feed?.promotions ?? []).map((promotion) => ({
+        ...promotion,
+        origin: origin.code,
+        originName: origin.name,
+      })),
+    );
+    const promotions = selectHighlights(candidates, query.limit, now).map((promotion) => ({
+      ...promotion,
+      purchaseUrl: this.purchaseUrl(promotion.origin, promotion),
+    }));
+    this.metrics.promotionHighlightsRequestsTotal.inc({
+      result: promotions.length > 0 ? 'ok' : 'empty',
+    });
+    return { status: 'OK', generatedAt: now.toISOString(), promotions };
+  }
+
+  /**
+   * SPEC-034: aquece os feeds das cidades da vitrine pelo mesmo caminho do
+   * `/v1/promotions` (cache fresco não chama a fonte; orçamento, Retry-After
+   * e single-flight valem igual). Em sequência, para não estourar a fonte.
+   */
+  async warmShowcase(): Promise<{ cities: number; promotions: number }> {
+    const codes = this.config.PROMOTION_SHOWCASE_ORIGIN_CITIES;
+    if (!this.config.PROMOTION_ENGINE_ENABLED || codes.length === 0) {
+      return { cities: 0, promotions: 0 };
+    }
+    const startedAt = Date.now();
+    const origins = await this.places.searchableCities(codes);
+    let promotions = 0;
+    for (const origin of origins.values()) {
+      try {
+        promotions += (await this.feed(origin, 'ONE_WAY')).promotions.length;
+      } catch (error) {
+        // Uma cidade que falha não impede as outras; o próximo aquecimento tenta de novo.
+        logEvent({
+          event: 'promotion_showcase_warm_failed',
+          origin: origin.code,
+          errorCode: error instanceof SearchError ? error.errorCode : 'unknown',
+        });
+      }
+    }
+    logEvent({
+      event: 'promotion_showcase_warmed',
+      cities: origins.size,
+      promotions,
+      durationMs: Date.now() - startedAt,
+    });
+    return { cities: origins.size, promotions };
+  }
+
+  onApplicationBootstrap(): void {
+    if (!this.config.PROMOTION_ENGINE_ENABLED) return;
+    if (this.config.PROMOTION_SHOWCASE_ORIGIN_CITIES.length === 0) return;
+    const warm = () => {
+      void this.warmShowcase().catch(() => undefined);
+    };
+    this.warmStart = setTimeout(warm, 0);
+    this.warmTimer = setInterval(warm, this.config.PROMOTION_SHOWCASE_REFRESH_MINUTES * MINUTE_MS);
+    this.warmTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.warmStart) clearTimeout(this.warmStart);
+    if (this.warmTimer) clearInterval(this.warmTimer);
   }
 
   /**

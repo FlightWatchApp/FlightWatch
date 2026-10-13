@@ -34,5 +34,7 @@ export const SHARED_ENV: Record<string, string> = {
   AUTH_RATE_LIMIT_MAX: '1000',
   ROUTE_PAGE_RATE_LIMIT_MAX: '1000',
   PROMOTION_ENGINE_ENABLED: 'true',
+  // SPEC-034: vitrine com uma cidade, aquecida no startup da API.
+  PROMOTION_SHOWCASE_ORIGIN_CITIES: 'SAO',
   ROUTE_PAGE_ENABLED: 'true',
 };

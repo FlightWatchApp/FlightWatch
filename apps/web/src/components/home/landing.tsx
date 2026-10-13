@@ -1,13 +1,13 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import type { PromotionItem } from '@flight-watch/contracts';
+import type { PromotionHighlight, PromotionItem } from '@flight-watch/contracts';
 import { PromotionCard } from '@/components/promotions/promotion-card';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import buttonStyles from '@/components/ui/button.module.css';
 import { IconBell, IconExternalLink, IconSearch, IconShield } from '@/components/ui/icon';
 import { HeroIllustration } from './hero-illustration';
 import { HeroOriginPicker } from './hero-origin-picker';
-import type { HeroPromotion } from './hero-promotion';
+import { type HeroPromotion, heroFrom } from './hero-promotion';
 import styles from './landing.module.css';
 
 const primaryLg = [buttonStyles.button, buttonStyles.primary, buttonStyles.lg].join(' ');
@@ -20,9 +20,16 @@ export interface LandingProps {
   morePromotions?: PromotionItem[];
   /** SPEC-032: promoção real do cartão do topo; null mostra o exemplo. */
   heroPromotion?: HeroPromotion | null;
-  /** Há cidade escolhida (cookie), mesmo que sem promoção agora. */
+  /** Há cidade escolhida (cookie) ou sugerida, mesmo que sem promoção agora. */
   heroOriginChosen?: boolean;
+  /** SPEC-034: cidade sugerida pelo acesso (não gravada); null se escolhida ou sem sugestão. */
+  originSuggestion?: { code: string; name: string } | null;
+  /** SPEC-034: vitrine das cidades mais usadas, cada promoção com a sua origem. */
+  showcase?: PromotionHighlight[];
 }
+
+/** Quantos cartões cada seção mostra. */
+const SECTION_SIZE = 3;
 
 /**
  * PG-01: início para visitante. As promoções já vêm resolvidas pelo chamador
@@ -33,8 +40,28 @@ export function Landing({
   morePromotions = [],
   heroPromotion = null,
   heroOriginChosen = false,
+  originSuggestion = null,
+  showcase = [],
 }: LandingProps) {
+  // Promoções da origem (escolhida ou sugerida) — a do cartão e as seguintes.
   const promotions = heroPromotion ? [heroPromotion.promotion, ...morePromotions] : [];
+  // SPEC-034: sem promoção da origem, o cartão do topo vem da vitrine.
+  const showcaseHero = !heroPromotion && showcase[0] ? showcase[0] : null;
+  const hero =
+    heroPromotion ??
+    (showcaseHero ? heroFrom(showcaseHero.origin, showcaseHero.originName, showcaseHero) : null);
+  // "Destaques do Brasil" sem repetir destinos já mostrados acima.
+  const shown = new Set([
+    ...promotions.slice(0, SECTION_SIZE).map((promotion) => promotion.destination),
+    ...(hero ? [hero.promotion.destination] : []),
+  ]);
+  const highlights = showcase
+    .filter((promotion) => !shown.has(promotion.destination))
+    .slice(0, SECTION_SIZE * 2);
+  const renderedAt = hero?.renderedAt ?? new Date().toISOString();
+  const pickerOrigin = heroPromotion
+    ? { code: heroPromotion.origin, name: heroPromotion.originName }
+    : originSuggestion;
 
   return (
     <>
@@ -61,63 +88,96 @@ export function Landing({
             </p>
           </div>
           <div className={styles.heroArt}>
-            <HeroIllustration live={heroPromotion} />
+            <HeroIllustration live={hero} />
             <HeroOriginPicker
-              key={heroPromotion?.origin ?? 'none'}
-              origin={
-                heroPromotion
-                  ? { code: heroPromotion.origin, name: heroPromotion.originName }
-                  : null
-              }
+              key={pickerOrigin?.code ?? 'none'}
+              origin={pickerOrigin}
               noPromotion={heroOriginChosen && !heroPromotion}
+              suggested={originSuggestion !== null}
             />
-            {heroPromotion?.promotion.purchaseUrl && <PurchaseNote />}
+            {hero?.promotion.purchaseUrl && <PurchaseNote />}
           </div>
         </div>
       </section>
 
+      {heroPromotion && promotions.length > 0 && (
+        <section
+          className={`container ${styles.section} reveal`}
+          style={delay(80)}
+          aria-labelledby="promo-title"
+        >
+          <div className={styles.sectionHead}>
+            <div>
+              <h2 id="promo-title" className={styles.sectionTitle}>
+                Promoções saindo de {heroPromotion.originName}
+              </h2>
+              <p className={styles.sectionLead}>
+                Datas em que o preço observado está bem abaixo das outras datas próximas da mesma
+                rota.
+              </p>
+            </div>
+            <Link href="/opportunities" className={styles.sectionLink}>
+              Ver todas →
+            </Link>
+          </div>
+          <div className={styles.dealGrid}>
+            {promotions.slice(0, SECTION_SIZE).map((promotion) => (
+              <PromotionCard
+                key={promotion.destination}
+                origin={heroPromotion.origin}
+                originName={heroPromotion.originName}
+                promotion={promotion}
+                renderedAt={renderedAt}
+              />
+            ))}
+          </div>
+          <PurchaseNote />
+        </section>
+      )}
+
       <section
         className={`container ${styles.section} reveal`}
-        style={delay(80)}
-        aria-labelledby="promo-title"
+        style={delay(120)}
+        aria-labelledby="showcase-title"
       >
         <div className={styles.sectionHead}>
           <div>
-            <h2 id="promo-title" className={styles.sectionTitle}>
-              Promoções agora
+            <h2 id="showcase-title" className={styles.sectionTitle}>
+              Destaques do Brasil
             </h2>
             <p className={styles.sectionLead}>
-              Datas em que o preço observado está bem abaixo das outras datas próximas da mesma
-              rota.
+              As melhores promoções saindo das cidades mais usadas do país. Cada cartão diz de onde
+              sai.
             </p>
           </div>
           <Link href="/opportunities" className={styles.sectionLink}>
-            Ver todas →
+            Escolher minha cidade →
           </Link>
         </div>
-        {heroPromotion && promotions.length > 0 ? (
+        {highlights.length > 0 ? (
           <>
             <div className={styles.dealGrid}>
-              {promotions.slice(0, 3).map((promotion) => (
+              {highlights.map((promotion) => (
                 <PromotionCard
-                  key={promotion.destination}
-                  origin={heroPromotion.origin}
-                  originName={heroPromotion.originName}
+                  key={`${promotion.origin}-${promotion.destination}`}
+                  origin={promotion.origin}
+                  originName={promotion.originName}
                   promotion={promotion}
-                  renderedAt={heroPromotion.renderedAt}
+                  renderedAt={renderedAt}
                 />
               ))}
             </div>
             <PurchaseNote />
           </>
-        ) : heroOriginChosen ? (
+        ) : heroOriginChosen && !heroPromotion ? (
           <p className={styles.emptyDeals}>
             Nenhuma promoção saindo desta cidade neste momento. Escolha outra cidade de origem ou
             monitore a sua viagem para ser avisado quando o preço cair.
           </p>
         ) : (
           <p className={styles.emptyDeals}>
-            Escolha a cidade de onde você sai, no cartão acima, para ver as promoções a partir dela.
+            Nenhum destaque no momento. Escolha a cidade de onde você sai, no cartão acima, para ver
+            as promoções a partir dela.
           </p>
         )}
       </section>
@@ -137,8 +197,8 @@ export function Landing({
             </span>
             <h3>Busque ou escolha uma promoção</h3>
             <p>
-              Veja as ofertas de uma rota ou as promoções que o sistema identificou no histórico de
-              preços.
+              Veja as ofertas de uma rota ou as promoções que o sistema encontrou comparando cada
+              preço com as outras datas da mesma rota.
             </p>
           </li>
           <li className={styles.step}>

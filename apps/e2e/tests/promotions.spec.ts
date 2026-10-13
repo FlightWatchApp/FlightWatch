@@ -16,7 +16,7 @@ test('promoções por origem escolhida: página de promoções e seção da pág
     .getByRole('option', { name: /São Paulo/ })
     .first()
     .click();
-  const section = page.getByRole('region', { name: 'Promoções agora' });
+  const section = page.getByRole('region', { name: 'Promoções saindo de São Paulo' });
   await expect(section.getByRole('article').first()).toBeVisible();
   await expect(section).toContainText('abaixo das datas próximas');
 
@@ -25,7 +25,26 @@ test('promoções por origem escolhida: página de promoções e seção da pág
   await expect(section.getByRole('article').first()).toBeVisible();
 });
 
-test('sem origem escolhida, a home pede a cidade e não inventa promoção', async ({ page }) => {
+// SPEC-034: sem cidade, a home mostra a vitrine (não o exemplo) e cada cartão diz de onde sai.
+test('sem origem escolhida, a home mostra a vitrine com a origem de cada promoção', async ({
+  page,
+}) => {
   await page.goto('/');
-  await expect(page.getByText('Escolha a cidade de onde você sai')).toBeVisible();
+  const showcase = page.getByRole('region', { name: 'Destaques do Brasil' });
+  await expect(page.getByText('Exemplo', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('article').first()).toContainText('Saindo de São Paulo');
+  await expect(showcase).toBeVisible();
+});
+
+// SPEC-034: cidade sugerida pelo acesso (cabeçalhos da Cloudflare), sem gravar cookie.
+test('cidade sugerida pelo acesso aparece como sugestão e não vira cookie', async ({ browser }) => {
+  const context = await browser.newContext({
+    extraHTTPHeaders: { 'cf-ipcountry': 'BR', 'cf-ipcity': 'S%C3%A3o%20Paulo' },
+  });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.getByText('Sugerida pelo seu acesso')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Saindo de' })).toHaveValue(/São Paulo/);
+  expect((await context.cookies()).some((cookie) => cookie.name === 'fw_origin')).toBe(false);
+  await context.close();
 });
