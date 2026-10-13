@@ -9,6 +9,7 @@ import {
   secretField,
   urlField,
   iataListField,
+  emailFromField,
 } from './fields.js';
 
 /**
@@ -18,7 +19,7 @@ import {
 
 /** Adapters disponíveis. Um adapter real entra aqui e na factory do pacote dele. */
 export const FLIGHT_PROVIDERS = ['simulated', 'travelpayouts'] as const;
-export const EMAIL_PROVIDERS = ['simulated'] as const;
+export const EMAIL_PROVIDERS = ['simulated', 'resend'] as const;
 
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
 const LOCAL_REDIS_URL = 'redis://localhost:6379';
@@ -54,6 +55,13 @@ function requireProviderCredentials(values: {
     ? [{ key: 'TRAVELPAYOUTS_TOKEN', message: 'obrigatória com FLIGHT_PROVIDER=travelpayouts' }]
     : [];
 }
+/** A API usa as duas fontes externas: voos (busca) e e-mail (cadastro, senha). */
+function requireApiCredentials(
+  values: Parameters<typeof requireProviderCredentials>[0] &
+    Parameters<typeof requireEmailCredentials>[0],
+) {
+  return [...requireProviderCredentials(values), ...requireEmailCredentials(values)];
+}
 const basisPoints = (defaultBps: number) => intField({ min: 1, max: 10_000, default: defaultBps });
 const cacheMinutes = (defaultMinutes: number) =>
   intField({ min: 1, max: 7 * 24 * 60, default: defaultMinutes });
@@ -86,7 +94,30 @@ const routePage = {
   ROUTE_SITEMAP_TTL_MINUTES: cacheMinutes(360),
 };
 
-const emailProvider = { EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated') };
+const emailProvider = {
+  EMAIL_PROVIDER: enumField(EMAIL_PROVIDERS, 'simulated'),
+  // SPEC-035: obrigatórios com EMAIL_PROVIDER=resend (regra abaixo).
+  RESEND_API_KEY: optionalSecretField(16),
+  EMAIL_FROM: emailFromField(),
+  EMAIL_PROVIDER_TIMEOUT_MS: durationMsField(10_000),
+};
+
+/** SPEC-035 AC-1: e-mail real sem credencial ou sem remetente não sobe. */
+function requireEmailCredentials(values: {
+  EMAIL_PROVIDER: (typeof EMAIL_PROVIDERS)[number];
+  RESEND_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+}) {
+  if (values.EMAIL_PROVIDER !== 'resend') return [];
+  return [
+    ...(values.RESEND_API_KEY
+      ? []
+      : [{ key: 'RESEND_API_KEY', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+    ...(values.EMAIL_FROM
+      ? []
+      : [{ key: 'EMAIL_FROM', message: 'obrigatória com EMAIL_PROVIDER=resend' }]),
+  ];
+}
 
 export const apiConfig = {
   service: 'api',
@@ -114,7 +145,7 @@ export const apiConfig = {
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
     INTERNAL_API_SECRET: LOCAL_INTERNAL_API_SECRET,
   },
-  rules: requireProviderCredentials,
+  rules: requireApiCredentials,
 };
 
 export const schedulerConfig = {
@@ -173,6 +204,7 @@ export const notificationWorkerConfig = {
     REDIS_URL: LOCAL_REDIS_URL,
     WEB_BASE_URL: LOCAL_WEB_BASE_URL,
   },
+  rules: requireEmailCredentials,
 };
 
 export const ALL_CONFIG_DEFINITIONS = {

@@ -15,6 +15,7 @@ import {
   type EmailSender,
   renderAlertEmail,
 } from '@flight-watch/notifications';
+import { logEvent } from '@flight-watch/observability';
 import type { NotificationRequestedJob } from '@flight-watch/queue';
 import type { NotificationWorkerMetrics } from './metrics.js';
 
@@ -197,6 +198,17 @@ export async function processNotificationJob(
       }
     });
     recordDelivery(deliveryError.retryable ? 'retryable_failure' : 'permanent_failure');
+    // SPEC-035: erro de configuração do provedor (chave, domínio) é nosso, não do
+    // destinatário — evento próprio para alguém olhar. Sem e-mail no log.
+    logEvent({
+      event:
+        deliveryError.errorClass === 'PROVIDER_CONFIGURATION'
+          ? 'email_provider_configuration_error'
+          : 'notification_delivery_failed',
+      deliveryId: delivery.id,
+      errorClass: deliveryError.errorClass,
+      retryable: deliveryError.retryable,
+    });
 
     if (deliveryError.retryable) {
       // Relança para o BullMQ reagendar conforme o backoff configurado na fila.

@@ -78,6 +78,29 @@ export function iataListField() {
     });
 }
 
+/**
+ * Remetente de e-mail opcional: "nome@dominio" ou "Nome <nome@dominio>".
+ * Obrigatoriedade vem das regras do processo (SPEC-035).
+ */
+export function emailFromField() {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined || raw.trim() === '') return undefined;
+      const value = raw.trim();
+      const address = /^[^<>]*<([^<>]+)>$/.exec(value)?.[1] ?? value;
+      if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'deve ser "nome@dominio" ou "Nome <nome@dominio>"',
+        });
+        return z.NEVER;
+      }
+      return value;
+    });
+}
+
 export function portField(defaultPort?: number) {
   return intField({ min: 1, max: 65_535, default: defaultPort });
 }
