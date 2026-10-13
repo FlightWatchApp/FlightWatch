@@ -24,12 +24,12 @@ porta `EmailSender` que já existe. O resto do sistema não muda.
 
 ## Configuração
 
-| Variável                    | Padrão      | Regra                                                                                                   |
-| --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `EMAIL_PROVIDER`            | `simulated` | ganha o valor `resend`; `simulated` continua proibido com `APP_ENV=production` (SPEC-024)               |
-| `RESEND_API_KEY`            | —           | segredo; **obrigatório** com `EMAIL_PROVIDER=resend` (mesmo padrão do `TRAVELPAYOUTS_TOKEN`)            |
-| `EMAIL_FROM`                | —           | **obrigatório** com `resend`; ex.: `Flight Watch <avisos@avisos.flightwatch.com.br>`                    |
-| `EMAIL_PROVIDER_TIMEOUT_MS` | `10000`     | timeout de cada envio                                                                                   |
+| Variável                    | Padrão      | Regra                                                                                        |
+| --------------------------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `EMAIL_PROVIDER`            | `simulated` | ganha o valor `resend`; `simulated` continua proibido com `APP_ENV=production` (SPEC-024)    |
+| `RESEND_API_KEY`            | —           | segredo; **obrigatório** com `EMAIL_PROVIDER=resend` (mesmo padrão do `TRAVELPAYOUTS_TOKEN`) |
+| `EMAIL_FROM`                | —           | **obrigatório** com `resend`; ex.: `Flight Watch <avisos@avisos.flightwatch.com.br>`         |
+| `EMAIL_PROVIDER_TIMEOUT_MS` | `10000`     | timeout de cada envio                                                                        |
 
 Valem para a API (cadastro e senha) e para o notification-worker (alertas).
 
@@ -52,14 +52,14 @@ da própria conta; qualquer outro destino é recusado (ver "Erros").
 
 ### Erros → classe da porta
 
-| Resposta do Resend                                                    | Classe                   | Retenta? | Por quê                                                        |
-| --------------------------------------------------------------------- | ------------------------ | -------- | -------------------------------------------------------------- |
-| timeout / falha de rede                                               | `TIMEOUT`                | sim      | transitório                                                    |
-| 429 (`rate_limit_exceeded`, cotas diária/mensal)                      | `RATE_LIMITED`           | sim      | volta depois                                                   |
-| 409 `concurrent_idempotent_requests`                                  | `TEMPORARY_UNAVAILABLE`  | sim      | o envio original ainda está em curso                           |
-| 5xx                                                                   | `TEMPORARY_UNAVAILABLE`  | sim      | indisponibilidade                                              |
+| Resposta do Resend                                                    | Classe                   | Retenta? | Por quê                                                                                                                                         |
+| --------------------------------------------------------------------- | ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| timeout / falha de rede                                               | `TIMEOUT`                | sim      | transitório                                                                                                                                     |
+| 429 (`rate_limit_exceeded`, cotas diária/mensal)                      | `RATE_LIMITED`           | sim      | volta depois                                                                                                                                    |
+| 409 `concurrent_idempotent_requests`                                  | `TEMPORARY_UNAVAILABLE`  | sim      | o envio original ainda está em curso                                                                                                            |
+| 5xx                                                                   | `TEMPORARY_UNAVAILABLE`  | sim      | indisponibilidade                                                                                                                               |
 | 401/403 (chave inválida/suspensa, domínio não verificado, modo teste) | `PROVIDER_CONFIGURATION` | **sim**  | erro **nosso**, não do destinatário: retentar dá tempo de corrigir a configuração sem perder o alerta; log `email_provider_configuration_error` |
-| 400/422 (pedido inválido) e 409 `invalid_idempotent_request`          | `REJECTED`               | não      | repetir não resolve                                            |
+| 400/422 (pedido inválido) e 409 `invalid_idempotent_request`          | `REJECTED`               | não      | repetir não resolve                                                                                                                             |
 
 `PROVIDER_CONFIGURATION` e `REJECTED` são classes novas; nenhuma desativa o
 canal do usuário (o worker só marca aquele alerta). `PERMANENT_BOUNCE` fica
@@ -105,4 +105,25 @@ Sem migração. Liga com `EMAIL_PROVIDER=resend`; volta com
 
 ## Evidência de implementação
 
-Pendente.
+2026-10-13, branch `feat/resend-email` (sobre `feat/route-page`).
+
+- Adapter `ResendEmailSender` (17 testes com `fetch` falso: corpo, headers,
+  idempotência, cada linha da tabela de erros, timeout, falha de rede, sem
+  chave/destinatário nas mensagens), factory (3), config (5: obrigatoriedade
+  com `resend`, formato do remetente sem ecoar o valor). Notifications 37,
+  config 46, notification-worker 13; lint 14/14, typecheck 22/22.
+- Documentação do Resend conferida antes do código: endpoint, `Idempotency-Key`
+  (24 h, até 256 caracteres; mesma chave devolve o envio já feito), erros e
+  limite de 10 req/s por time.
+- **Execução real (AC-7)**, modo de teste do Resend (`onboarding@resend.dev`),
+  sistema local com Travelpayouts:
+  - cadastro de `app.flightwatch@gmail.com` → e-mail de confirmação chegou;
+  - confirmação pelo link → monitoramento com preço desejado acima do preço
+    observado → alerta de preço chegou (owner confirmou);
+  - banco: entrega `DELIVERED` com id do Resend; nenhum
+    `notification_delivery_failed` nem `email_provider_configuration_error`.
+- **Achado:** o e-mail de confirmação caiu no spam do Gmail. Causa principal:
+  remetente de teste compartilhado (`onboarding@resend.dev`) + link para
+  `localhost`. Correção prevista: domínio próprio com SPF/DKIM/DMARC
+  (passo 7 do checklist) e, depois, versão HTML + `List-Unsubscribe` nos
+  alertas.
