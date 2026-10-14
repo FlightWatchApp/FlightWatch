@@ -37,8 +37,8 @@ export default function PrivacyPage() {
             texto da senha) e o fuso horário do seu navegador, para mostrar datas no seu horário.
           </li>
           <li>
-            <strong>Monitoramentos:</strong> rotas, datas, número de passageiros, preço desejado e
-            os alertas que enviamos para você.
+            <strong>Monitoramentos:</strong> rotas, datas, número de passageiros e os alertas que
+            enviamos para você.
           </li>
           <li>
             <strong>Sem conta:</strong> buscar e ver promoções não exige cadastro. Não associamos

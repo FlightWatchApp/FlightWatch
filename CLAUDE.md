@@ -501,7 +501,13 @@ execução registra o provedor que de fato consultou.
 - outcomes: `queued`, `suppressed`, `idempotent_replay`;
 - `alert_event_lag_seconds`;
 - `alert_worker_pages_processed_total`;
-- `alert_worker_watch_skipped_total{reason}`.
+- `alert_worker_watch_skipped_total{reason}`;
+- `alert_low_price_reason_total{reason}` e `alert_low_price_reference_total{source}` (SPEC-039).
+
+SPEC-039: Watch novo tem uma regra só, `LOW_PRICE` (15% abaixo do preço
+normal ou abaixo do menor da viagem; sem preço desejado). Referências são
+da viagem (`findLowPriceReferences`), uma consulta por observação, não por
+Watch; o "só cai mais" é decidido dentro da transação com a regra travada.
 
 ### 6.6 `apps/notification-worker`
 

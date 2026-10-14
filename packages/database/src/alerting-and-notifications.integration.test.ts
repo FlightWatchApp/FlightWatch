@@ -20,6 +20,11 @@ import {
   markNotificationDeliveryResult,
   reconcileStaleSendingNotificationDeliveries,
 } from './notification-delivery-repository.js';
+import {
+  findLowPriceReferences,
+  findLowPriceReferencesForTargets,
+} from './low-price-repository.js';
+import { backfillLowPriceRules, revertLowPriceRules } from './low-price-backfill.js';
 
 // SPEC-012: mesmo placeholder de apps/notification-worker/src/process-job.ts.
 const STALE_SENDING_THRESHOLD_MS = 5 * 60 * 1000;
@@ -521,5 +526,142 @@ describe('notification delivery repository', () => {
         second.filter((row) => row.id === delivery.id).length;
       expect(totalResolved).toBe(1);
     });
+  });
+});
+
+describe('findLowPriceReferences (SPEC-039)', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const until = new Date('2026-10-14T12:00:00Z');
+  const at = (daysAgo: number, hour = 12) => new Date(Date.UTC(2026, 9, 14 - daysAgo, hour, 0, 0));
+
+  it('menor preço por dia na janela, menor da janela longa e a observação atual fora', async () => {
+    const { target } = await seedTargetWithWatch();
+    await createObservation(target.id, 50_000, at(1, 8));
+    await createObservation(target.id, 45_000, at(1, 20)); // mesmo dia: fica o menor
+    await createObservation(target.id, 47_000, at(2));
+    await createObservation(target.id, 30_000, at(40)); // fora dos 30 dias, dentro dos 90
+    await createObservation(target.id, 10_000, at(100)); // fora das duas janelas
+    const current = await createObservation(target.id, 20_000, at(0));
+
+    const refs = await findLowPriceReferences(prisma, {
+      searchTargetId: target.id,
+      currency: 'BRL',
+      until,
+      excludeObservationId: current.id,
+      historyWindowDays: 30,
+      lowestWindowDays: 90,
+    });
+
+    expect(refs.dailyLows).toEqual([
+      { day: '2026-10-12', amountMinor: 47_000 },
+      { day: '2026-10-13', amountMinor: 45_000 },
+    ]);
+    expect(refs.lowestAmountMinor).toBe(30_000);
+    expect(until.getTime() - at(40).getTime()).toBeGreaterThan(30 * DAY);
+  });
+
+  it('em lote: as mesmas referências por viagem, inclusive vazias', async () => {
+    const first = await seedTargetWithWatch();
+    const second = await seedTargetWithWatch();
+    await createObservation(first.target.id, 50_000, at(1));
+    await createObservation(first.target.id, 45_000, at(2));
+    await createObservation(first.target.id, 30_000, at(40));
+
+    const refs = await findLowPriceReferencesForTargets(prisma, {
+      targets: [
+        { id: first.target.id, currency: 'BRL' },
+        { id: second.target.id, currency: 'BRL' },
+      ],
+      until,
+      historyWindowDays: 30,
+      lowestWindowDays: 90,
+    });
+
+    expect(refs.get(first.target.id)).toEqual({
+      dailyLows: [
+        { day: '2026-10-12', amountMinor: 45_000 },
+        { day: '2026-10-13', amountMinor: 50_000 },
+      ],
+      lowestAmountMinor: 30_000,
+    });
+    expect(refs.get(second.target.id)).toEqual({ dailyLows: [], lowestAmountMinor: null });
+  });
+
+  it('sem observações, não há referência', async () => {
+    const { target } = await seedTargetWithWatch();
+    const refs = await findLowPriceReferences(prisma, {
+      searchTargetId: target.id,
+      currency: 'BRL',
+      until,
+      historyWindowDays: 30,
+      lowestWindowDays: 90,
+    });
+    expect(refs).toEqual({ dailyLows: [], lowestAmountMinor: null });
+  });
+});
+
+describe('backfillLowPriceRules (SPEC-039)', () => {
+  async function seedWithRules(status: 'ACTIVE' | 'PAUSED' | 'CANCELLED') {
+    const { watch } = await seedTargetWithWatch();
+    await prisma.watch.update({ where: { id: watch.id }, data: { status } });
+    await prisma.alertRule.create({
+      data: {
+        watchId: watch.id,
+        type: 'TARGET_PRICE',
+        targetAmountMinor: 100,
+        cooldownSeconds: 3600,
+      },
+    });
+    return watch;
+  }
+
+  async function rulesOf(watchId: string) {
+    const rules = await prisma.alertRule.findMany({ where: { watchId } });
+    return rules.map((rule) => `${rule.type}:${rule.enabled}`).sort();
+  }
+
+  it('ativos e pausados ficam só com LOW_PRICE; regras antigas desativadas, não apagadas', async () => {
+    const active = await seedWithRules('ACTIVE');
+    const paused = await seedWithRules('PAUSED');
+    const cancelled = await seedWithRules('CANCELLED');
+
+    const dry = await backfillLowPriceRules(prisma, { dropPercent: 15, dryRun: true });
+    expect(dry.migrated).toBeGreaterThanOrEqual(2);
+    expect(await rulesOf(active.id)).not.toContain('LOW_PRICE:true');
+
+    await backfillLowPriceRules(prisma, { dropPercent: 15, batchSize: 1 });
+
+    for (const watch of [active, paused]) {
+      expect(await rulesOf(watch.id)).toEqual([
+        'LOW_PRICE:true',
+        'PERCENTAGE_DROP:false',
+        'TARGET_PRICE:false',
+      ]);
+    }
+    expect(await rulesOf(cancelled.id)).toEqual(['PERCENTAGE_DROP:true', 'TARGET_PRICE:true']);
+
+    // Rodar de novo não muda nada.
+    const again = await backfillLowPriceRules(prisma, { dropPercent: 15 });
+    expect(again.migrated).toBe(0);
+    expect(await rulesOf(active.id)).toHaveLength(3);
+  });
+
+  it('o modo inverso volta as regras antigas e não deixa Watch novo sem regra', async () => {
+    const migrated = await seedWithRules('ACTIVE');
+    await backfillLowPriceRules(prisma, { dropPercent: 15 });
+    const { watch: fresh } = await seedTargetWithWatch();
+    await prisma.alertRule.deleteMany({ where: { watchId: fresh.id } });
+    await prisma.alertRule.create({
+      data: { watchId: fresh.id, type: 'LOW_PRICE', dropPercent: 15, cooldownSeconds: 43_200 },
+    });
+
+    await revertLowPriceRules(prisma);
+
+    expect(await rulesOf(migrated.id)).toEqual([
+      'LOW_PRICE:false',
+      'PERCENTAGE_DROP:true',
+      'TARGET_PRICE:true',
+    ]);
+    expect(await rulesOf(fresh.id)).toEqual(['LOW_PRICE:true']);
   });
 });

@@ -6,7 +6,7 @@ import { ApiError } from '@/lib/api/client';
 import { listOpportunities } from '@/lib/api/opportunities';
 import type { OpportunityItem } from '@/lib/api/types';
 import { getWatch, listWatches } from '@/lib/api/watches';
-import { pickHighlightWatch } from '@/lib/domain/watch-price';
+import { pickHighlightWatch, isBelowTypicalPrice } from '@/lib/domain/watch-price';
 
 async function safeOpportunities(): Promise<OpportunityItem[]> {
   try {
@@ -35,12 +35,8 @@ export default async function WatchesPage() {
 
   const opportunities = await safeOpportunities();
   const active = watches.filter((watch) => watch.status === 'ACTIVE' || watch.status === 'PAUSED');
-  const reachedTarget = watches.filter(
-    (watch) =>
-      watch.status === 'ACTIVE' &&
-      watch.targetAmountMinor !== null &&
-      watch.currentPrice !== null &&
-      watch.currentPrice.amountMinor <= watch.targetAmountMinor,
+  const belowTypical = watches.filter(
+    (watch) => watch.status === 'ACTIVE' && isBelowTypicalPrice(watch),
   ).length;
   const highlightSummary = pickHighlightWatch(watches);
   const highlight = highlightSummary ? await getWatch(highlightSummary.id) : null;
@@ -65,7 +61,7 @@ export default async function WatchesPage() {
         monitoring={active}
         stats={{
           monitoredCount: active.length,
-          targetReachedCount: reachedTarget,
+          belowTypicalCount: belowTypical,
           currentOfferCount: active.filter((watch) => watch.currentOffer !== null).length,
         }}
       />

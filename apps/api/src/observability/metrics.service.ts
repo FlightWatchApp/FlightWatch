@@ -31,6 +31,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-039: prévias da criação de Watch, pela fonte do preço normal. */
+  readonly watchPreviewTotal = new Counter({
+    name: 'watch_preview_total',
+    help: 'Prévias de criação de Watch pela fonte do preço normal — history/nearby_dates/none (SPEC-039).',
+    labelNames: ['source'],
+    registers: [this.registry],
+  });
+
   /** SPEC-009 §13. */
   readonly watchDetailFetchTotal = new Counter({
     name: 'watch_detail_fetch_total',

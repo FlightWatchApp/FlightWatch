@@ -10,9 +10,9 @@ import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
 import { IconPlus } from '@/components/ui/icon';
-import { parseAmountMinor } from '@/lib/domain/money';
 import type { TripType, WatchDetail } from '@/lib/api/types';
 import { createWatchAction } from '@/app/watches/new/actions';
+import { LowPricePreview } from './low-price-preview';
 import { WatchCreatedSummary } from './watch-created-summary';
 import styles from './create-watch-modal.module.css';
 
@@ -39,7 +39,6 @@ export function CreateWatchModal({
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [currency, setCurrency] = useState(SUPPORTED_CURRENCIES[0] ?? '');
-  const [targetPrice, setTargetPrice] = useState('');
 
   function openModal(): void {
     setFormError(null);
@@ -74,11 +73,6 @@ export function CreateWatchModal({
       setFormError('Informe a data de volta, ou mude para só ida.');
       return;
     }
-    const targetAmountMinor = parseAmountMinor(targetPrice);
-    if (targetAmountMinor === null) {
-      setFormError('Informe um preço desejado válido, maior que zero.');
-      return;
-    }
 
     startTransition(() => {
       void (async () => {
@@ -90,7 +84,6 @@ export function CreateWatchModal({
           returnDate: tripType === 'ROUND_TRIP' ? returnDate : null,
           currency,
           market: 'BR',
-          targetAmountMinor,
         });
 
         if (result.success && result.watch) {
@@ -128,8 +121,8 @@ export function CreateWatchModal({
         ) : (
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
             <p className={styles.intro}>
-              Escolha uma rota, defina sua meta de preço e acompanhe as próximas oportunidades em um
-              só lugar.
+              Escolha a rota e as datas. Avisamos por e-mail quando observarmos um preço bem abaixo
+              do normal para essa viagem.
             </p>
 
             <div className={styles.row}>
@@ -220,23 +213,14 @@ export function CreateWatchModal({
               )}
             </div>
 
-            <FormField
-              label="Preço desejado"
-              hint="Avisamos quando o preço atingir esse valor ou menos."
-              required
-            >
-              {(field) => (
-                <TextInput
-                  id={field.id}
-                  aria-describedby={field.describedBy}
-                  invalid={field.invalid}
-                  inputMode="decimal"
-                  placeholder="800,00"
-                  value={targetPrice}
-                  onChange={(event) => setTargetPrice(event.target.value)}
-                />
-              )}
-            </FormField>
+            <LowPricePreview
+              origin={origin?.code ?? null}
+              destination={destination?.code ?? null}
+              tripType={tripType}
+              departureDate={departureDate}
+              returnDate={returnDate}
+              currency={currency}
+            />
 
             {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 

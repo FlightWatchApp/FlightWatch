@@ -6,7 +6,8 @@ import styles from './price-history-chart.module.css';
 
 export interface PriceHistoryChartProps {
   points: PricePoint[];
-  targetAmountMinor: number | null;
+  /** SPEC-039: preço normal da viagem (linha tracejada); null sem preço normal. */
+  typicalAmountMinor: number | null;
 }
 
 const WIDTH = 640;
@@ -25,7 +26,7 @@ const INNER_HEIGHT = HEIGHT - PADDING * 2;
  */
 export function PriceHistoryChart({
   points: rawPoints,
-  targetAmountMinor,
+  typicalAmountMinor,
 }: PriceHistoryChartProps) {
   if (rawPoints.length === 0) {
     return <p className={styles.empty}>Ainda não há preço observado para desenhar o histórico.</p>;
@@ -37,8 +38,8 @@ export function PriceHistoryChart({
 
   const currency = points[0]?.currency ?? 'BRL';
   const amounts = points.map((point) => point.amountMinor);
-  if (targetAmountMinor !== null) {
-    amounts.push(targetAmountMinor);
+  if (typicalAmountMinor !== null) {
+    amounts.push(typicalAmountMinor);
   }
   const min = Math.min(...amounts);
   const max = Math.max(...amounts);
@@ -72,22 +73,22 @@ export function PriceHistoryChart({
           </linearGradient>
         </defs>
 
-        {targetAmountMinor !== null && (
+        {typicalAmountMinor !== null && (
           <>
             <line
               x1={PADDING}
               x2={WIDTH - PADDING}
-              y1={y(targetAmountMinor)}
-              y2={y(targetAmountMinor)}
+              y1={y(typicalAmountMinor)}
+              y2={y(typicalAmountMinor)}
               className={styles.targetLine}
             />
             <text
               x={WIDTH - PADDING}
-              y={y(targetAmountMinor) - 6}
+              y={y(typicalAmountMinor) - 6}
               className={styles.targetLabel}
               textAnchor="end"
             >
-              Preço desejado · {formatMoney({ amountMinor: targetAmountMinor, currency })}
+              Preço normal · {formatMoney({ amountMinor: typicalAmountMinor, currency })}
             </text>
           </>
         )}

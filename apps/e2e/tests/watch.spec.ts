@@ -6,7 +6,7 @@ test('busca, monitoramento, pausa, reativação e encerramento', async ({ page }
   await searchSaoPauloRio(page);
   await expect(page.getByRole('button', { name: 'Monitorar preço' }).first()).toBeVisible();
 
-  await monitorFirstOffer(page, '1,00');
+  await monitorFirstOffer(page);
 
   await page.goto('/watches');
   await page.getByRole('link', { name: 'Ver detalhes e histórico' }).first().click();

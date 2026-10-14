@@ -12,6 +12,7 @@ import type { OpportunityItem } from '@/lib/api/types';
 import { listWatches } from '@/lib/api/watches';
 import { matchesVisitorCity, visitorCityFromHeaders } from '@/lib/domain/visitor-city';
 import { ORIGIN_COOKIE_NAME, normalizeOriginCode } from './opportunities/origin';
+import { isBelowTypicalPrice } from '@/lib/domain/watch-price';
 
 /** PG-01/PG-02: promoções são um complemento da home — se o feed falhar, a página continua. */
 async function safeOpportunities(): Promise<OpportunityItem[]> {
@@ -78,12 +79,8 @@ export default async function HomePage() {
   const opportunities = await safeOpportunities();
 
   const active = watches.filter((watch) => watch.status === 'ACTIVE' || watch.status === 'PAUSED');
-  const reachedTarget = watches.filter(
-    (watch) =>
-      watch.status === 'ACTIVE' &&
-      watch.targetAmountMinor !== null &&
-      watch.currentPrice !== null &&
-      watch.currentPrice.amountMinor <= watch.targetAmountMinor,
+  const belowTypical = watches.filter(
+    (watch) => watch.status === 'ACTIVE' && isBelowTypicalPrice(watch),
   ).length;
 
   return (
@@ -98,7 +95,7 @@ export default async function HomePage() {
         notificationChannelVerified={user.notificationChannelVerified}
         opportunities={opportunities}
         monitoredCount={active.length}
-        targetReachedCount={reachedTarget}
+        belowTypicalCount={belowTypical}
         currentOfferCount={active.filter((watch) => watch.currentOffer !== null).length}
       />
     </>

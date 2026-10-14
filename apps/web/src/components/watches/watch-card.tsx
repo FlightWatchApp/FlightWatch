@@ -6,7 +6,7 @@ import { StatusTag } from '@/components/ui/status-tag';
 import type { WatchSummary } from '@/lib/api/types';
 import { formatDate, formatRelativeTime, isStale } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
-import { isAtLowestObservedPrice, isTargetReached } from '@/lib/domain/watch-price';
+import { isAtLowestObservedPrice, isBelowTypicalPrice } from '@/lib/domain/watch-price';
 import { WATCH_STATUS_PRESENTATION } from '@/lib/domain/watch-status';
 import styles from './watch-card.module.css';
 import { WatchLifecycleActions } from './watch-lifecycle-actions';
@@ -23,7 +23,7 @@ export interface WatchCardProps {
 export function WatchCard({ watch }: WatchCardProps) {
   const status = WATCH_STATUS_PRESENTATION[watch.status];
   const atLowest = isAtLowestObservedPrice(watch);
-  const targetReached = isTargetReached(watch);
+  const belowTypical = isBelowTypicalPrice(watch);
   const inactive = watch.status !== 'ACTIVE';
   const stale = watch.lastCheck ? isStale(watch.lastCheck.at) : true;
   const tripLabel =
@@ -49,19 +49,22 @@ export function WatchCard({ watch }: WatchCardProps) {
           <p className={styles.priceLabel}>Último preço observado</p>
           <p className={`${styles.price} tabular-nums`}>{price ?? '—'}</p>
         </div>
-        {watch.targetAmountMinor !== null && (
+        {watch.lowPrice?.typicalAmountMinor != null && (
           <div>
-            <p className={styles.priceLabel}>Preço desejado</p>
+            <p className={styles.priceLabel}>Preço normal</p>
             <p className={`${styles.target} tabular-nums`}>
-              {formatMoney({ amountMinor: watch.targetAmountMinor, currency: watch.currency })}
+              {formatMoney({
+                amountMinor: watch.lowPrice.typicalAmountMinor,
+                currency: watch.currency,
+              })}
             </p>
           </div>
         )}
       </div>
 
-      {(targetReached || atLowest) && (
+      {(belowTypical || atLowest) && (
         <div className={styles.highlights}>
-          {targetReached && <span className={styles.highlightStrong}>Preço desejado atingido</span>}
+          {belowTypical && <span className={styles.highlightStrong}>Bem abaixo do normal</span>}
           {atLowest && (
             <span className={styles.highlight}>
               <IconSparkle size={12} />

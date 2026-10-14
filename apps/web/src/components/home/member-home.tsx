@@ -22,7 +22,8 @@ export interface MemberHomeProps {
   notificationChannelVerified: boolean;
   opportunities: OpportunityItem[];
   monitoredCount: number;
-  targetReachedCount: number;
+  /** SPEC-039: monitoramentos ativos com preço bem abaixo do normal. */
+  belowTypicalCount: number;
   currentOfferCount: number;
 }
 
@@ -39,7 +40,7 @@ export function MemberHome({
   notificationChannelVerified,
   opportunities,
   monitoredCount,
-  targetReachedCount,
+  belowTypicalCount,
   currentOfferCount,
 }: MemberHomeProps) {
   const featured = opportunities.slice(0, 3);
@@ -90,8 +91,8 @@ export function MemberHome({
                 <dd>{monitoredCount}</dd>
               </div>
               <div>
-                <dt>Metas atingidas</dt>
-                <dd>{targetReachedCount}</dd>
+                <dt>Abaixo do normal</dt>
+                <dd>{belowTypicalCount}</dd>
               </div>
             </dl>
             <Link href="/watches" className={styles.overviewLink}>

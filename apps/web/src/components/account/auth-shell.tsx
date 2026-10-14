@@ -14,7 +14,7 @@ export interface AuthShellProps {
 // na mesma voz de components/home/landing.tsx — nada prometido aqui que a home não diga.
 const BENEFITS = [
   { Icon: IconRoute, text: 'Preço com histórico, não só o de hoje.' },
-  { Icon: IconBell, text: 'Um e-mail quando o preço desejado for atingido.' },
+  { Icon: IconBell, text: 'Um e-mail quando o preço ficar bem abaixo do normal.' },
   { Icon: IconShield, text: 'Compra direto no site parceiro, sem intermediação.' },
 ];
 

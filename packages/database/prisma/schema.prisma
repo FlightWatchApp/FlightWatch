@@ -272,6 +272,9 @@ enum AlertRuleType {
   PERCENTAGE_DROP
   ABSOLUTE_DROP
   NEW_OBSERVED_LOW
+  // SPEC-039: única regra de Watches novos — 15% abaixo do preço normal ou
+  // abaixo do menor já observado. As outras ficam para auditoria.
+  LOW_PRICE
 }
 
 enum ReferenceStrategy {
@@ -290,10 +293,15 @@ model AlertRule {
   dropPercent       Float?
   dropAmountMinor   Int?
 
-  referenceStrategy ReferenceStrategy?
-  cooldownSeconds   Int
-  enabled           Boolean            @default(true)
-  ruleVersion       Int                @default(1)
+  referenceStrategy   ReferenceStrategy?
+  // SPEC-039: preço normal das datas próximas no momento da criação (linha de
+  // base até haver histórico próprio). Nunca recalculado.
+  baselineAmountMinor Int?
+  baselineSource      String?
+  baselineComputedAt  DateTime?
+  cooldownSeconds     Int
+  enabled             Boolean            @default(true)
+  ruleVersion         Int                @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

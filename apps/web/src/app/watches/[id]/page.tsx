@@ -17,7 +17,7 @@ import { getRouteFacts } from '@/lib/api/routes';
 import { getWatch } from '@/lib/api/watches';
 import { formatDate, formatRelativeTime, isStale } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
-import { isAtLowestObservedPrice, isTargetReached } from '@/lib/domain/watch-price';
+import { isAtLowestObservedPrice, isBelowTypicalPrice } from '@/lib/domain/watch-price';
 import { routePagesEnabled } from '@/lib/domain/route-flag';
 import { routePath } from '@/lib/domain/route-url';
 import { WATCH_STATUS_PRESENTATION } from '@/lib/domain/watch-status';
@@ -50,7 +50,8 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
   const hasLifecycleActions = watch.status === 'ACTIVE' || watch.status === 'PAUSED';
   const inactive = watch.status !== 'ACTIVE';
   const stale = watch.lastCheck ? isStale(watch.lastCheck.at) : true;
-  const targetReached = isTargetReached(watch);
+  const belowTypical = isBelowTypicalPrice(watch);
+  const lowPrice = watch.lowPrice;
   const atLowest = isAtLowestObservedPrice(watch);
   // PG-06: a linha "Última verificação" só aparece quando não repetiria o
   // Freshness da oferta atual — sem oferta, inativo ou dado velho.
@@ -106,11 +107,9 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        {(targetReached || atLowest) && (
+        {(belowTypical || atLowest) && (
           <div className={styles.highlights}>
-            {targetReached && (
-              <span className={styles.highlightStrong}>Preço desejado atingido</span>
-            )}
+            {belowTypical && <span className={styles.highlightStrong}>Bem abaixo do normal</span>}
             {atLowest && (
               <span className={styles.highlight}>
                 <IconSparkle size={12} />
@@ -127,15 +126,32 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
               {watch.lowestPrice ? formatMoney(watch.lowestPrice) : '—'}
             </dd>
           </div>
-          {watch.targetAmountMinor !== null && (
+          {lowPrice && (
             <div>
-              <dt>Preço desejado</dt>
+              <dt>Preço normal</dt>
               <dd className="tabular-nums">
-                {formatMoney({ amountMinor: watch.targetAmountMinor, currency: watch.currency })}
+                {lowPrice.typicalAmountMinor !== null
+                  ? formatMoney({
+                      amountMinor: lowPrice.typicalAmountMinor,
+                      currency: watch.currency,
+                    })
+                  : 'Ainda calculando'}
               </dd>
             </div>
           )}
         </dl>
+
+        {lowPrice && (
+          <p className={styles.alertRule}>
+            {lowPrice.typicalSource === 'HISTORY'
+              ? 'Preço normal calculado com os preços que observamos nos últimos 30 dias. '
+              : lowPrice.typicalSource === 'NEARBY_DATES'
+                ? 'Preço normal calculado com os preços das datas próximas desta rota. '
+                : ''}
+            Avisamos por e-mail quando observarmos um preço pelo menos {lowPrice.dropPercent}%
+            abaixo do normal ou o menor preço já observado pelo Flight Watch para esta viagem.
+          </p>
+        )}
 
         {watch.currentOffer && (
           <Freshness
@@ -175,7 +191,7 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
         <p className={styles.chartSubtitle}>O eixo não começa em zero.</p>
         <PriceHistoryChart
           points={watch.priceHistory}
-          targetAmountMinor={watch.targetAmountMinor}
+          typicalAmountMinor={lowPrice?.typicalAmountMinor ?? null}
         />
       </Card>
       {routeFacts && <RouteFacts {...routeFacts} />}

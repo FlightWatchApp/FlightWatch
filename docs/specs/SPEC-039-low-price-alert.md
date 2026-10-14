@@ -1,6 +1,6 @@
 # SPEC-039 — Alerta de preço baixo pelo histórico (fim do preço desejado)
 
-Status: draft — aguardando revisão do owner
+Status: implemented (owner aprovou executar em 2026-10-14) — backfill dos Watches existentes aguarda aprovação
 Owner: Alerting
 Dependências: SPEC-005 (avaliação de alertas), SPEC-006 (notificação),
 SPEC-008 (ciclo do Watch), SPEC-014 (Watch a partir de oferta), SPEC-031
@@ -94,8 +94,10 @@ qualquer um dos casos vale:
    Preço que sobe e volta ao mesmo valor não gera aviso repetido.
 2. **Cooldown** de 12 h, como hoje (SPEC-035): um alerta que passa a regra
    dentro da janela fica `SUPPRESSED` (`COOLDOWN_ACTIVE`).
-3. Avaliação não elegível por (1) registra `not_triggered` com motivo
-   `NOT_BELOW_LAST_ALERT` na justificativa, para auditoria.
+3. Avaliação barrada por (1) não cria `AlertEvent` e conta
+   `alert_rules_evaluated_total{type="LOW_PRICE",result="not_triggered"}`.
+   Replay do mesmo job não é barrado: a chave de deduplicação é conferida
+   antes (H05).
 
 ### Linha de base na criação
 
@@ -114,12 +116,14 @@ qualquer um dos casos vale:
 - **Sai** o campo "Preço desejado".
 - **Entra** um resumo antes do botão:
   > São Paulo → Brasília · 20/11
-  > Preço normal **R$ 450** · Menor já observado **R$ 380** · Hoje **R$ 470**
+  > Preço normal **R$ 450** · Menor já observado **R$ 380** · Na sua data **R$ 470**
   > [gráfico de preço]
   > Vamos avisar quando observarmos um preço pelo menos 15% abaixo do normal
   > ou o menor preço já observado pelo Flight Watch.
-- Gráfico: histórico próprio, se houver; senão, preço por data das datas
-  próximas (`PriceByDateChart`, o mesmo da página da rota e da SPEC-038).
+- Gráfico: preço por data das datas próximas (`PriceByDateChart`, o mesmo
+  da página da rota e da SPEC-038). O histórico próprio aparece na página do
+  monitoramento.
+- Só para reais (BRL): com outra moeda, a tela mostra só o texto do alerta.
 - Sem dados: "Ainda não temos histórico desta viagem. Vamos acompanhar e
   avisar quando o preço cair." O botão continua habilitado.
 - Texto obrigatório: "menor preço já observado pelo Flight Watch", nunca
@@ -134,7 +138,10 @@ qualquer um dos casos vale:
 
 ### E-mail
 
-Template novo para `LOW_PRICE` (versão nova do template, SPEC-006):
+Caso novo no template de alerta (`renderAlertEmail`), assunto "Preço baixo:
+…". A versão do template continua 1: o texto dos tipos antigos não mudou.
+Os motivos vêm da justificativa do `AlertEvent`, validada na leitura pelo
+notification-worker (`lowPriceDetails`).
 
 > **R$ 360** para São Paulo → Brasília em 20/11
 > 20% abaixo do preço normal (R$ 450) · o menor preço já observado pelo
@@ -148,17 +155,19 @@ monitoramento.
 
 - `POST /v1/watches` e `POST /v1/offers/:id/watch`: o campo `alertRules`
   **deixa de ser aceito** do cliente. A API cria sempre uma regra
-  `LOW_PRICE`. Requisição com `alertRules` → `400`
-  (`ALERT_RULES_NOT_ACCEPTED`), para nenhum cliente achar que escolheu algo.
+  `LOW_PRICE`. Requisição com `alertRules` → `400` de validação (o schema é
+  `.strict()`), para nenhum cliente achar que escolheu algo.
   Mudança incompatível dentro de `v1`, aceita porque o único cliente é o
   web (BFF) e os dois sobem juntos.
-- `GET /v1/watches/preview?origin&destination&departureDate&returnDate&adults`
-  (autenticado, rate limit `pages`): `typicalAmountMinor`,
-  `typicalSource` (`HISTORY` | `NEARBY_DATES` | `NONE`),
-  `lowestAmountMinor`, `currentAmountMinor`, `currency`, série do gráfico e
-  `dropPercent`. Não cria nada.
-- `GET /v1/watches/:id`: ganha `typicalAmountMinor`, `typicalSource`,
-  `lowestAmountMinor` (aditivo).
+- `GET /v1/watches/preview?origin&destination&tripType&departureDate&returnDate`
+  (autenticado, rate limit `pages`): `typicalAmountMinor`, `typicalSource`
+  (`HISTORY` | `NEARBY_DATES` | `null`), `lowestAmountMinor`,
+  `currentAmountMinor`, `currency`, `days` (gráfico) e `dropPercent`. Não
+  cria nada. Métrica `watch_preview_total{source}`.
+- `GET /v1/watches` e `GET /v1/watches/:id`: o campo `targetAmountMinor` **sai**
+  e entra `lowPrice` (`dropPercent`, `typicalAmountMinor`, `typicalSource`,
+  `thresholdAmountMinor`, `lowestAmountMinor`; `null` sem regra `LOW_PRICE`
+  ativa), calculado em lote para a lista inteira (duas consultas).
 - Schemas Zod em `packages/contracts`.
 
 ## Persistência e migração
@@ -168,9 +177,8 @@ Migração **só aditiva**:
 - `AlertRuleType` ganha `LOW_PRICE`.
 - `AlertRule` ganha `baselineAmountMinor Int?`, `baselineSource String?`,
   `baselineComputedAt DateTime?`. `dropPercent` (já existe) guarda os 15%.
-- Índice para as consultas de referência, se o plano de execução pedir:
-  `price_observations (search_target_id, observed_at)` (conferir o que já
-  existe antes de criar).
+- Sem índice novo: as consultas usam o índice existente
+  `price_observations (searchTargetId, observedAt DESC)`.
 
 **Watches existentes** (backfill, script limitado, reiniciável e
 idempotente — CLAUDE.md §19):
@@ -179,8 +187,11 @@ idempotente — CLAUDE.md §19):
   `enabled = false` (não são apagadas: os alertas já enviados apontam para
   elas) e é criada uma regra `LOW_PRICE`, sem linha de base;
 - Watches terminais não mudam;
-- rodar duas vezes não cria regra duplicada (tipo único por Watch,
-  `assertUniqueAlertRuleTypes`);
+- rodar duas vezes não cria regra duplicada (Watch com `LOW_PRICE` é pulado,
+  conferido de novo dentro da transação);
+- comando: `pnpm --filter @flight-watch/database backfill:low-price -- --dry-run`
+  (sem `--dry-run` aplica; `--revert` desfaz, só em Watches que têm regra
+  antiga);
 - precisa de aprovação do owner antes de rodar em produção (CLAUDE.md §21).
 
 ## Idempotência e concorrência
@@ -274,4 +285,32 @@ e desativar `LOW_PRICE` com o mesmo script em modo inverso. Nada é apagado.
 
 ## Evidência de implementação
 
-Ainda não implementada.
+2026-10-14, branch `feat/low-price-alert`.
+
+- Domínio: `evaluateLowPriceRule`, `resolveTypicalPrice`,
+  `nearbyDatesBaseline`, `lowPriceThresholdMinor` — 10 testes (bordas de 15%
+  em centavos, menor igual/abaixo, motivos juntos, "só cai mais", sem
+  referência, moedas, janela, linha de base).
+- Banco: migração aditiva `20261014220000_low_price_alert` (conferida contra o
+  schema com `prisma migrate diff`: sem diferença); `findLowPriceReferences`
+  e versão em lote; backfill e reversão — 5 testes de integração com
+  Postgres real.
+- Alert-worker: 6 testes com Postgres real (histórico 15%/14%, linha de base,
+  menor de antes do Watch, "só cai mais", replay 3× = 1 alerta, sem
+  referência) — 17/17.
+- E-mail: 3 testes do template e 2 da leitura da justificativa.
+- API: criação com uma regra `LOW_PRICE` (15%, linha de base das datas
+  próximas), `400` com `alertRules`, prévia (dados, consulta inválida, sem
+  login) — 213/213.
+- Web: sai o preço desejado de todas as telas (formulário, modal, busca,
+  feed antigo, cartões, destaque, detalhe, contadores "Metas atingidas" →
+  "Abaixo do normal"); prévia `LowPricePreview`; linha do preço normal no
+  gráfico — 106 testes.
+- E2E (Playwright, simulado): 12/12; o teste de alerta escolhe uma data cujo
+  preço simulado está 15% abaixo das datas próximas e recebe o e-mail "Preço
+  baixo" com o motivo.
+- Navegador, dados reais da Travelpayouts (SAO → BSB, 20/11): preço normal
+  R$ 496 pelas datas próximas, gráfico outubro–dezembro; desktop e celular sem
+  rolagem horizontal nem erro no console.
+- Banco local: `--dry-run` do backfill mostra 2 Watches a migrar (3 regras
+  antigas). **Não aplicado**: aguarda aprovação do owner.

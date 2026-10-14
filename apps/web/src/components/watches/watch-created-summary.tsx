@@ -28,7 +28,9 @@ export function WatchCreatedSummary({ watch, onClose }: WatchCreatedSummaryProps
         <IconCheckCircle size={18} />
         <div>
           <strong>Monitoramento criado</strong>
-          <span>Vamos acompanhar essa rota e avisar quando o preço atingir sua meta.</span>
+          <span>
+            Vamos acompanhar essa viagem e avisar quando observarmos um preço bem abaixo do normal.
+          </span>
         </div>
       </div>
 
@@ -53,11 +55,14 @@ export function WatchCreatedSummary({ watch, onClose }: WatchCreatedSummaryProps
           </strong>
         </div>
         <div>
-          <span>Preço desejado</span>
+          <span>Preço normal</span>
           <strong>
-            {watch.targetAmountMinor !== null
-              ? formatMoney({ amountMinor: watch.targetAmountMinor, currency: watch.currency })
-              : 'Sem meta definida'}
+            {watch.lowPrice?.typicalAmountMinor != null
+              ? formatMoney({
+                  amountMinor: watch.lowPrice.typicalAmountMinor,
+                  currency: watch.currency,
+                })
+              : 'Calculando com o histórico'}
           </strong>
         </div>
         {watch.lowestPrice && (
@@ -86,7 +91,7 @@ export function WatchCreatedSummary({ watch, onClose }: WatchCreatedSummaryProps
         </div>
         <PriceHistoryChart
           points={watch.priceHistory}
-          targetAmountMinor={watch.targetAmountMinor}
+          typicalAmountMinor={watch.lowPrice?.typicalAmountMinor ?? null}
         />
       </section>
 

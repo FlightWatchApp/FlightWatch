@@ -91,7 +91,6 @@ function validBody(overrides: Record<string, unknown> = {}) {
     adults: 1,
     currency: 'BRL',
     market: 'BR',
-    alertRules: [{ type: 'TARGET_PRICE', amountMinor: 80000, cooldownSeconds: 43200 }],
     notificationChannelId: '',
     ...overrides,
   };
@@ -114,6 +113,54 @@ describe('POST /v1/watches (e2e, Postgres real via Testcontainers)', () => {
 
     const stored = await prisma.watch.findUnique({ where: { id: response.body.id } });
     expect(stored?.userId).toBe(userId);
+  });
+
+  // SPEC-039 AC-2: uma regra só, LOW_PRICE com 15% e a linha de base das datas próximas.
+  it('creates exactly one LOW_PRICE rule with the configured percent and a baseline', async () => {
+    const { channelId, token } = await createVerifiedUserWithChannel();
+
+    const response = await request(app.getHttpServer())
+      .post('/v1/watches')
+      .set(...authHeader(token))
+      .send(validBody({ notificationChannelId: channelId }));
+
+    expect(response.status).toBe(201);
+    const rules = await prisma.alertRule.findMany({ where: { watchId: response.body.id } });
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({
+      type: 'LOW_PRICE',
+      dropPercent: 15,
+      cooldownSeconds: 43_200,
+      baselineSource: 'NEARBY_DATES',
+    });
+    expect(rules[0]?.baselineAmountMinor).toBeGreaterThan(0);
+
+    const list = await request(app.getHttpServer())
+      .get('/v1/watches')
+      .set(...authHeader(token));
+    expect(list.body.watches[0].lowPrice).toMatchObject({
+      dropPercent: 15,
+      typicalSource: 'NEARBY_DATES',
+      typicalAmountMinor: rules[0]?.baselineAmountMinor,
+    });
+    expect(list.body.watches[0]).not.toHaveProperty('targetAmountMinor');
+  });
+
+  // SPEC-039 AC-1: o cliente não escolhe regra nem preço desejado.
+  it('rejects alertRules sent by the client', async () => {
+    const { channelId, token } = await createVerifiedUserWithChannel();
+
+    const response = await request(app.getHttpServer())
+      .post('/v1/watches')
+      .set(...authHeader(token))
+      .send(
+        validBody({
+          notificationChannelId: channelId,
+          alertRules: [{ type: 'TARGET_PRICE', amountMinor: 100, cooldownSeconds: 43_200 }],
+        }),
+      );
+
+    expect(response.status).toBe(400);
   });
 
   // DOMAIN.md §3.2: expiresAt precisa ser setado na criação (regressão: ficava
@@ -1056,5 +1103,41 @@ describe('currentOffer projection and POST /v1/watches/:id/purchase-click (SPEC-
     expect(body).toContain(
       'watch_purchase_link_click_total{provider="SIMULATED",status="CURRENT"}',
     );
+  });
+});
+
+describe('GET /v1/watches/preview (SPEC-039)', () => {
+  const query = 'origin=DOU&destination=GRU&tripType=ONE_WAY&departureDate=2026-12-20';
+
+  it('mostra o preço normal das datas próximas, o preço do dia e o gráfico, sem criar nada', async () => {
+    const { token } = await createVerifiedUserWithChannel();
+    const watchesBefore = await prisma.watch.count();
+
+    const response = await request(app.getHttpServer())
+      .get(`/v1/watches/preview?${query}`)
+      .set(...authHeader(token));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      currency: 'BRL',
+      dropPercent: 15,
+      typicalSource: 'NEARBY_DATES',
+    });
+    expect(response.body.typicalAmountMinor).toBeGreaterThan(0);
+    expect(response.body.days.length).toBeGreaterThan(0);
+    expect(await prisma.watch.count()).toBe(watchesBefore);
+  });
+
+  it('recusa consulta inválida e pede login', async () => {
+    const { token } = await createVerifiedUserWithChannel();
+    const invalid = await request(app.getHttpServer())
+      .get(
+        '/v1/watches/preview?origin=DOU&destination=GRU&tripType=ROUND_TRIP&departureDate=2026-12-20',
+      )
+      .set(...authHeader(token));
+    expect(invalid.status).toBe(400);
+
+    const anonymous = await request(app.getHttpServer()).get(`/v1/watches/preview?${query}`);
+    expect(anonymous.status).toBe(401);
   });
 });

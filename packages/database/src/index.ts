@@ -4,6 +4,8 @@ export * from './search-target-repository.js';
 export * from './scheduler-repository.js';
 export * from './price-observation-repository.js';
 export * from './alert-event-repository.js';
+export * from './low-price-repository.js';
+export * from './low-price-backfill.js';
 export * from './notification-delivery-repository.js';
 export * from './watch-listing-repository.js';
 export * from './watch-lifecycle-repository.js';

@@ -11,7 +11,6 @@ const validPayload = {
   adults: 1 as const,
   currency: 'BRL',
   market: 'BR',
-  alertRules: [{ type: 'TARGET_PRICE' as const, amountMinor: 80000, cooldownSeconds: 43200 }],
   notificationChannelId: '11111111-1111-1111-1111-111111111111',
 };
 
@@ -113,35 +112,11 @@ describe('createWatchRequestSchema', () => {
     expect(nonLeapYear.success).toBe(false);
   });
 
-  it('rejects zero alert rules', () => {
-    const result = createWatchRequestSchema.safeParse({ ...validPayload, alertRules: [] });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects more than four alert rules', () => {
-    const rules = [
-      { type: 'TARGET_PRICE' as const, amountMinor: 80000, cooldownSeconds: 43200 },
-      { type: 'PERCENTAGE_DROP' as const, percent: 10, cooldownSeconds: 43200 },
-      { type: 'ABSOLUTE_DROP' as const, dropAmountMinor: 10000, cooldownSeconds: 43200 },
-      { type: 'NEW_OBSERVED_LOW' as const, cooldownSeconds: 43200 },
-    ];
+  // SPEC-039: o cliente não escolhe regras — a API cria a de preço baixo.
+  it('rejects alertRules sent by the client', () => {
     const result = createWatchRequestSchema.safeParse({
       ...validPayload,
-      alertRules: [
-        ...rules,
-        { type: 'TARGET_PRICE' as const, amountMinor: 1, cooldownSeconds: 43200 },
-      ],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects duplicate alert rule types', () => {
-    const result = createWatchRequestSchema.safeParse({
-      ...validPayload,
-      alertRules: [
-        { type: 'TARGET_PRICE', amountMinor: 80000, cooldownSeconds: 43200 },
-        { type: 'TARGET_PRICE', amountMinor: 70000, cooldownSeconds: 43200 },
-      ],
+      alertRules: [{ type: 'TARGET_PRICE', amountMinor: 100, cooldownSeconds: 43200 }],
     });
     expect(result.success).toBe(false);
   });
@@ -152,38 +127,6 @@ describe('createWatchRequestSchema', () => {
       notificationChannelId: 'not-a-uuid',
     });
     expect(result.success).toBe(false);
-  });
-
-  it.each([0, -1, 101])('rejects an out-of-range PERCENTAGE_DROP percent: %s', (percent) => {
-    const result = createWatchRequestSchema.safeParse({
-      ...validPayload,
-      alertRules: [{ type: 'PERCENTAGE_DROP', percent, cooldownSeconds: 43200 }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it.each([0, 100, 3_000_000])('rejects an out-of-range cooldownSeconds: %s', (cooldownSeconds) => {
-    const result = createWatchRequestSchema.safeParse({
-      ...validPayload,
-      alertRules: [{ type: 'TARGET_PRICE', amountMinor: 80000, cooldownSeconds }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts each alert rule type on its own', () => {
-    const cases = [
-      { type: 'TARGET_PRICE' as const, amountMinor: 80000, cooldownSeconds: 43200 },
-      { type: 'PERCENTAGE_DROP' as const, percent: 15, cooldownSeconds: 43200 },
-      { type: 'ABSOLUTE_DROP' as const, dropAmountMinor: 10000, cooldownSeconds: 43200 },
-      { type: 'NEW_OBSERVED_LOW' as const, cooldownSeconds: 43200 },
-    ];
-    for (const alertRule of cases) {
-      const result = createWatchRequestSchema.safeParse({
-        ...validPayload,
-        alertRules: [alertRule],
-      });
-      expect(result.success).toBe(true);
-    }
   });
 
   it('normalizes casing on IATA/currency/market codes', () => {

@@ -19,6 +19,22 @@ export const currentOfferSchema = z.object({
   status: z.enum(['CURRENT', 'EXPIRED']),
 });
 
+/**
+ * SPEC-039: resumo do alerta de preço baixo, calculado pela API (o web não
+ * refaz a regra). null para Watch sem a regra `LOW_PRICE` ativa.
+ */
+export const watchLowPriceSchema = z.object({
+  /** Quanto abaixo do preço normal dispara (inteiro, fixado na regra). */
+  dropPercent: z.number().int(),
+  /** Preço normal; null sem histórico próprio suficiente nem linha de base. */
+  typicalAmountMinor: z.number().int().nullable(),
+  typicalSource: z.enum(['HISTORY', 'NEARBY_DATES']).nullable(),
+  /** Maior preço que ainda conta como "bem abaixo do normal". */
+  thresholdAmountMinor: z.number().int().nullable(),
+  /** Menor preço já observado da viagem nos últimos 90 dias. */
+  lowestAmountMinor: z.number().int().nullable(),
+});
+
 export const watchListItemSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'EXPIRED', 'CANCELLED']),
@@ -33,7 +49,7 @@ export const watchListItemSchema = z.object({
   currency: z.string(),
   currentPrice: moneySchema.nullable(),
   lowestPrice: moneySchema.nullable(),
-  targetAmountMinor: z.number().int().nullable(),
+  lowPrice: watchLowPriceSchema.nullable(),
   lastCheck: z
     .object({
       at: z.string(),
@@ -66,6 +82,7 @@ export const listWatchesQuerySchema = z.object({
 export type ListWatchesQuery = z.infer<typeof listWatchesQuerySchema>;
 
 export type CurrentOffer = z.infer<typeof currentOfferSchema>;
+export type WatchLowPrice = z.infer<typeof watchLowPriceSchema>;
 export type WatchListItem = z.infer<typeof watchListItemSchema>;
 export type ListWatchesResponse = z.infer<typeof listWatchesResponseSchema>;
 

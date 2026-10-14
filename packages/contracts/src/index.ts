@@ -2,6 +2,7 @@ export * from './watches/create-watch.js';
 export * from './watches/errors.js';
 export * from './watches/lifecycle.js';
 export * from './watches/list-watches.js';
+export * from './watches/watch-preview.js';
 export * from './auth/errors.js';
 export * from './auth/session.js';
 export * from './auth/register.js';

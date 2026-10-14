@@ -1,6 +1,6 @@
 # SPEC-035 — Escopo das regras de alerta no lançamento
 
-Status: implemented
+Status: deprecated — substituída pela SPEC-039 (2026-10-14): sai o preço desejado, entra o alerta de preço baixo
 Owner: owner do produto (decisão D1 do checklist pré-lançamento, 2026-10-10)
 Dependencies: SPEC-001 (contrato de Watch), SPEC-014 (derivação de Watch a partir de oferta)
 
