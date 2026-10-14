@@ -13,7 +13,13 @@ export const dynamic = 'force-dynamic';
  * em URL canônica. Áreas privadas ficam fora (e bloqueadas no robots).
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const pages: MetadataRoute.Sitemap = ['/', '/opportunities', '/transparencia'].map((path) => ({
+  const pages: MetadataRoute.Sitemap = [
+    '/',
+    '/opportunities',
+    '/transparencia',
+    '/privacidade',
+    '/termos',
+  ].map((path) => ({
     url: `${WEB_BASE_URL}${path}`,
   }));
   if (!routePagesEnabled()) return pages;

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import styles from './page.module.css';
+import styles from '@/components/layout/document-page.module.css';
 
 export const metadata = {
   title: 'Como ganhamos dinheiro',
@@ -34,17 +34,16 @@ export default function TransparencyPage() {
           Alguns links de compra carregam um código de afiliado que identifica que você veio do
           Flight Watch. Se a compra for concluída, o parceiro pode nos pagar uma porcentagem. Esse
           código nunca muda o preço, a ordem das promoções nem quais rotas aparecem: a classificação
-          de promoção é calculada só a partir do histórico de preços observados.
+          de promoção é calculada só a partir dos preços observados.
         </p>
       </section>
 
       <section className={styles.section}>
         <h2>O que é uma promoção aqui</h2>
         <p>
-          Uma rota vira promoção quando o preço observado agora é o menor que o sistema já viu para
-          ela, ou quando está bem abaixo da média observada recentemente. Cada promoção mostra o
-          motivo e quantos preços foram usados na comparação. Não prometemos que é o menor preço de
-          todos os sites — é o menor preço observado pelo sistema.
+          Uma rota vira promoção quando o preço de uma data está bem abaixo dos preços das datas
+          próximas da mesma rota. Cada promoção mostra quanto está abaixo e como calculamos. Não
+          prometemos o menor preço de todos os sites: é o preço que o sistema observou na fonte.
         </p>
       </section>
 

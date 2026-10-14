@@ -109,6 +109,11 @@ export default function RegisterPage() {
 
           {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 
+          <p className={styles.consent}>
+            Ao criar a conta, você concorda com os <Link href="/termos">Termos de Uso</Link> e a{' '}
+            <Link href="/privacidade">Política de Privacidade</Link>.
+          </p>
+
           <Button type="submit" disabled={isPending} fullWidth>
             {isPending ? 'Criando conta…' : 'Criar conta'}
           </Button>

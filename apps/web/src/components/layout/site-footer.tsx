@@ -18,6 +18,8 @@ export function SiteFooter() {
           <Link href="/opportunities">Promoções</Link>
           <Link href="/search">Buscar passagens</Link>
           <Link href="/transparencia">Como ganhamos dinheiro</Link>
+          <Link href="/privacidade">Privacidade</Link>
+          <Link href="/termos">Termos de uso</Link>
         </nav>
 
         <p className={styles.disclaimer}>
