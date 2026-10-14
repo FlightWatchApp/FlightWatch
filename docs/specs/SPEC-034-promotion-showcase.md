@@ -59,6 +59,10 @@ automática, hotéis e pacotes.
 - **Com cidade**: como hoje (SPEC-032) e, abaixo, "Destaques do Brasil" sem
   repetir destinos já mostrados.
 - Todo cartão mostra a origem.
+- **`/opportunities`** (owner, 2026-10-14): sem cidade, além do pedido de
+  cidade, mostra "Destaques do Brasil". A vitrine também aparece quando a
+  cidade escolhida não tem promoção ou a fonte falhou; com promoções da
+  cidade, não aparece.
 
 ### Cidade sugerida pelo acesso
 
@@ -136,3 +140,6 @@ motor ligado); desliga esvaziando a variável.
   nenhum cookie gravado, nada fora da tela, sem erro no console.
 - **Não verificado:** a Cloudflare real enviando os cabeçalhos (depende do
   deploy atrás da Cloudflare com "visitor location headers" ligado).
+- 2026-10-14, `/opportunities` com a vitrine: E2E 13/13 (teste novo em
+  `promotions.spec.ts`); navegador com dados reais (desktop e celular): 9
+  destaques, sem rolagem horizontal, sem erro no console.
