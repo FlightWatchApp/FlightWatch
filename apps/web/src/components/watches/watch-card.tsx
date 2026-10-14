@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { RouteLine } from '@/components/brand/route-line';
-import { PurchaseButton } from '@/components/purchase/purchase-button';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { IconAlertTriangle, IconChevronRight, IconClock, IconSparkle } from '@/components/ui/icon';
 import { StatusTag } from '@/components/ui/status-tag';
 import type { WatchSummary } from '@/lib/api/types';
@@ -82,15 +82,12 @@ export function WatchCard({ watch }: WatchCardProps) {
       </p>
 
       <div className={styles.actions}>
-        {watch.currentOffer && !inactive && (
-          <PurchaseButton
-            href={watch.currentOffer.purchaseUrl}
-            status={watch.currentOffer.status}
-            size="sm"
-            watchId={watch.id}
-            context={`${watch.origin} para ${watch.destination}${price ? ` por ${price}` : ''}`}
-          />
-        )}
+        {/* SPEC-038: a compra fica na página do monitoramento, com a companhia e o aviso de preço. */}
+        <ViewOfferLink
+          href={`/watches/${watch.id}`}
+          size="sm"
+          context={`${watch.origin} para ${watch.destination}${price ? ` por ${price}` : ''}`}
+        />
         <WatchLifecycleActions watchId={watch.id} status={watch.status} />
       </div>
     </article>

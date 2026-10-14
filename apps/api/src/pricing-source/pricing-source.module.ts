@@ -3,6 +3,7 @@ import { createFlightProvider } from '@flight-watch/providers';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
 import { KEY_VALUE_STORE, type KeyValueStore, RedisKeyValueStore } from './key-value-store.js';
+import { FlightDetailsCache } from './flight-details-cache.js';
 import { PriceCalendarCache } from './price-calendar-cache.js';
 import { ProviderCooldown } from './provider-guard.js';
 
@@ -30,9 +31,16 @@ import { ProviderCooldown } from './provider-guard.js';
       useFactory: (config: ApiConfig) => new RedisKeyValueStore(config.REDIS_URL),
     },
     PriceCalendarCache,
+    FlightDetailsCache,
     ProviderCooldown,
   ],
-  exports: [FLIGHT_PROVIDER, KEY_VALUE_STORE, PriceCalendarCache, ProviderCooldown],
+  exports: [
+    FLIGHT_PROVIDER,
+    KEY_VALUE_STORE,
+    PriceCalendarCache,
+    FlightDetailsCache,
+    ProviderCooldown,
+  ],
 })
 export class PricingSourceModule implements OnModuleDestroy {
   constructor(@Inject(KEY_VALUE_STORE) private readonly store: KeyValueStore) {}

@@ -13,6 +13,8 @@ import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
 import { OfferCard } from './[id]/offer-card';
 import styles from './search-results.module.css';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
+import { offerPath } from '@/lib/domain/route-url';
 
 export interface SearchResultsProps {
   search: FlightSearchResult;
@@ -22,6 +24,15 @@ export interface SearchResultsProps {
 }
 
 export function SearchResults({ search, embedded = false, calendar = null }: SearchResultsProps) {
+  // SPEC-038: busca só de ida leva à página da oferta da mesma data (mesma fonte e cache).
+  const offerHref =
+    routePagesEnabled() && search.tripType === 'ONE_WAY'
+      ? offerPath(
+          { code: search.origin, name: search.originName ?? '' },
+          { code: search.destination, name: search.destinationName ?? '' },
+          search.departureDate,
+        )
+      : null;
   const tripLabel =
     search.tripType === 'ROUND_TRIP' && search.returnDate
       ? `${formatDate(search.departureDate)} → ${formatDate(search.returnDate)}`
@@ -150,9 +161,14 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
             </InlineAlert>
           )}
           {search.offers.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} cheapest={offer.id === cheapest?.id} />
+            <OfferCard
+              key={offer.id}
+              offer={offer}
+              cheapest={offer.id === cheapest?.id}
+              offerHref={offerHref}
+            />
           ))}
-          {search.offers.some((offer) => offer.purchaseUrl) && <PurchaseNote />}
+          {!offerHref && search.offers.some((offer) => offer.purchaseUrl) && <PurchaseNote />}
         </div>
       )}
     </section>

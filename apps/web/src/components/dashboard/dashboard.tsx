@@ -134,7 +134,6 @@ export function Dashboard({ userEmail, highlight, promotions, monitoring, stats 
                     </li>
                   ))}
                 </ul>
-                {monitoring.some((watch) => watch.currentOffer) && <PurchaseNote />}
               </>
             ) : (
               <EmptyState

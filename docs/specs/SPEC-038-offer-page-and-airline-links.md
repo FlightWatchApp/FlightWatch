@@ -1,6 +1,6 @@
 # SPEC-038 — Página "Ver oferta" e compra no site da companhia aérea
 
-Status: draft — aguardando revisão do owner
+Status: F1–F4 implementadas (owner aprovou executar em 2026-10-14); F5 bloqueada pela pergunta 1
 Owner: Discovery
 Dependências: SPEC-018 (link de compra), SPEC-020 (afiliado e transparência),
 SPEC-029 (catálogo de lugares), SPEC-030 (provedor Travelpayouts), SPEC-031
@@ -58,7 +58,7 @@ no lugar de "Comprar passagem":
 | Vitrine "Destaques do Brasil" | `promotions/promotion-card.tsx`                           | página da oferta pública                  |
 | Feed antigo (motor desligado) | `deals/deal-card.tsx`                                     | página da oferta pública                  |
 | Página da rota                | `route/route-prices.tsx`                                  | página da oferta pública                  |
-| Resultado de busca            | `search/search-results.tsx`, `search/[id]/offer-card.tsx` | página da oferta da busca                 |
+| Resultado de busca (só ida)   | `search/search-results.tsx`, `search/[id]/offer-card.tsx` | página da oferta pública da mesma data    |
 | Monitoramentos                | `watches/watch-card.tsx`, `watch-highlight.tsx`           | página do monitoramento (`/watches/[id]`) |
 
 O botão de compra (`PurchaseButton`) sai dos cartões e fica só nas páginas
@@ -104,8 +104,10 @@ Estados distintos (CLAUDE.md §6.1):
   SPEC-033 (ex.: `/voos/sao-paulo-SAO-para-rio-de-janeiro-RIO/2026-11-29`).
   Só ida nesta versão, como as promoções. Slug fora do formato → 308 para
   o canônico, como na SPEC-033.
-- **Oferta de uma busca**: `/search/{searchId}/oferta/{offerId}` — mostra o
-  preço guardado naquela busca (SPEC-014), não recalcula.
+- **Oferta de uma busca**: a mesma página pública da data (decisão da
+  implementação, 2026-10-14: a busca e a página leem a mesma fonte e o mesmo
+  cache; uma página separada por busca repetiria tudo). Busca de ida e volta
+  continua com os botões de hoje, porque a página da oferta é só de ida.
 - **Monitoramento**: `/watches/{id}` ganha o mesmo cartão em destaque e os
   mesmos botões, com o último preço observado.
 
@@ -143,25 +145,28 @@ por preço (verificado em 2026-10-14, SAO → RIO, novembro):
   "Fatias", F1). Se a nova cobrir bem menos rotas, as duas convivem: a
   antiga para o calendário, a nova para os detalhes.
 
-### Domínio
+**Resultado da F1 (2026-10-14, 20 rotas, dezembro, só ida):** a consulta nova
+cobre **122 dias contra 301** da atual (40%); todos os dias dela trazem a
+companhia; nos 122 dias em comum o preço da nova é sempre 0,2% a 1,3% maior
+(mesma oferta, conversão de moeda diferente). Companhias mais vistas: AD,
+G3, JJ e LA (as duas da LATAM), H2, AR. **Decisão:** as duas convivem. O
+preço mostrado continua o da consulta atual (igual ao cartão e à promoção);
+a consulta nova só dá os detalhes do **voo mais barato encontrado naquele
+dia**, apresentados assim na página.
 
-`FareSummary` (`packages/domain/src/pricing/flight-offer.ts`) ganha campos
-**opcionais** — dados antigos continuam válidos, e o sistema nunca inventa
-um campo que a fonte não deu (ADR-004, SPEC-030):
+### Detalhes do voo na leitura (revisado após a F1)
 
-```ts
-carrierCode?: string;       // IATA da companhia, ex.: "AD"
-flightNumber?: string;      // "4193"
-departureAt?: string;       // RFC 3339 com o fuso da origem
-originAirport?: string;     // IATA do aeroporto, ex.: "GRU"
-destinationAirport?: string;
-```
-
-`toStoredItinerary`/`parseStoredItinerary` aceitam os dois formatos (com e
-sem os campos). Sem migração: o itinerário é JSON.
-
-O cache do calendário (Redis, SPEC-031) muda de versão de chave, para as
-entradas antigas, sem companhia, se reconstruírem sozinhas.
+- Porta nova do provedor, `flightDetailsByDay` (rota, mês, moeda, só ida):
+  para cada dia, o voo mais barato da consulta nova — companhia, número do
+  voo, saída (RFC 3339 com fuso), aeroportos, duração, escalas, preço e o
+  link da fonte. O provedor simulado gera detalhes determinísticos.
+- A API guarda o resultado no Redis por rota e mês (como o calendário,
+  SPEC-031) e só o lê na página da oferta e na do monitoramento.
+- **Nada muda nas observações gravadas** (`FareSummary`, itinerário): os
+  detalhes não fazem parte do preço observado e são buscados na hora de
+  mostrar. Sem migração de itinerário.
+- Dia sem detalhe na consulta nova: a página mostra preço e data, sem
+  companhia (nada inventado).
 
 ### Catálogo de companhias
 
@@ -264,7 +269,7 @@ destinationAirport, durationMinutes, stops }`, e os dois links:
 | Fatia | Conteúdo                                                                                                                                                               | Depende de      |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
 | F1    | **Spike**: cobertura de `prices_for_dates` × `v2/prices/latest` em 20 rotas (nacionais e internacionais); formato do link de busca de LATAM, GOL e Azul, testado à mão | —               |
-| F2    | Adaptador na consulta nova, `FareSummary` com os campos novos, cache com chave nova                                                                                    | F1              |
+| F2    | Porta `flightDetailsByDay` (Travelpayouts e simulado) e cache por rota-mês na API                                                                                      | F1              |
 | F3    | Catálogo de companhias (tabela, sync, logos)                                                                                                                           | —               |
 | F4    | Página da oferta pública, "Ver oferta" em todos os cartões, página do monitoramento e da busca com o cartão em destaque                                                | F2, F3          |
 | F5    | Botão principal para a companhia (ADR-009 + allowlist), secundário configurável, `/transparencia` atualizada                                                           | F4 e pergunta 1 |
@@ -295,8 +300,7 @@ resposta da Travelpayouts.
 ## Testes
 
 - Domínio: `airlineSearchUrl` por companhia (URL esperada), fallback para a
-  página inicial, companhia desconhecida; `FareSummary` com e sem os campos
-  novos (ida e volta pelo `toStoredItinerary`/`parseStoredItinerary`).
+  página inicial, companhia desconhecida.
 - Provedor: parser de `prices_for_dates` com fixture real (anonimizada),
   menor preço por dia, `gate` descartado, campos ausentes.
 - API (e2e): oferta pública nos quatro estados, allowlist, parceiro `none`.
@@ -325,4 +329,32 @@ resposta da Travelpayouts.
 
 ## Evidência de implementação
 
-Ainda não implementada.
+2026-10-14, branch `feat/offer-page` (sobre `feat/low-price-alert`).
+
+- **F1**: comparação real em 20 rotas (ver "Resultado da F1"). Formato dos
+  links de busca de LATAM, GOL e Azul **não verificado**: fica para a F5,
+  que está bloqueada.
+- **F2**: porta `flightDetailsByDay` (Travelpayouts `prices_for_dates` e
+  simulado determinístico) — 4 testes; `FlightDetailsCache` (Redis, rota-mês).
+- **F3**: tabela `airlines` (migração aditiva
+  `20261015000000_airlines_catalog`, conferida com `prisma migrate diff`),
+  `syncAirlinesCatalog`/`findAirlineNames`, sync no scheduler com a regra de
+  frescor do catálogo de lugares, métrica `airlines_sync_total{result}` —
+  testes de fonte, banco e scheduler. Execução real: 1121 companhias
+  gravadas, 38 descartadas.
+- **F4**: `GET /v1/routes/:o/:d/offers/:date` (estados OK, NO_PRICE,
+  UPDATING, UNAVAILABLE; preço do calendário, não do detalhe; métrica
+  `offer_page_requests_total{result}`) — 3 e2e; página
+  `/voos/{rota}/{data}` (308 para o canônico, `noindex, follow`, canonical
+  na rota); "Ver oferta" em promoções, vitrine, cartão do topo, página da
+  rota, busca só de ida e monitoramentos (estes levam a `/watches/{id}`, que
+  ganhou o voo do dia); logos por `next/image` (CSP sem mudança). Com a
+  página da rota desligada, os cartões mantêm a compra direta.
+- E2E 14/14 (2 novos em `offer.spec.ts`, e o de alerta confere o voo na
+  página do monitoramento).
+- Navegador, dados reais: São Paulo → São José do Rio Preto, 29/10, R$ 319
+  (60% abaixo das datas próximas), GOL G3 1368, 10:00, CGH → SJP, 1h10,
+  direto, logo carregado; desktop e celular sem rolagem horizontal nem erro.
+- **Fora desta entrega**: F5 (botão para o site da companhia, ADR-009,
+  allowlist e `PURCHASE_COMPARE_PARTNER`). O botão de compra continua o do
+  parceiro de hoje.

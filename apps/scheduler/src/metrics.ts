@@ -14,6 +14,8 @@ export interface SchedulerMetrics {
   placesSyncTotal: Counter<'result'>;
   /** SPEC-029: contagens do último ciclo de sincronização do catálogo. */
   placesSyncRecords: Gauge<'kind' | 'outcome'>;
+  /** SPEC-038: ciclos de sincronização do catálogo de companhias. */
+  airlinesSyncTotal: Counter<'result'>;
   refreshDelayedTargetsGauge: (prisma: PrismaClient) => Promise<void>;
 }
 
@@ -68,6 +70,13 @@ export function createSchedulerMetrics(): SchedulerMetrics {
     registers: [registry],
   });
 
+  const airlinesSyncTotal = new Counter({
+    name: 'airlines_sync_total',
+    help: 'Ciclos de sincronização do catálogo de companhias, por resultado (SPEC-038).',
+    labelNames: ['result'],
+    registers: [registry],
+  });
+
   async function refreshDelayedTargetsGauge(prisma: PrismaClient): Promise<void> {
     const rows = await countDelayedSearchTargetsByPriority(prisma);
     targetsDelayed.reset();
@@ -89,6 +98,7 @@ export function createSchedulerMetrics(): SchedulerMetrics {
     targetsDelayed,
     placesSyncTotal,
     placesSyncRecords,
+    airlinesSyncTotal,
     refreshDelayedTargetsGauge,
   };
 }

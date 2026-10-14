@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { RouteLine } from '@/components/brand/route-line';
+import { FlightSummary } from '@/components/offer/flight-summary';
 import { RouteFacts } from '@/components/route/route-facts';
 import { RouteSummary } from '@/components/route/route-summary';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
@@ -13,7 +14,7 @@ import { StatusTag } from '@/components/ui/status-tag';
 import { PriceHistoryChart } from '@/components/watches/price-history-chart';
 import { WatchLifecycleActions } from '@/components/watches/watch-lifecycle-actions';
 import { ApiError } from '@/lib/api/client';
-import { getRouteFacts } from '@/lib/api/routes';
+import { getRouteFacts, getRouteOffer } from '@/lib/api/routes';
 import { getWatch } from '@/lib/api/watches';
 import { formatDate, formatRelativeTime, isStale } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
@@ -22,6 +23,11 @@ import { routePagesEnabled } from '@/lib/domain/route-flag';
 import { routePath } from '@/lib/domain/route-url';
 import { WATCH_STATUS_PRESENTATION } from '@/lib/domain/watch-status';
 import styles from './page.module.css';
+
+/** Data de viagem já passada (UTC, sem fuso: CLAUDE.md §8.2). */
+function isPastDate(date: string): boolean {
+  return date < new Date().toISOString().slice(0, 10);
+}
 
 /** SPEC-033: página privada, fora do Google. */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -45,6 +51,14 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
   // Mesmo cabeçalho de rota da página pública (SPEC-033 fatia 5). Fatos do catálogo, sem
   // preço: se falhar, o monitoramento continua útil sem o mapa.
   const routeFacts = await getRouteFacts(watch.origin, watch.destination).catch(() => null);
+  // SPEC-038: voo mais barato que a fonte viu no dia (só ida, com a página da rota ligada).
+  // Falha ou dia sem detalhe: a página segue sem o bloco.
+  const flight =
+    routePagesEnabled() && watch.tripType === 'ONE_WAY' && !isPastDate(watch.departureDate)
+      ? await getRouteOffer(watch.origin, watch.destination, watch.departureDate)
+          .then((offer) => offer.flight)
+          .catch(() => null)
+      : null;
 
   const status = WATCH_STATUS_PRESENTATION[watch.status];
   const hasLifecycleActions = watch.status === 'ACTIVE' || watch.status === 'PAUSED';
@@ -140,6 +154,8 @@ export default async function WatchDetailPage({ params }: { params: Promise<{ id
             </div>
           )}
         </dl>
+
+        {flight && <FlightSummary flight={flight} />}
 
         {lowPrice && (
           <p className={styles.alertRule}>

@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import type {
   GetRouteFactsResponse,
+  GetRouteOfferResponse,
   GetRouteResponse,
   ListRoutesResponse,
 } from '@flight-watch/contracts';
@@ -26,5 +27,13 @@ export const getRouteFacts = cache(
   (origin: string, destination: string): Promise<GetRouteFactsResponse> =>
     apiFetch<GetRouteFactsResponse>(
       `/v1/routes/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/facts`,
+    ),
+);
+
+/** SPEC-038: oferta de um dia (só ida); mesma `cache` por requisição que a rota. */
+export const getRouteOffer = cache(
+  (origin: string, destination: string, date: string): Promise<GetRouteOfferResponse> =>
+    apiFetch<GetRouteOfferResponse>(
+      `/v1/routes/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/offers/${encodeURIComponent(date)}`,
     ),
 );

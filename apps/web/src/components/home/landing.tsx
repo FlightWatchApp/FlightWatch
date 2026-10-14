@@ -9,6 +9,7 @@ import { HeroIllustration } from './hero-illustration';
 import { HeroOriginPicker } from './hero-origin-picker';
 import { type HeroPromotion, heroFrom } from './hero-promotion';
 import styles from './landing.module.css';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
 
 const primaryLg = [buttonStyles.button, buttonStyles.primary, buttonStyles.lg].join(' ');
 const secondaryLg = [buttonStyles.button, buttonStyles.secondary, buttonStyles.lg].join(' ');
@@ -95,7 +96,7 @@ export function Landing({
               noPromotion={heroOriginChosen && !heroPromotion}
               suggested={originSuggestion !== null}
             />
-            {hero?.promotion.purchaseUrl && <PurchaseNote />}
+            {hero?.promotion.purchaseUrl && !hero.offerHref && <PurchaseNote />}
           </div>
         </div>
       </section>
@@ -123,6 +124,7 @@ export function Landing({
           <div className={styles.dealGrid}>
             {promotions.slice(0, SECTION_SIZE).map((promotion) => (
               <PromotionCard
+                offerPages={routePagesEnabled()}
                 key={promotion.destination}
                 origin={heroPromotion.origin}
                 originName={heroPromotion.originName}
@@ -159,6 +161,7 @@ export function Landing({
             <div className={styles.dealGrid}>
               {highlights.map((promotion) => (
                 <PromotionCard
+                  offerPages={routePagesEnabled()}
                   key={`${promotion.origin}-${promotion.destination}`}
                   origin={promotion.origin}
                   originName={promotion.originName}

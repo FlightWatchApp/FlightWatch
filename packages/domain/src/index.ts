@@ -3,6 +3,7 @@ export * from './search-target/canonical-key.js';
 export * from './watch/watch-status.js';
 export * from './alert-rule/alert-rule.js';
 export * from './alert-rule/low-price.js';
+export * from './airline/airline.js';
 export * from './pricing/flight-offer.js';
 export * from './pricing/observation-key.js';
 export * from './pricing/purchase-link.js';

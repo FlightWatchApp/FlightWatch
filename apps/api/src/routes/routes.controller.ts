@@ -2,6 +2,8 @@ import { Controller, Get, Param, Query, UseFilters, UseGuards } from '@nestjs/co
 import { SkipThrottle } from '@nestjs/throttler';
 import type {
   GetRouteFactsResponse,
+  GetRouteOfferParams,
+  GetRouteOfferResponse,
   GetRouteParams,
   GetRouteQuery,
   GetRouteResponse,
@@ -10,7 +12,11 @@ import type {
 import { SearchErrorFilter } from '../searches/search-error.filter.js';
 import { SearchThrottlerGuard } from '../searches/search-throttler.guard.js';
 import { AUTH_THROTTLER, SEARCH_THROTTLER } from '../throttling/throttling.module.js';
-import { GetRouteParamsPipe, GetRouteQueryPipe } from './get-route.pipe.js';
+import {
+  GetRouteOfferParamsPipe,
+  GetRouteParamsPipe,
+  GetRouteQueryPipe,
+} from './get-route.pipe.js';
 import { RoutesService } from './routes.service.js';
 
 /**
@@ -37,6 +43,16 @@ export class RoutesController {
   @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
   async facts(@Param(GetRouteParamsPipe) params: GetRouteParams): Promise<GetRouteFactsResponse> {
     return this.routes.facts(params.origin, params.destination);
+  }
+
+  /** SPEC-038: oferta de um dia (só ida). */
+  @Get(':origin/:destination/offers/:date')
+  @UseGuards(SearchThrottlerGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
+  async offer(
+    @Param(GetRouteOfferParamsPipe) params: GetRouteOfferParams,
+  ): Promise<GetRouteOfferResponse> {
+    return this.routes.offer(params.origin, params.destination, params.date);
   }
 
   @Get(':origin/:destination')

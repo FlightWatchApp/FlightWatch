@@ -4,7 +4,9 @@ import { ProviderError } from '../errors.js';
 import type {
   CalendarDay,
   CheapestByDestinationQuery,
+  DayFlightDetails,
   DestinationFare,
+  FlightDetailsQuery,
   FlightProvider,
   FlightSearchQuery,
   PriceCalendarQuery,
@@ -45,6 +47,25 @@ const responseSchema = z.object({
 });
 
 type Entry = z.infer<typeof entrySchema>;
+
+const IATA = /^[A-Z0-9]{2,3}$/;
+
+/** SPEC-038: `aviasales/v3/prices_for_dates` — um voo por entrada, com companhia e horário. */
+const detailSchema = z.object({
+  departure_at: z.string(),
+  airline: z.string().regex(IATA),
+  flight_number: z.union([z.string(), z.number()]).nullish(),
+  origin_airport: z.string().regex(IATA),
+  destination_airport: z.string().regex(IATA),
+  price: z.number().positive(),
+  transfers: z.number().int().nonnegative().nullish(),
+  duration_to: z.number().positive().nullish(),
+});
+
+type Detail = z.infer<typeof detailSchema>;
+
+/** "2026-11-29T10:10:00-03:00": data local da partida, sem converter fuso. */
+const LOCAL_DATE = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}/;
 
 export interface TravelpayoutsFlightProviderOptions {
   token: string;
@@ -156,6 +177,36 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  /**
+   * SPEC-038: o voo mais barato de cada dia do mês, com companhia e horário
+   * (`prices_for_dates`). Cobre menos dias que o calendário (F1: 40%), por
+   * isso só complementa a exibição; o preço exibido é o do calendário.
+   */
+  async flightDetailsByDay(query: FlightDetailsQuery): Promise<DayFlightDetails[]> {
+    const raw = await this.fetchData('/aviasales/v3/prices_for_dates', {
+      origin: query.originIata,
+      destination: query.destinationIata,
+      departure_at: query.month,
+      one_way: 'true',
+      currency: query.currency.toLowerCase(),
+      sorting: 'price',
+      unique: 'false',
+      limit: '1000',
+    });
+    const byDate = new Map<string, DayFlightDetails>();
+    for (const item of raw) {
+      const parsed = detailSchema.safeParse(item);
+      if (!parsed.success) continue;
+      const details = toDayDetails(parsed.data);
+      if (!details || !details.date.startsWith(query.month)) continue;
+      const current = byDate.get(details.date);
+      if (!current || details.amountMinor < current.amountMinor) {
+        byDate.set(details.date, details);
+      }
+    }
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   allFlightsUrl(query: FlightSearchQuery): string {
     return buildAviasalesSearchUrl(query);
   }
@@ -210,15 +261,25 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
   }
 
   private async fetchLatest(query: Record<string, string>): Promise<Entry[]> {
-    const params = new URLSearchParams({
+    const raw = await this.fetchData('/v2/prices/latest', {
       ...query,
       limit: '1000',
       show_to_affiliates: 'true',
     });
+    // Entrada malformada é descartada; não derruba as demais.
+    return raw.flatMap((item) => {
+      const entry = entrySchema.safeParse(item);
+      return entry.success ? [entry.data] : [];
+    });
+  }
+
+  /** GET na Data API com o tratamento de erro comum (H08); devolve `data` cru. */
+  private async fetchData(path: string, query: Record<string, string>): Promise<unknown[]> {
+    const params = new URLSearchParams(query);
 
     let response: Response;
     try {
-      response = await this.fetchFn(`${this.baseUrl}/v2/prices/latest?${params.toString()}`, {
+      response = await this.fetchFn(`${this.baseUrl}${path}?${params.toString()}`, {
         // Token só no header: nunca na URL, que pode acabar em log de proxy.
         headers: { 'X-Access-Token': this.options.token, Accept: 'application/json' },
         signal: AbortSignal.timeout(this.options.timeoutMs),
@@ -260,11 +321,7 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
     if (!parsed.success || parsed.data.success === false) {
       throw new ProviderError('MALFORMED_RESPONSE', 'travelpayouts: unexpected response shape');
     }
-    // Entrada malformada é descartada; não derruba as demais.
-    return parsed.data.data.flatMap((raw) => {
-      const entry = entrySchema.safeParse(raw);
-      return entry.success ? [entry.data] : [];
-    });
+    return parsed.data.data;
   }
 
   /** Econômica, ainda atual segundo a fonte e com preço positivo. */
@@ -328,4 +385,25 @@ export class TravelpayoutsFlightProvider implements FlightProvider {
       qualityFlags: ['CACHED_PRICE'],
     };
   }
+}
+
+/** Entrada da fonte → detalhes do dia; data local sem conversão de fuso (CLAUDE.md §8.2). */
+function toDayDetails(detail: Detail): DayFlightDetails | null {
+  const match = LOCAL_DATE.exec(detail.departure_at);
+  if (!match?.[1] || Number.isNaN(Date.parse(detail.departure_at))) return null;
+  const flightNumber =
+    detail.flight_number === null || detail.flight_number === undefined
+      ? null
+      : String(detail.flight_number).trim() || null;
+  return {
+    date: match[1],
+    carrierCode: detail.airline,
+    flightNumber,
+    departureAt: detail.departure_at,
+    originAirport: detail.origin_airport,
+    destinationAirport: detail.destination_airport,
+    durationMinutes: detail.duration_to ?? null,
+    stops: detail.transfers ?? 0,
+    amountMinor: Math.round(detail.price * 100),
+  };
 }

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import {
   type GetRouteFactsResponse,
+  type GetRouteOfferResponse,
   type GetRouteQuery,
   type GetRouteResponse,
   getRouteResponseSchema,
@@ -17,16 +18,19 @@ import {
   greatCircleKm,
   medianMinor,
   promotionFreshness,
+  referenceMonths,
   resolvePurchaseUrl,
 } from '@flight-watch/domain';
-import type { RouteCity } from '@flight-watch/database';
+import { type RouteCity, findAirlineNames } from '@flight-watch/database';
 import { type CalendarDay, type FlightProvider, ProviderError } from '@flight-watch/providers';
 import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
 import { KEY_VALUE_STORE, type KeyValueStore } from '../pricing-source/key-value-store.js';
+import { FlightDetailsCache } from '../pricing-source/flight-details-cache.js';
 import { PriceCalendarCache } from '../pricing-source/price-calendar-cache.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { DailyCallBudget, ProviderCooldown } from '../pricing-source/provider-guard.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
@@ -106,6 +110,8 @@ export class RoutesService {
     private readonly promotions: PromotionsService,
     private readonly cooldown: ProviderCooldown,
     private readonly metrics: MetricsService,
+    private readonly details: FlightDetailsCache,
+    private readonly prisma: PrismaService,
   ) {
     this.ttlMs = config.ROUTE_PAGE_CACHE_TTL_MINUTES * MINUTE_MS;
     this.budget = new DailyCallBudget(store, {
@@ -206,6 +212,138 @@ export class RoutesService {
     }
     this.metrics.routePageRequestsTotal.inc({ prices: status.toLowerCase(), cache: 'miss' });
     return { ...stored, allFlightsUrl: this.allFlightsUrl(stored) };
+  }
+
+  /**
+   * SPEC-038 — oferta de um dia (só ida): o preço do calendário para a data
+   * (o mesmo do cartão), as datas próximas para o gráfico, a promoção em cache
+   * se for a mesma data, e o voo mais barato que a fonte viu no dia. Mesmo
+   * cache, orçamento e Retry-After da página da rota.
+   */
+  async offer(
+    originParam: string,
+    destinationParam: string,
+    date: string,
+  ): Promise<GetRouteOfferResponse> {
+    if (!this.config.ROUTE_PAGE_ENABLED) {
+      throw new SearchError('ROUTE_NOT_FOUND', 'route page disabled');
+    }
+    const [originCode, destinationCode] = await Promise.all([
+      this.places.resolveCity(originParam),
+      this.places.resolveCity(destinationParam),
+    ]);
+    if (!originCode || !destinationCode || originCode === destinationCode) {
+      throw new SearchError('ROUTE_NOT_FOUND', 'route not found');
+    }
+    const now = new Date();
+    const today = isoDate(now.getTime());
+    if (date < today) {
+      throw new SearchError('ROUTE_NOT_FOUND', 'offer date in the past');
+    }
+    const { origin, destination } = await this.catalogFacts(originCode, destinationCode);
+
+    const results = await Promise.all(
+      referenceMonths(date, now).map((month) =>
+        this.month(originCode, destinationCode, month, 'ONE_WAY'),
+      ),
+    );
+    const days = results
+      .flatMap((result) => (result.kind === 'days' ? result.days : []))
+      .filter((day) => day.date >= today && promotionFreshness(day.observedAt, now) !== 'EXPIRED')
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    const price = days.find((day) => day.date === date) ?? null;
+    const others = days.filter((day) => day.date !== date).map((day) => day.amountMinor);
+
+    const routeStatus = priceStatus(results, days.length);
+    const status: GetRouteOfferResponse['status'] = price
+      ? 'OK'
+      : routeStatus === 'OK' || routeStatus === 'NO_PRICES'
+        ? 'NO_PRICE'
+        : routeStatus;
+
+    const [promotion, flight] = await Promise.all([
+      this.promotions.cachedPromotion(originCode, destinationCode, 'ONE_WAY'),
+      price ? this.flightOf(originCode, destinationCode, date) : Promise.resolve(null),
+    ]);
+    this.metrics.offerPageRequestsTotal.inc({ result: status.toLowerCase() });
+
+    return {
+      origin: { code: origin.code, name: origin.name },
+      destination: { code: destination.code, name: destination.name },
+      date,
+      status,
+      price,
+      currency: ROUTE_CURRENCY,
+      days,
+      nearbyMedianMinor: others.length >= 5 ? medianMinor(others) : null,
+      promotion:
+        promotion && promotion.departureDate === date
+          ? { discountBps: promotion.discountBps, explanation: promotion.reference.explanation }
+          : null,
+      flight,
+      purchaseUrl: price ? this.purchaseUrl(originCode, destinationCode, date) : null,
+      generatedAt: now.toISOString(),
+    };
+  }
+
+  /** Voo mais barato do dia (detalhes); qualquer falha vira "sem detalhe", nunca erro. */
+  private async flightOf(
+    origin: string,
+    destination: string,
+    date: string,
+  ): Promise<GetRouteOfferResponse['flight']> {
+    let details;
+    try {
+      details = await this.details.get(
+        {
+          originIata: origin,
+          destinationIata: destination,
+          month: date.slice(0, 7),
+          currency: ROUTE_CURRENCY,
+        },
+        { beforeFetch: () => this.beforeFetch() },
+      );
+    } catch (error) {
+      if (error instanceof ProviderError) {
+        await this.cooldown.note(error, 'route_page_provider_rate_limited');
+        return null;
+      }
+      if (error instanceof MonthRefused) return null;
+      throw error;
+    }
+    const day = details?.find((item) => item.date === date);
+    if (!day) return null;
+    const names = await findAirlineNames(this.prisma.client, [day.carrierCode]);
+    return {
+      carrierCode: day.carrierCode,
+      carrierName: names.get(day.carrierCode) ?? null,
+      flightNumber: day.flightNumber,
+      departureAt: day.departureAt,
+      originAirport: day.originAirport,
+      destinationAirport: day.destinationAirport,
+      durationMinutes: day.durationMinutes === null ? null : Math.round(day.durationMinutes),
+      stops: day.stops,
+    };
+  }
+
+  /** Busca do dia no site parceiro, pela allowlist e com afiliado (SPEC-020). */
+  private purchaseUrl(origin: string, destination: string, date: string): string | null {
+    const raw = this.provider.allFlightsUrl?.({
+      originIata: origin,
+      destinationIata: destination,
+      departureDate: date,
+      returnDate: null,
+      tripType: 'ONE_WAY',
+      cabin: 'ECONOMY',
+      adults: 1,
+      currency: ROUTE_CURRENCY,
+      market: ROUTE_MARKET,
+    });
+    return withAffiliateTracking(
+      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
+      this.provider.strategy,
+      'ROUTE',
+    );
   }
 
   /** Lugares, distância e tempo estimado: só catálogo, sem fonte de preços nem orçamento. */

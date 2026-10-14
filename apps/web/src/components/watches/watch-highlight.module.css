@@ -49,18 +49,6 @@
   margin-top: var(--space-4);
 }
 
-.detailsLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  padding-inline: var(--space-2);
-  color: var(--color-text-on-dark);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
 .right {
   display: flex;
   flex-direction: column;

@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, type PipeTransform } from '@nestjs/common';
 import type { z, ZodTypeAny } from 'zod';
 import {
+  type GetRouteOfferParams,
   type GetRouteParams,
   type GetRouteQuery,
+  getRouteOfferParamsSchema,
   getRouteParamsSchema,
   getRouteQuerySchema,
 } from '@flight-watch/contracts';
@@ -31,5 +33,13 @@ export class GetRouteParamsPipe implements PipeTransform<unknown, GetRouteParams
 export class GetRouteQueryPipe implements PipeTransform<unknown, GetRouteQuery> {
   transform(value: unknown): GetRouteQuery {
     return validate(getRouteQuerySchema, value, 'invalid route query');
+  }
+}
+
+/** SPEC-038: rota e data da oferta. */
+@Injectable()
+export class GetRouteOfferParamsPipe implements PipeTransform<unknown, GetRouteOfferParams> {
+  transform(value: unknown): GetRouteOfferParams {
+    return validate(getRouteOfferParamsSchema, value, 'invalid offer');
   }
 }

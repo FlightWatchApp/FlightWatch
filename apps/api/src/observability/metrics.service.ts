@@ -202,6 +202,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-038. */
+  readonly offerPageRequestsTotal = new Counter({
+    name: 'offer_page_requests_total',
+    help: 'Respostas da página da oferta por resultado — ok/no_price/updating/unavailable (SPEC-038).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
   readonly routePageRequestsTotal = new Counter({
     name: 'route_page_requests_total',
     help: 'Respostas da página da rota por estado dos preços (ok/no_prices/updating/unavailable) e cache da resposta (hit/miss) (SPEC-033).',

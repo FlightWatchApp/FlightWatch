@@ -541,3 +541,13 @@ model Place {
   @@index([cityCode])
   @@map("places")
 }
+
+// SPEC-038: companhias aéreas (nome para a página da oferta), sincronizadas
+// pelo scheduler a partir do arquivo público da Travelpayouts. Nunca apagadas.
+model Airline {
+  code     String   @id
+  name     String
+  syncedAt DateTime
+
+  @@map("airlines")
+}

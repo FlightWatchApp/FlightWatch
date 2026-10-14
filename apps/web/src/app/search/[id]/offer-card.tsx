@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { RouteLine } from '@/components/brand/route-line';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,6 +23,8 @@ export interface OfferCardProps {
   offer: FlightSearchOfferView;
   /** CP-16: a oferta mais barata desta busca ganha a marca — nunca "do mercado". */
   cheapest?: boolean;
+  /** SPEC-038: página da oferta desta data; com ela, a compra fica lá. */
+  offerHref?: string | null;
 }
 
 /**
@@ -29,7 +32,7 @@ export interface OfferCardProps {
  * link não passa na allowlist — o card nunca inventa um link nesse caso,
  * mesmo que `deeplink` bruto exista no banco.
  */
-export function OfferCard({ offer, cheapest = false }: OfferCardProps) {
+export function OfferCard({ offer, cheapest = false, offerHref = null }: OfferCardProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -104,14 +107,24 @@ export function OfferCard({ offer, cheapest = false }: OfferCardProps) {
       </div>
 
       <div className={styles.offerActions}>
-        {offer.purchaseUrl && (
-          <PurchaseButton
-            href={offer.purchaseUrl}
-            status={offer.availabilityStatus}
+        {offerHref ? (
+          <ViewOfferLink
+            href={offerHref}
+            size="sm"
             {...(first && last
               ? { context: `${first.originIata} para ${last.destinationIata}` }
               : {})}
           />
+        ) : (
+          offer.purchaseUrl && (
+            <PurchaseButton
+              href={offer.purchaseUrl}
+              status={offer.availabilityStatus}
+              {...(first && last
+                ? { context: `${first.originIata} para ${last.destinationIata}` }
+                : {})}
+            />
+          )
         )}
         <Button
           variant="secondary"

@@ -4,7 +4,9 @@ import { ProviderError } from '../errors.js';
 import type {
   CalendarDay,
   CheapestByDestinationQuery,
+  DayFlightDetails,
   DestinationFare,
+  FlightDetailsQuery,
   FlightProvider,
   FlightSearchQuery,
   PriceCalendarQuery,
@@ -27,6 +29,8 @@ function deterministicPriceMinor(seed: string): number {
 // — mesma allowlist que packages/domain/src/pricing/purchase-link.ts exige
 // antes de expor qualquer deeplink numa resposta HTTP.
 const SIMULATED_BOOKING_HOST = 'booking.simulated-provider.flightwatch.dev';
+/** SPEC-038: companhias simuladas (códigos IATA reais, dados inventados). */
+const SIMULATED_CARRIERS = ['AD', 'G3', 'LA'] as const;
 // SPEC-018: 1h é só um valor plausível pra ter dado real pra projetar e
 // testar — não é uma política de produto aprovada (ver spec, "Questões em aberto").
 const SIMULATED_OFFER_TTL_MS = 60 * 60 * 1000;
@@ -162,6 +166,33 @@ export class SimulatedFlightProvider implements FlightProvider {
         ),
         stops: 0,
         observedAt,
+      };
+    });
+  }
+
+  /**
+   * SPEC-038: um voo por dia, com o mesmo preço do calendário simulado e
+   * companhia, número e horário derivados da mesma semente (sem aleatoriedade).
+   * Aeroportos simulados = códigos das cidades.
+   */
+  async flightDetailsByDay(query: FlightDetailsQuery): Promise<DayFlightDetails[]> {
+    const [year, month] = query.month.split('-').map(Number);
+    const daysInMonth = new Date(Date.UTC(year ?? 0, month ?? 1, 0)).getUTCDate();
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      const date = `${query.month}-${String(index + 1).padStart(2, '0')}`;
+      const seed = `${query.originIata}|${query.destinationIata}|${date}`;
+      const value = createHash('sha256').update(`details|${seed}`).digest().readUInt32BE(0);
+      const hour = String(6 + (value % 16)).padStart(2, '0');
+      return {
+        date,
+        carrierCode: SIMULATED_CARRIERS[value % SIMULATED_CARRIERS.length] ?? 'AD',
+        flightNumber: String(1000 + (value % 8000)),
+        departureAt: `${date}T${hour}:${value % 2 === 0 ? '10' : '40'}:00-03:00`,
+        originAirport: query.originIata,
+        destinationAirport: query.destinationIata,
+        durationMinutes: 60 + (value % 180),
+        stops: 0,
+        amountMinor: deterministicPriceMinor(seed),
       };
     });
   }

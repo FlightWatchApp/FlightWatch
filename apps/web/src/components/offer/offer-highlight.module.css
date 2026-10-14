@@ -1,0 +1,154 @@
+/* SPEC-038 — mesmo fundo do destaque do monitoramento (petróleo + brilho da rota). */
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse 60% 90% at 85% 0%, var(--color-route-glow), transparent 70%),
+    var(--color-brand-strong);
+  color: var(--color-text-on-dark);
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.badge {
+  padding: 0.2rem var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-success-soft-bg);
+  color: var(--color-success-soft-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.route {
+  margin: 0;
+  font-size: inherit;
+}
+
+.trip,
+.age {
+  color: var(--color-text-on-dark-muted);
+  font-size: var(--text-sm);
+}
+
+.price {
+  margin-top: var(--space-2);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.secondary {
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-on-dark);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-on-dark);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text-on-dark) 10%, transparent);
+}
+
+.secondary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.flight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.carrier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.logo {
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.carrierName {
+  font-weight: 600;
+}
+
+.flightNote,
+.nearby {
+  color: var(--color-text-on-dark-muted);
+  font-size: var(--text-sm);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.stats > div {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text-on-dark) 10%, transparent);
+}
+
+.stats dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-on-dark-muted);
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice,
+.explanation {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.sectionTitle {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xl);
+}
+
+.routeLink {
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .card {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    padding: var(--space-6);
+  }
+}

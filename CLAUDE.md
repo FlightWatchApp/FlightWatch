@@ -378,7 +378,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - Searches/Offers (SPEC-014: busca de descoberta pública e derivação de Watch a partir de uma oferta);
 - Opportunities (SPEC-015: feed público de oportunidades, `Deal` computado em leitura);
 - Promotions (SPEC-032: feed público por origem; provedor e cache vêm do `PricingSourceModule`, global);
-- Routes (SPEC-033: página da rota e sitemap; orçamento e rate limit `pages` próprios);
+- Routes (SPEC-033: página da rota e sitemap; orçamento e rate limit `pages` próprios; SPEC-038: oferta de um dia, `GET /v1/routes/:o/:d/offers/:date`, com o voo mais barato do dia via `FlightDetailsCache`);
 - Health;
 - Observability interna.
 
@@ -413,7 +413,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - `AcquireScheduleLease`;
 - `ReconcileAbandonedLeases`;
 - `ExpireWatches`;
-- `SyncPlacesCatalog` (SPEC-029: catálogo de cidades/aeroportos, no startup se vazio ou com 7+ dias e a cada 24 h; `places:sync` força).
+- `SyncPlacesCatalog` (SPEC-029: catálogo de cidades/aeroportos, no startup se vazio ou com 7+ dias e a cada 24 h; `places:sync` força) e, no mesmo ciclo, o catálogo de companhias (SPEC-038, tabela `airlines`).
 - `EnforceProviderBudget`.
 
 **Job produzido:** `PriceCheckRequested.v1`.
@@ -594,6 +594,7 @@ Cada package deve exportar uma superfície pública pequena. Não importar arqui
 | `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas                   |
 | `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019)      |
 | `Place`                            | cidade ou aeroporto do catálogo (SPEC-029)         | chave `(code, kind)`; nunca apagado, só `searchable=false`; nenhuma lista no código |
+| `Airline`                          | companhia do catálogo (SPEC-038)                   | código IATA de 2 caracteres; só nome para exibição; nenhuma lista no código         |
 | promoção (SPEC-032)                | conclusão sobre preços da fonte, por origem        | **não é model Prisma** — só cache Redis reconstruível; avaliação pura no domínio    |
 
 ### 8.1 Dinheiro

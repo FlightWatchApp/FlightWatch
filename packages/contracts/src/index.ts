@@ -22,3 +22,4 @@ export * from './opportunities/list-opportunities.js';
 export * from './places/places.js';
 export * from './promotions/list-promotions.js';
 export * from './routes/get-route.js';
+export * from './routes/get-route-offer.js';

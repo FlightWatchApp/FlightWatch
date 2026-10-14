@@ -12,4 +12,5 @@ export * from './watch-lifecycle-repository.js';
 export * from './flight-search-repository.js';
 export * from './opportunity-repository.js';
 export * from './places-repository.js';
+export * from './airlines-repository.js';
 export * from './places-test-fixture.js';

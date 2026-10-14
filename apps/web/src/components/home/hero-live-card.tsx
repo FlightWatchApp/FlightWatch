@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PriceByDateChart } from '@/components/charts/price-by-date-chart';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
 import { formatMoney } from '@/lib/domain/money';
 import { monthsLabel, shortDate } from '@/lib/domain/price-chart';
@@ -73,14 +74,22 @@ export function HeroLiveCard({ live }: { live: HeroPromotion }) {
         )}
 
         <div className={styles.actions}>
-          {promotion.purchaseUrl && (
-            <PurchaseButton
-              href={promotion.purchaseUrl}
-              status="CURRENT"
+          {live.offerHref ? (
+            <ViewOfferLink
+              href={live.offerHref}
               size="sm"
-              label="Ver no site parceiro"
               context={`${originName} para ${promotion.destinationName} por ${priceText}`}
             />
+          ) : (
+            promotion.purchaseUrl && (
+              <PurchaseButton
+                href={promotion.purchaseUrl}
+                status="CURRENT"
+                size="sm"
+                label="Ver no site parceiro"
+                context={`${originName} para ${promotion.destinationName} por ${priceText}`}
+              />
+            )
           )}
           <form action={searchPromotionDateAction}>
             <input type="hidden" name="origin" value={origin} />

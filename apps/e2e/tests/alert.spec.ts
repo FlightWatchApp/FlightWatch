@@ -30,6 +30,8 @@ test('preço bem abaixo do normal: o sistema consulta, detecta e envia o e-mail 
   await expect(page.getByText('Monitorando').first()).toBeVisible();
   await expect(page.getByText('Preço normal', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Bem abaixo do normal', { exact: true })).toBeVisible();
+  // SPEC-038: o voo mais barato que a fonte viu no dia (provedor simulado).
+  await expect(page.getByText('Voo mais barato que encontramos neste dia')).toBeVisible();
 
   // Clique de compra: abre o parceiro em outra aba, sem sair do Flight Watch.
   await context.route('**/*simulated-provider*/**', (route) =>

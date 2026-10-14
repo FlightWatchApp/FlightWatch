@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { RouteLine } from '@/components/brand/route-line';
-import { PurchaseButton } from '@/components/purchase/purchase-button';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { Freshness } from '@/components/ui/freshness';
 import type { WatchDetail } from '@/lib/api/types';
 import { formatDate } from '@/lib/domain/freshness';
@@ -71,18 +70,11 @@ export function WatchHighlight({ watch }: WatchHighlightProps) {
         )}
 
         <div className={styles.actions}>
-          {watch.currentOffer ? (
-            <PurchaseButton
-              href={watch.currentOffer.purchaseUrl}
-              status={watch.currentOffer.status}
-              watchId={watch.id}
-              context={`${watch.origin} para ${watch.destination}`}
-              inverse
-            />
-          ) : null}
-          <Link href={`/watches/${watch.id}`} className={styles.detailsLink}>
-            Ver detalhes e histórico
-          </Link>
+          <ViewOfferLink
+            href={`/watches/${watch.id}`}
+            context={`${watch.origin} para ${watch.destination}`}
+            inverse
+          />
         </div>
       </div>
 
