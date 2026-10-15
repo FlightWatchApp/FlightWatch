@@ -127,9 +127,20 @@ class CountingProvider implements FlightProvider {
       : days;
   }
 
+  detailsCalls: string[] = [];
+
+  /** SPEC-038: detalhes do simulado (companhia, voo, horário). */
+  async flightDetailsByDay(
+    query: Parameters<NonNullable<FlightProvider['flightDetailsByDay']>>[0],
+  ): ReturnType<NonNullable<FlightProvider['flightDetailsByDay']>> {
+    this.detailsCalls.push(`${query.originIata}-${query.destinationIata}-${query.month}`);
+    return this.simulated.flightDetailsByDay(query);
+  }
+
   reset(): void {
     this.candidateCalls = [];
     this.calendarCalls = [];
+    this.detailsCalls = [];
     this.failCandidates.clear();
     this.holdCandidates.clear();
   }
@@ -245,6 +256,10 @@ describe('GET /v1/promotions — motor ligado', () => {
     expect(Date.parse(rio.observedAt)).toBeLessThanOrEqual(Date.now());
     expect(rio.score).toBeGreaterThan(0);
     expect(rio.purchaseUrl).toMatch(/^https:\/\/booking\.simulated-provider\.flightwatch\.dev\//);
+    // SPEC-038: o voo mais barato do dia vem junto (só exibição; o preço é o do feed).
+    expect(rio.flight).toMatchObject({ originAirport: 'SAO', destinationAirport: 'RIO', stops: 0 });
+    expect(['AD', 'G3', 'LA']).toContain(rio.flight.carrierCode);
+    expect(provider.detailsCalls).toEqual([`SAO-RIO-${DEPARTURE.slice(0, 7)}`]);
 
     // 1 chamada de candidatos; BSB (velho) e ZZZ (fora do catálogo) nem viram candidatos.
     expect(provider.candidateCalls).toEqual(['SAO']);

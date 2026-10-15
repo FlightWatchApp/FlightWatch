@@ -355,6 +355,12 @@ resposta da Travelpayouts.
 - Navegador, dados reais: São Paulo → São José do Rio Preto, 29/10, R$ 319
   (60% abaixo das datas próximas), GOL G3 1368, 10:00, CGH → SJP, 1h10,
   direto, logo carregado; desktop e celular sem rolagem horizontal nem erro.
+- **Cartões de promoção com o voo** (owner, 2026-10-14): o feed anexa o voo
+  mais barato do dia (`flight` em `PromotionItem`, mesmo cache rota-mês e
+  orçamento do feed; recusa ou erro deixa a promoção sem voo). O cartão
+  ficou largo na página de promoções (até 72rem, duas colunas por container
+  query) e continua empilhado em grades estreitas e no celular. Execução
+  real: as 6 promoções de São Paulo com companhia (GOL e Azul).
 - **Fora desta entrega**: F5 (botão para o site da companhia, ADR-009,
   allowlist e `PURCHASE_COMPARE_PARTNER`). O botão de compra continua o do
   parceiro de hoje.
