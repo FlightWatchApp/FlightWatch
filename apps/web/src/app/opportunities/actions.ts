@@ -35,7 +35,6 @@ export type MonitorableOpportunity = Pick<
 
 export async function monitorOpportunityAction(
   opportunity: MonitorableOpportunity,
-  targetAmountMinor: number,
 ): Promise<MonitorOpportunityActionResult> {
   const user = await getCurrentUser();
   if (!user) {
@@ -54,7 +53,6 @@ export async function monitorOpportunityAction(
       returnDate: opportunity.returnDate,
       currency: opportunity.currency,
       market: opportunity.market,
-      targetAmountMinor,
       notificationChannelId: user.notificationChannelId,
     });
     try {

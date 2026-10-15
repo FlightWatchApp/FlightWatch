@@ -11,8 +11,8 @@ import type { SelectedPlace } from '@/components/places/place-options';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
-import { parseAmountMinor } from '@/lib/domain/money';
 import type { TripType } from '@/lib/api/types';
+import { LowPricePreview } from '@/components/watches/low-price-preview';
 import { createWatchAction } from './actions';
 import styles from './page.module.css';
 
@@ -30,7 +30,6 @@ export function NewWatchForm() {
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [currency, setCurrency] = useState(SUPPORTED_CURRENCIES[0] ?? '');
-  const [targetPrice, setTargetPrice] = useState('');
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -52,11 +51,6 @@ export function NewWatchForm() {
       setFormError('Informe a data de volta, ou mude para só ida.');
       return;
     }
-    const targetAmountMinor = parseAmountMinor(targetPrice);
-    if (targetAmountMinor === null) {
-      setFormError('Informe um preço desejado válido, maior que zero.');
-      return;
-    }
 
     startTransition(() => {
       void (async () => {
@@ -68,7 +62,6 @@ export function NewWatchForm() {
           returnDate: tripType === 'ROUND_TRIP' ? returnDate : null,
           currency,
           market: 'BR',
-          targetAmountMinor,
         });
         if (result.success) {
           router.push('/watches');
@@ -88,8 +81,8 @@ export function NewWatchForm() {
       <div>
         <h1>Novo monitoramento</h1>
         <p className={styles.subtitle}>
-          Configure a rota, as datas e o preço que você quer acompanhar. Você recebe um alerta por
-          e-mail quando a condição for atendida.
+          Escolha a rota e as datas. Você recebe um e-mail quando observarmos um preço bem abaixo do
+          normal para essa viagem — sem precisar adivinhar um valor.
         </p>
       </div>
 
@@ -182,24 +175,16 @@ export function NewWatchForm() {
                 </Select>
               )}
             </FormField>
-            <FormField
-              label="Preço desejado"
-              hint="Avisamos por e-mail quando o preço atingir esse valor ou menos, e também quando surgir um novo menor preço que observamos."
-              required
-            >
-              {(field) => (
-                <TextInput
-                  id={field.id}
-                  aria-describedby={field.describedBy}
-                  invalid={field.invalid}
-                  inputMode="decimal"
-                  placeholder="800,00"
-                  value={targetPrice}
-                  onChange={(event) => setTargetPrice(event.target.value)}
-                />
-              )}
-            </FormField>
           </div>
+
+          <LowPricePreview
+            origin={origin?.code ?? null}
+            destination={destination?.code ?? null}
+            tripType={tripType}
+            departureDate={departureDate}
+            returnDate={returnDate}
+            currency={currency}
+          />
 
           {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 

@@ -65,6 +65,35 @@ export interface DestinationFare {
   observedAt: string;
 }
 
+/** SPEC-038: rota e mês para os detalhes do voo mais barato de cada dia (só ida). */
+export interface FlightDetailsQuery {
+  originIata: string;
+  destinationIata: string;
+  /** AAAA-MM */
+  month: string;
+  currency: string;
+}
+
+/**
+ * SPEC-038: o voo mais barato que a fonte viu num dia. Só para exibição — o
+ * preço mostrado continua o do calendário (SPEC-031); este preço pode diferir
+ * um pouco (conversão de moeda da fonte).
+ */
+export interface DayFlightDetails {
+  /** AAAA-MM-DD (data local da partida). */
+  date: string;
+  /** IATA da companhia, ex.: "AD". */
+  carrierCode: string;
+  flightNumber: string | null;
+  /** RFC 3339 com o fuso da origem. */
+  departureAt: string;
+  originAirport: string;
+  destinationAirport: string;
+  durationMinutes: number | null;
+  stops: number;
+  amountMinor: number;
+}
+
 export interface FlightProvider {
   readonly strategy: string;
   search(query: FlightSearchQuery, context: ProviderContext): Promise<ProviderSearchResult>;
@@ -74,4 +103,6 @@ export interface FlightProvider {
   allFlightsUrl?(query: FlightSearchQuery): string;
   /** SPEC-032 (opcional): um preço por destino; sem a capacidade, o feed fica vazio. */
   cheapestByDestination?(query: CheapestByDestinationQuery): Promise<DestinationFare[]>;
+  /** SPEC-038 (opcional): voo mais barato de cada dia do mês, com companhia e horário. */
+  flightDetailsByDay?(query: FlightDetailsQuery): Promise<DayFlightDetails[]>;
 }

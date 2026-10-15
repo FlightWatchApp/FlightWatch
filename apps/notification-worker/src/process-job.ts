@@ -13,6 +13,7 @@ import { computeDeliveryKey } from '@flight-watch/domain';
 import {
   EmailDeliveryError,
   type EmailSender,
+  type LowPriceEmailDetails,
   renderAlertEmail,
 } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
@@ -162,6 +163,8 @@ export async function processNotificationJob(
     observedAt: alertEvent.priceObservation.observedAt.toISOString(),
     userTimezone: alertEvent.watch.user.timezone,
     unsubscribeUrl: buildUnsubscribeUrl(alertEvent.watchId),
+    lowPrice:
+      alertEvent.triggerType === 'LOW_PRICE' ? lowPriceDetails(alertEvent.justification) : null,
   });
 
   try {
@@ -215,4 +218,23 @@ export async function processNotificationJob(
       throw deliveryError;
     }
   }
+}
+
+/**
+ * SPEC-039: motivos do alerta de preço baixo, lidos da justificativa gravada
+ * pelo alert-worker. JSON do banco é validado aqui (fronteira): campo
+ * inesperado vira ausência de detalhe, nunca erro de envio.
+ */
+export function lowPriceDetails(justification: unknown): LowPriceEmailDetails | null {
+  if (typeof justification !== 'object' || justification === null) return null;
+  const { reasons, typicalAmountMinor } = justification as Record<string, unknown>;
+  if (!Array.isArray(reasons)) return null;
+  return {
+    belowTypical: reasons.includes('BELOW_TYPICAL'),
+    lowestObserved: reasons.includes('LOWEST_OBSERVED'),
+    typicalAmountMinor:
+      typeof typicalAmountMinor === 'number' && Number.isSafeInteger(typicalAmountMinor)
+        ? typicalAmountMinor
+        : null,
+  };
 }

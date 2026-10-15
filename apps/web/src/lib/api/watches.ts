@@ -2,8 +2,8 @@ import type {
   ListWatchesResponse,
   WatchDetailResponse,
   WatchListItem,
+  WatchPreviewResponse,
 } from '@flight-watch/contracts';
-import { buildLaunchAlertRules } from '@/lib/domain/alert-rules';
 import { apiFetch } from './client';
 import type { WatchDetail, WatchSummary } from './types';
 
@@ -60,11 +60,10 @@ export interface CreateWatchInput {
   returnDate: string | null;
   currency: string;
   market: string;
-  targetAmountMinor: number;
   notificationChannelId: string;
 }
 
-/** Regras do escopo de lançamento — ver `buildLaunchAlertRules`. */
+/** SPEC-039: sem regras do cliente — a API cria o alerta de preço baixo. */
 export async function createWatch(input: CreateWatchInput): Promise<{ id: string }> {
   return apiFetch<{ id: string }>('/v1/watches', {
     method: 'POST',
@@ -78,8 +77,29 @@ export async function createWatch(input: CreateWatchInput): Promise<{ id: string
       adults: 1,
       currency: input.currency,
       market: input.market,
-      alertRules: buildLaunchAlertRules(input.targetAmountMinor),
       notificationChannelId: input.notificationChannelId,
     }),
   });
+}
+
+export interface WatchPreviewInput {
+  origin: string;
+  destination: string;
+  tripType: 'ONE_WAY' | 'ROUND_TRIP';
+  departureDate: string;
+  returnDate: string | null;
+}
+
+/** SPEC-039: preço normal, menor já observado e preço de hoje antes de criar. */
+export function previewWatch(input: WatchPreviewInput): Promise<WatchPreviewResponse> {
+  const params = new URLSearchParams({
+    origin: input.origin,
+    destination: input.destination,
+    tripType: input.tripType,
+    departureDate: input.departureDate,
+  });
+  if (input.tripType === 'ROUND_TRIP' && input.returnDate) {
+    params.set('returnDate', input.returnDate);
+  }
+  return apiFetch<WatchPreviewResponse>(`/v1/watches/preview?${params.toString()}`);
 }

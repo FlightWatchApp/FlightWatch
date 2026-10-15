@@ -58,3 +58,36 @@ describe('renderAlertEmail', () => {
     expect(email.textBody).toContain(base.unsubscribeUrl);
   });
 });
+
+describe('renderAlertEmail — LOW_PRICE (SPEC-039)', () => {
+  const lowPrice: AlertEmailTemplateData = {
+    ...base,
+    triggerType: 'LOW_PRICE',
+    currentAmountMinor: 36_000,
+    referenceAmountMinor: 45_000,
+    lowPrice: { belowTypical: true, lowestObserved: true, typicalAmountMinor: 45_000 },
+  };
+
+  it('explica os dois motivos, com a porcentagem e o preço normal', () => {
+    const email = renderAlertEmail(lowPrice);
+    // Intl separa "R$" do valor com espaço não quebrável.
+    expect(email.subject).toMatch(/^Preço baixo: DOU → GRU por R\$\s360,00$/);
+    expect(email.textBody).toMatch(/20% abaixo do preço normal desta viagem \(R\$\s450,00\)\./);
+    expect(email.textBody).toContain('menor preço já observado pelo Flight Watch');
+    expect(email.textBody.toLowerCase()).not.toContain('mercado');
+  });
+
+  it('mostra só o motivo que valeu', () => {
+    const email = renderAlertEmail({
+      ...lowPrice,
+      lowPrice: { belowTypical: false, lowestObserved: true, typicalAmountMinor: null },
+    });
+    expect(email.textBody).not.toContain('abaixo do preço normal');
+    expect(email.textBody).toContain('menor preço já observado');
+  });
+
+  it('sem detalhes, usa a explicação genérica', () => {
+    const email = renderAlertEmail({ ...lowPrice, lowPrice: null });
+    expect(email.textBody).toContain('bem abaixo do que costumamos observar');
+  });
+});

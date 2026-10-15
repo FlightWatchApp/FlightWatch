@@ -26,14 +26,16 @@ import {
   resolvePurchaseUrl,
   selectHighlights,
 } from '@flight-watch/domain';
-import type { SearchableCity } from '@flight-watch/database';
+import { type SearchableCity, findAirlineNames } from '@flight-watch/database';
 import { logEvent } from '@flight-watch/observability';
 import { type DestinationFare, type FlightProvider, ProviderError } from '@flight-watch/providers';
 import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
+import { FlightDetailsCache } from '../pricing-source/flight-details-cache.js';
 import { PriceCalendarCache } from '../pricing-source/price-calendar-cache.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { KEY_VALUE_STORE, type KeyValueStore } from '../pricing-source/key-value-store.js';
 import { DailyCallBudget, ProviderCooldown } from '../pricing-source/provider-guard.js';
 import { FLIGHT_PROVIDER } from '../searches/flight-provider.token.js';
@@ -139,6 +141,8 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
     private readonly places: PlacesService,
     private readonly metrics: MetricsService,
     private readonly cooldown: ProviderCooldown,
+    private readonly details: FlightDetailsCache,
+    private readonly prisma: PrismaService,
   ) {
     this.budget = new DailyCallBudget(store, {
       keyPrefix: 'promotions:budget:v1',
@@ -420,7 +424,11 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
         round,
       ),
     );
-    const promotions = evaluated.filter((item): item is StoredPromotion => item !== null);
+    const promotions = await this.withFlights(
+      origin.code,
+      evaluated.filter((item): item is StoredPromotion => item !== null),
+      round,
+    );
     const generatedAt = now.toISOString();
 
     if (round.refused && promotions.length === 0) {
@@ -573,7 +581,66 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
       observedAt: fare.observedAt,
       score: promotion.score,
       scoreVersion: promotion.scoreVersion,
+      flight: null,
     };
+  }
+
+  /**
+   * SPEC-038: anexa o voo mais barato do dia (companhia, horário) às promoções
+   * só de ida. Mesmo cache rota-mês da página da oferta e mesmo orçamento do
+   * feed; recusa ou erro da fonte deixa a promoção sem voo, nunca a derruba.
+   */
+  private async withFlights(
+    origin: string,
+    promotions: StoredPromotion[],
+    round: RoundState,
+  ): Promise<StoredPromotion[]> {
+    const withDetails = await mapWithConcurrency(
+      promotions,
+      CANDIDATE_CONCURRENCY,
+      async (promotion) => {
+        if (promotion.tripType !== 'ONE_WAY') return { promotion, day: null };
+        try {
+          const details = await this.details.get(
+            {
+              originIata: origin,
+              destinationIata: promotion.destination,
+              month: promotion.departureDate.slice(0, 7),
+              currency: PROMOTION_CURRENCY,
+            },
+            { beforeFetch: () => this.beforeCall(round) },
+          );
+          const day = details?.find((item) => item.date === promotion.departureDate) ?? null;
+          return { promotion, day };
+        } catch (error) {
+          if (error instanceof CallRefused) return { promotion, day: null };
+          if (error instanceof ProviderError) {
+            await this.noteProviderError(error);
+            return { promotion, day: null };
+          }
+          throw error;
+        }
+      },
+    );
+    const names = await findAirlineNames(
+      this.prisma.client,
+      withDetails.flatMap(({ day }) => (day ? [day.carrierCode] : [])),
+    );
+    return withDetails.map(({ promotion, day }) => ({
+      ...promotion,
+      flight: day
+        ? {
+            carrierCode: day.carrierCode,
+            carrierName: names.get(day.carrierCode) ?? null,
+            flightNumber: day.flightNumber,
+            departureAt: day.departureAt,
+            originAirport: day.originAirport,
+            destinationAirport: day.destinationAirport,
+            durationMinutes: day.durationMinutes === null ? null : Math.round(day.durationMinutes),
+            stops: day.stops,
+          }
+        : null,
+    }));
   }
 
   /** Link pela allowlist (SPEC-018) e com afiliado na superfície OPPORTUNITY (SPEC-020). */

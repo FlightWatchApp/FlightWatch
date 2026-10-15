@@ -12,7 +12,8 @@ import styles from './dashboard.module.css';
 
 export interface DashboardStats {
   monitoredCount: number;
-  targetReachedCount: number;
+  /** SPEC-039: monitoramentos ativos com preço bem abaixo do normal. */
+  belowTypicalCount: number;
   currentOfferCount: number;
 }
 
@@ -35,14 +36,19 @@ function formatCount(value: number, singular: string, plural: string): string {
 }
 
 export function Dashboard({ userEmail, highlight, promotions, monitoring, stats }: DashboardProps) {
-  const targetLabel = formatCount(stats.targetReachedCount, 'meta atingida', 'metas atingidas');
-  const targetDistance =
-    highlight?.currentPrice && highlight.targetAmountMinor !== null
-      ? Math.abs(highlight.targetAmountMinor - highlight.currentPrice.amountMinor)
+  const belowTypicalLabel = formatCount(
+    stats.belowTypicalCount,
+    'abaixo do normal',
+    'abaixo do normal',
+  );
+  const typical = highlight?.lowPrice?.typicalAmountMinor ?? null;
+  const typicalDistance =
+    highlight?.currentPrice && typical !== null
+      ? Math.abs(typical - highlight.currentPrice.amountMinor)
       : null;
-  const targetDirection =
-    highlight?.currentPrice && highlight.targetAmountMinor !== null
-      ? highlight.currentPrice.amountMinor <= highlight.targetAmountMinor
+  const typicalDirection =
+    highlight?.currentPrice && typical !== null
+      ? highlight.currentPrice.amountMinor <= typical
         ? 'abaixo'
         : 'acima'
       : null;
@@ -116,7 +122,7 @@ export function Dashboard({ userEmail, highlight, promotions, monitoring, stats 
                 <p className={styles.sectionKicker}>Rotas sob observação</p>
                 <h2 id="monitoring-title">Todos os seus monitoramentos</h2>
               </div>
-              <span className={styles.count}>{targetLabel}</span>
+              <span className={styles.count}>{belowTypicalLabel}</span>
             </div>
 
             {monitoring.length > 0 ? (
@@ -128,7 +134,6 @@ export function Dashboard({ userEmail, highlight, promotions, monitoring, stats 
                     </li>
                   ))}
                 </ul>
-                {monitoring.some((watch) => watch.currentOffer) && <PurchaseNote />}
               </>
             ) : (
               <EmptyState
@@ -156,8 +161,8 @@ export function Dashboard({ userEmail, highlight, promotions, monitoring, stats 
                 <dd>{stats.monitoredCount}</dd>
               </div>
               <div className={styles.stat}>
-                <dt>Metas atingidas</dt>
-                <dd>{stats.targetReachedCount}</dd>
+                <dt>Abaixo do normal</dt>
+                <dd>{stats.belowTypicalCount}</dd>
               </div>
               <div className={styles.stat}>
                 <dt>Ofertas atuais</dt>
@@ -176,16 +181,16 @@ export function Dashboard({ userEmail, highlight, promotions, monitoring, stats 
             </Link>
           </section>
 
-          {highlight?.currentPrice && targetDistance !== null && targetDirection && (
+          {highlight?.currentPrice && typicalDistance !== null && typicalDirection && (
             <p className={styles.targetNote}>
               Seu destaque está{' '}
               <strong>
                 {formatMoney({
-                  amountMinor: targetDistance,
+                  amountMinor: typicalDistance,
                   currency: highlight.currentPrice.currency,
                 })}
               </strong>{' '}
-              {targetDirection} do preço desejado.
+              {typicalDirection} do preço normal.
             </p>
           )}
         </aside>

@@ -3,7 +3,14 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
-import { getWatch, type CreateWatchInput, createWatch } from '@/lib/api/watches';
+import {
+  getWatch,
+  type CreateWatchInput,
+  createWatch,
+  previewWatch,
+  type WatchPreviewInput,
+} from '@/lib/api/watches';
+import type { WatchPreviewResponse } from '@flight-watch/contracts';
 import type { WatchDetail } from '@/lib/api/types';
 import { revalidatePath } from 'next/cache';
 
@@ -18,7 +25,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   UNSUPPORTED_SEARCH: 'Essa rota, moeda ou mercado ainda não é suportado nesta versão.',
   WATCH_LIMIT_REACHED: 'Limite de monitoramentos do seu plano foi atingido.',
   CHANNEL_NOT_VERIFIED: 'Seu canal de notificação ainda não foi verificado.',
-  INVALID_WATCH_INPUT: 'Alguns dados não são válidos — confira rota, datas e preço desejado.',
+  INVALID_WATCH_INPUT: 'Alguns dados não são válidos — confira a rota e as datas.',
 };
 
 export async function createWatchAction(
@@ -55,5 +62,20 @@ export async function createWatchAction(
       };
     }
     return { success: false, error: 'Não foi possível criar o monitoramento. Tente novamente.' };
+  }
+}
+
+/**
+ * SPEC-039: prévia da viagem antes de criar (preço normal, menor já observado,
+ * preço de hoje e datas próximas). Falha vira `null`: a tela segue sem prévia,
+ * e criar o monitoramento continua possível.
+ */
+export async function previewWatchAction(
+  input: WatchPreviewInput,
+): Promise<WatchPreviewResponse | null> {
+  try {
+    return await previewWatch(input);
+  } catch {
+    return null;
   }
 }

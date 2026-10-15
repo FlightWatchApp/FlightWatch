@@ -17,14 +17,20 @@ import type {
   ListWatchesResponse,
   WatchDetailResponse,
   WatchListItem,
+  WatchPreviewQuery,
+  WatchPreviewResponse,
 } from '@flight-watch/contracts';
+import { SkipThrottle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
+import { SearchThrottlerGuard } from '../searches/search-throttler.guard.js';
+import { AUTH_THROTTLER, SEARCH_THROTTLER } from '../throttling/throttling.module.js';
 import { CreateWatchErrorFilter } from './create-watch-error.filter.js';
 import { ListWatchesQueryPipe } from './list-watches-query.pipe.js';
 import { CreateWatchValidationPipe } from './create-watch.pipe.js';
 import { WatchIdValidationPipe } from './watch-id.pipe.js';
+import { WatchPreviewQueryPipe } from './watch-preview-query.pipe.js';
 import { WatchLifecycleErrorFilter } from './watch-lifecycle-error.filter.js';
 import { WatchesService } from './watches.service.js';
 
@@ -40,6 +46,18 @@ export class WatchesController {
     @Query(ListWatchesQueryPipe) query: ListWatchesQuery,
   ): Promise<ListWatchesResponse> {
     return this.watchesService.listWatches(userId, query);
+  }
+
+  // SPEC-039: antes de ':id' para a leitura ficar óbvia (o roteador já dá
+  // prioridade ao caminho fixo).
+  // Pode consultar o calendário da fonte: limite `pages`, como a página da rota.
+  @Get('preview')
+  @UseGuards(SearchThrottlerGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
+  async preview(
+    @Query(WatchPreviewQueryPipe) query: WatchPreviewQuery,
+  ): Promise<WatchPreviewResponse> {
+    return this.watchesService.previewWatch(query);
   }
 
   // SPEC-009

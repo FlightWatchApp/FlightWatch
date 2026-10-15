@@ -5,4 +5,5 @@ export * from './resilience/circuit-breaker.js';
 export * from './simulated/simulated-flight-provider.js';
 export * from './factory.js';
 export * from './travelpayouts/places-source.js';
+export * from './travelpayouts/airlines-source.js';
 export * from './travelpayouts/flight-provider.js';

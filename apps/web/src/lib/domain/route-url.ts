@@ -42,6 +42,11 @@ export function routePath(origin: RoutePlaceRef, destination: RoutePlaceRef): st
   return `/voos/${routeSegment(origin, destination)}`;
 }
 
+/** SPEC-038: página da oferta de um dia — a rota canônica mais a data. */
+export function offerPath(origin: RoutePlaceRef, destination: RoutePlaceRef, date: string): string {
+  return `${routePath(origin, destination)}/${date}`;
+}
+
 // O código de 3 letras colado ao "-para-" é a âncora: "belem-do-para-bel-para-…"
 // lê a origem até "bel", porque o nome é preguiçoso e o código exige 3 letras.
 const SEGMENT = /^(?:(.*?)-)?([a-z]{3})-para-(?:(.*)-)?([a-z]{3})$/;

@@ -205,3 +205,23 @@ describe('SimulatedFlightProvider.cheapestByDestination (SPEC-032 AC-1)', () => 
     expect(fares.every((fare) => fare.returnDate !== null)).toBe(true);
   });
 });
+
+describe('flightDetailsByDay simulado (SPEC-038)', () => {
+  it('um voo por dia, com o mesmo preço do calendário e sempre o mesmo resultado', async () => {
+    const provider = new SimulatedFlightProvider();
+    const query = { originIata: 'SAO', destinationIata: 'RIO', month: '2026-11', currency: 'BRL' };
+
+    const details = await provider.flightDetailsByDay(query);
+    const calendar = await provider.priceCalendar({
+      ...query,
+      tripType: 'ONE_WAY',
+      tripLengthDays: null,
+    });
+
+    expect(details).toHaveLength(30);
+    expect(details.map((day) => day.amountMinor)).toEqual(calendar.map((day) => day.amountMinor));
+    expect(details[0]?.departureAt.startsWith('2026-11-01T')).toBe(true);
+    expect(['AD', 'G3', 'LA']).toContain(details[0]?.carrierCode);
+    expect(await provider.flightDetailsByDay(query)).toEqual(details);
+  });
+});

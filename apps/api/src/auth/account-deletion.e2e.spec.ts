@@ -86,7 +86,6 @@ async function createUserWithWatches(): Promise<TestUser & { watchIds: string[] 
         adults: 1,
         currency: 'BRL',
         market: 'BR',
-        alertRules: [{ type: 'TARGET_PRICE', amountMinor: 80000, cooldownSeconds: 43200 }],
         notificationChannelId: user.channelId,
       });
     expect(created.status).toBe(201);

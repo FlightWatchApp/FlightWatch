@@ -1,38 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { isAtLowestObservedPrice, isTargetReached, pickHighlightWatch } from './watch-price';
+import { isAtLowestObservedPrice, isBelowTypicalPrice, pickHighlightWatch } from './watch-price';
 
-describe('isTargetReached', () => {
-  it('is true when the current price is at or below the desired price', () => {
+describe('isBelowTypicalPrice (SPEC-039)', () => {
+  const lowPrice = {
+    dropPercent: 15,
+    typicalAmountMinor: 100_000,
+    typicalSource: 'HISTORY' as const,
+    thresholdAmountMinor: 85_000,
+    lowestAmountMinor: 80_000,
+  };
+
+  it('is true at or below the threshold the API computed', () => {
     expect(
-      isTargetReached({
-        currentPrice: { amountMinor: 50000, currency: 'BRL' },
-        targetAmountMinor: 50000,
-      }),
-    ).toBe(true);
-    expect(
-      isTargetReached({
-        currentPrice: { amountMinor: 48000, currency: 'BRL' },
-        targetAmountMinor: 50000,
-      }),
+      isBelowTypicalPrice({ currentPrice: { amountMinor: 85_000, currency: 'BRL' }, lowPrice }),
     ).toBe(true);
   });
 
-  it('is false when the current price is above the desired price', () => {
+  it('is false above the threshold, without a price, or without a typical price', () => {
     expect(
-      isTargetReached({
-        currentPrice: { amountMinor: 51000, currency: 'BRL' },
-        targetAmountMinor: 50000,
+      isBelowTypicalPrice({ currentPrice: { amountMinor: 85_001, currency: 'BRL' }, lowPrice }),
+    ).toBe(false);
+    expect(isBelowTypicalPrice({ currentPrice: null, lowPrice })).toBe(false);
+    expect(
+      isBelowTypicalPrice({
+        currentPrice: { amountMinor: 1, currency: 'BRL' },
+        lowPrice: { ...lowPrice, typicalAmountMinor: null, thresholdAmountMinor: null },
       }),
     ).toBe(false);
-  });
-
-  it('is false without a current price or without a desired price', () => {
-    expect(isTargetReached({ currentPrice: null, targetAmountMinor: 50000 })).toBe(false);
     expect(
-      isTargetReached({
-        currentPrice: { amountMinor: 48000, currency: 'BRL' },
-        targetAmountMinor: null,
-      }),
+      isBelowTypicalPrice({ currentPrice: { amountMinor: 1, currency: 'BRL' }, lowPrice: null }),
     ).toBe(false);
   });
 });
@@ -81,7 +77,13 @@ describe('pickHighlightWatch', () => {
     status: string;
     currentOffer: unknown;
     currentPrice: { amountMinor: number; currency: string } | null;
-    targetAmountMinor: number | null;
+    lowPrice: {
+      dropPercent: number;
+      typicalAmountMinor: number | null;
+      typicalSource: 'HISTORY' | 'NEARBY_DATES' | null;
+      thresholdAmountMinor: number | null;
+      lowestAmountMinor: number | null;
+    } | null;
     lowestPrice: { amountMinor: number; currency: string } | null;
   }
 
@@ -90,18 +92,26 @@ describe('pickHighlightWatch', () => {
     status: 'ACTIVE',
     currentOffer: { amountMinor: 1 },
     currentPrice: { amountMinor: 80000, currency: 'BRL' },
-    targetAmountMinor: null,
+    lowPrice: null,
     lowestPrice: null,
     ...overrides,
   });
 
-  it('prefers a watch whose target price was reached', () => {
-    const notReached = watch({ id: 'a', targetAmountMinor: 70000 });
-    const reached = watch({ id: 'b', targetAmountMinor: 90000 });
-    expect(pickHighlightWatch([notReached, reached])?.id).toBe('b');
+  const lowPrice = (thresholdAmountMinor: number) => ({
+    dropPercent: 15,
+    typicalAmountMinor: 100_000,
+    typicalSource: 'HISTORY' as const,
+    thresholdAmountMinor,
+    lowestAmountMinor: null,
   });
 
-  it('falls back to a watch at its lowest observed price when no target is reached', () => {
+  it('prefers a watch whose price is well below normal', () => {
+    const normal = watch({ id: 'a', lowPrice: lowPrice(70000) });
+    const low = watch({ id: 'b', lowPrice: lowPrice(85000) });
+    expect(pickHighlightWatch([normal, low])?.id).toBe('b');
+  });
+
+  it('falls back to a watch at its lowest observed price when none is below normal', () => {
     const plain = watch({ id: 'a' });
     const lowest = watch({ id: 'b', lowestPrice: { amountMinor: 80000, currency: 'BRL' } });
     expect(pickHighlightWatch([plain, lowest])?.id).toBe('b');

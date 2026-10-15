@@ -3,7 +3,8 @@
   flex-direction: column;
   gap: var(--space-8);
   padding-block: var(--space-10);
-  max-width: 48rem;
+  /* Cartões largos (duas colunas) a partir daqui; o texto continua em 48rem. */
+  max-width: 72rem;
 }
 
 .eyebrow {

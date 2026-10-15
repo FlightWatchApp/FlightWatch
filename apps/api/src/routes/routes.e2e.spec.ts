@@ -7,12 +7,19 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { LOCAL_INTERNAL_API_SECRET } from '@flight-watch/config';
 import { CLIENT_IP_HEADER, INTERNAL_SECRET_HEADER } from '@flight-watch/contracts';
-import { TEST_PLACES, createPrismaClient, syncPlacesCatalog } from '@flight-watch/database';
+import {
+  TEST_PLACES,
+  createPrismaClient,
+  syncAirlinesCatalog,
+  syncPlacesCatalog,
+} from '@flight-watch/database';
 import { estimateDirectFlightMinutes, greatCircleKm } from '@flight-watch/domain';
 import {
   type CalendarDay,
   type CheapestByDestinationQuery,
+  type DayFlightDetails,
   type DestinationFare,
+  type FlightDetailsQuery,
   type FlightProvider,
   type PriceCalendarQuery,
   ProviderError,
@@ -126,7 +133,30 @@ class CountingProvider implements FlightProvider {
     ].filter((day) => day.date.startsWith(query.month));
   }
 
+  detailsCalls: string[] = [];
+
+  /** SPEC-038: só a data de R$ 800 tem detalhe de voo (Azul, catálogo semeado). */
+  async flightDetailsByDay(query: FlightDetailsQuery): Promise<DayFlightDetails[]> {
+    this.detailsCalls.push(`${query.originIata}-${query.destinationIata}-${query.month}`);
+    const date = isoDate(12);
+    if (!date.startsWith(query.month)) return [];
+    return [
+      {
+        date,
+        carrierCode: 'AD',
+        flightNumber: '4193',
+        departureAt: `${date}T10:10:00-03:00`,
+        originAirport: 'GRU',
+        destinationAirport: 'SDU',
+        durationMinutes: 60,
+        stops: 1,
+        amountMinor: 80_500,
+      },
+    ];
+  }
+
   reset(): void {
+    this.detailsCalls = [];
     this.calendarCalls = [];
     this.candidateCalls = 0;
     this.failNext = null;
@@ -189,6 +219,7 @@ beforeAll(async () => {
   });
   const prisma = createPrismaClient(databaseUrl);
   await syncPlacesCatalog(prisma, TEST_PLACES, new Date());
+  await syncAirlinesCatalog(prisma, [{ code: 'AD', name: 'Azul Airlines' }], new Date());
   await prisma.$disconnect();
 }, 120_000);
 
@@ -253,6 +284,67 @@ describe('GET /v1/routes — página ligada', () => {
       /^https:\/\/booking\.simulated-provider\.flightwatch\.dev\//,
     );
     expect(provider.calendarCalls).toHaveLength(3);
+  });
+
+  // SPEC-038 AC-2/AC-3: oferta de um dia com o preço do calendário e o voo da fonte.
+  it('oferta do dia: preço do calendário, datas próximas, voo com companhia e link do parceiro', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/v1/routes/gru/dou/offers/${isoDate(12)}`)
+      .set(freshClient());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      origin: { code: 'SAO', name: 'São Paulo' },
+      destination: { code: 'DOU' },
+      date: isoDate(12),
+      status: 'OK',
+      price: { amountMinor: 80_000, stops: 1 },
+      flight: {
+        carrierCode: 'AD',
+        carrierName: 'Azul Airlines',
+        flightNumber: '4193',
+        originAirport: 'GRU',
+        destinationAirport: 'SDU',
+        durationMinutes: 60,
+      },
+    });
+    expect(response.body.days.length).toBeGreaterThan(1);
+    expect(response.body.purchaseUrl).toMatch(
+      /^https:\/\/booking\.simulated-provider\.flightwatch\.dev\//,
+    );
+    // O preço exibido é o do calendário, não o do detalhe (80.500).
+    expect(JSON.stringify(response.body)).not.toContain('80500');
+  });
+
+  it('oferta: data sem preço, data passada e data inválida', async () => {
+    const noPrice = await request(app.getHttpServer())
+      .get(`/v1/routes/SAO/DOU/offers/${isoDate(11)}`)
+      .set(freshClient());
+    expect(noPrice.status).toBe(200);
+    expect(noPrice.body).toMatchObject({
+      status: 'NO_PRICE',
+      price: null,
+      flight: null,
+      purchaseUrl: null,
+    });
+
+    const past = await request(app.getHttpServer())
+      .get(`/v1/routes/SAO/DOU/offers/${isoDate(-1)}`)
+      .set(freshClient());
+    expect(past.status).toBe(404);
+
+    const invalid = await request(app.getHttpServer())
+      .get('/v1/routes/SAO/DOU/offers/2027-02-30')
+      .set(freshClient());
+    expect(invalid.status).toBe(400);
+  });
+
+  it('oferta: fonte fora e nada em cache vira UNAVAILABLE, sem erro', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/v1/routes/SAO/MIA/offers/${isoDate(12)}`)
+      .set(freshClient());
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ status: 'UNAVAILABLE', price: null });
   });
 
   // EVAL-ROUTE-002 / AC-4: o contrato não tem campo de companhia, dia da semana nem classe.

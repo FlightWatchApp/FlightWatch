@@ -13,6 +13,8 @@ export interface AlertWorkerMetrics {
   eventLagSeconds: Histogram<never>;
   pagesProcessedTotal: Counter<never>;
   watchSkippedTotal: Counter<'reason'>;
+  lowPriceReasonTotal: Counter<'reason'>;
+  lowPriceReferenceTotal: Counter<'source'>;
 }
 
 export function createAlertWorkerMetrics(): AlertWorkerMetrics {
@@ -51,6 +53,20 @@ export function createAlertWorkerMetrics(): AlertWorkerMetrics {
     registers: [registry],
   });
 
+  const lowPriceReasonTotal = new Counter({
+    name: 'alert_low_price_reason_total',
+    help: 'Alertas de preço baixo disparados por motivo — below_typical/lowest_observed/both (SPEC-039).',
+    labelNames: ['reason'],
+    registers: [registry],
+  });
+
+  const lowPriceReferenceTotal = new Counter({
+    name: 'alert_low_price_reference_total',
+    help: 'Avaliações de preço baixo pela fonte do preço normal — history/nearby_dates/none (SPEC-039).',
+    labelNames: ['source'],
+    registers: [registry],
+  });
+
   return {
     registry,
     rulesEvaluatedTotal,
@@ -58,5 +74,7 @@ export function createAlertWorkerMetrics(): AlertWorkerMetrics {
     eventLagSeconds,
     pagesProcessedTotal,
     watchSkippedTotal,
+    lowPriceReasonTotal,
+    lowPriceReferenceTotal,
   };
 }

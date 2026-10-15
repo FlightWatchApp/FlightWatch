@@ -42,21 +42,3 @@ export function computeDisplayDropPercent(referenceMinor: number, currentMinor: 
   if (referenceMinor <= 0) return 0;
   return ((referenceMinor - currentMinor) / referenceMinor) * 100;
 }
-
-/**
- * Inverso de `formatMoney`: string digitada pelo usuário (vírgula ou ponto)
- * -> unidade mínima inteira. `null` para entrada vazia/inválida/não-positiva
- * — usado tanto por `watches/new` quanto por `search/[id]` (SPEC-014) para
- * não divergir na regra de parsing do preço-alvo.
- */
-export function parseAmountMinor(rawValue: string): number | null {
-  const normalized = rawValue.trim().replace(',', '.');
-  if (!normalized) {
-    return null;
-  }
-  const amount = Number.parseFloat(normalized);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
-  }
-  return Math.round(amount * 100);
-}

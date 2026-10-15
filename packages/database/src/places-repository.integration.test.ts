@@ -3,6 +3,11 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type PrismaClient, createPrismaClient } from './client.js';
 import {
+  findAirlineNames,
+  getAirlinesLastSyncedAt,
+  syncAirlinesCatalog,
+} from './airlines-repository.js';
+import {
   findPlaceSummaries,
   findRouteCities,
   findSearchableCities,
@@ -255,5 +260,27 @@ describe('findRouteCities (SPEC-033)', () => {
   it('código de aeroporto, cidade não pesquisável ou desconhecida ficam de fora', async () => {
     const cities = await findRouteCities(prisma, ['GRU', 'VSV', 'ZZZ']);
     expect(cities.size).toBe(0);
+  });
+});
+
+describe('airlines catalog (SPEC-038)', () => {
+  it('grava, atualiza o nome e devolve nomes por código', async () => {
+    expect(await getAirlinesLastSyncedAt(prisma)).toBeNull();
+    const first = new Date('2026-10-14T00:00:00Z');
+    await syncAirlinesCatalog(
+      prisma,
+      [
+        { code: 'AD', name: 'Azul Airlines' },
+        { code: 'G3', name: 'Gol' },
+        { code: 'G3', name: 'Gol Transportes Aéreos' },
+      ],
+      first,
+    );
+    const second = new Date('2026-10-15T00:00:00Z');
+    await syncAirlinesCatalog(prisma, [{ code: 'AD', name: 'Azul' }], second);
+
+    const names = await findAirlineNames(prisma, ['AD', 'G3', 'ZZ']);
+    expect(Object.fromEntries(names)).toEqual({ AD: 'Azul', G3: 'Gol Transportes Aéreos' });
+    expect(await getAirlinesLastSyncedAt(prisma)).toEqual(second);
   });
 });

@@ -1,7 +1,7 @@
 import { ConfigError, loadConfig, schedulerConfig } from '@flight-watch/config';
 import { createPrismaClient } from '@flight-watch/database';
 import { logEvent, startMetricsServer } from '@flight-watch/observability';
-import { fetchTravelpayoutsPlaces } from '@flight-watch/providers';
+import { fetchTravelpayoutsAirlines, fetchTravelpayoutsPlaces } from '@flight-watch/providers';
 import {
   createNotificationOutboxHandler,
   createNotificationQueue,
@@ -12,6 +12,7 @@ import {
   createRedisConnection,
   publishPendingOutboxEvents,
 } from '@flight-watch/queue';
+import { runAirlinesSync } from './airlines-sync.js';
 import { createSchedulerMetrics } from './metrics.js';
 import { PLACES_SOURCE_TIMEOUT_MS, runPlacesSync } from './places-sync.js';
 import { runSchedulerTick } from './tick.js';
@@ -101,13 +102,21 @@ async function main(): Promise<void> {
   void tick();
 
   // SPEC-029: não bloqueia o agendamento; falha mantém o catálogo anterior.
-  const syncPlaces = () =>
-    runPlacesSync({
+  // SPEC-038: catálogo de companhias, no mesmo ciclo e com a mesma regra de frescor.
+  const syncPlaces = async () => {
+    await runPlacesSync({
       prisma,
       fetchPlaces: () => fetchTravelpayoutsPlaces({ timeoutMs: PLACES_SOURCE_TIMEOUT_MS }),
       metrics,
       now: () => new Date(),
     });
+    await runAirlinesSync({
+      prisma,
+      fetchAirlines: () => fetchTravelpayoutsAirlines({ timeoutMs: PLACES_SOURCE_TIMEOUT_MS }),
+      metrics,
+      now: () => new Date(),
+    });
+  };
   const placesInterval = setInterval(() => void syncPlaces(), PLACES_SYNC_CHECK_INTERVAL_MS);
   void syncPlaces();
 

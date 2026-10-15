@@ -181,7 +181,6 @@ describe('GET /v1/searches/flights/:id (e2e, Postgres real via Testcontainers)',
 describe('POST /v1/offers/:id/watch (e2e, Postgres real via Testcontainers)', () => {
   function deriveWatchBody(channelId: string, overrides: Record<string, unknown> = {}) {
     return {
-      alertRules: [{ type: 'TARGET_PRICE', amountMinor: 80_000, cooldownSeconds: 43_200 }],
       notificationChannelId: channelId,
       ...overrides,
     };

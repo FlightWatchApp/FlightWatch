@@ -31,6 +31,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-039: prévias da criação de Watch, pela fonte do preço normal. */
+  readonly watchPreviewTotal = new Counter({
+    name: 'watch_preview_total',
+    help: 'Prévias de criação de Watch pela fonte do preço normal — history/nearby_dates/none (SPEC-039).',
+    labelNames: ['source'],
+    registers: [this.registry],
+  });
+
   /** SPEC-009 §13. */
   readonly watchDetailFetchTotal = new Counter({
     name: 'watch_detail_fetch_total',
@@ -191,6 +199,14 @@ export class MetricsService {
   readonly promotionBudgetRemaining = new Gauge({
     name: 'promotion_budget_remaining',
     help: 'Chamadas à fonte que ainda cabem no orçamento do feed hoje (dia UTC) (SPEC-032).',
+    registers: [this.registry],
+  });
+
+  /** SPEC-038. */
+  readonly offerPageRequestsTotal = new Counter({
+    name: 'offer_page_requests_total',
+    help: 'Respostas da página da oferta por resultado — ok/no_price/updating/unavailable (SPEC-038).',
+    labelNames: ['result'],
     registers: [this.registry],
   });
 

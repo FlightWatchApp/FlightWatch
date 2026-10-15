@@ -1,4 +1,4 @@
-import type { FareSummaryView } from '@flight-watch/contracts';
+import type { FareSummaryView, WatchLowPrice } from '@flight-watch/contracts';
 
 /**
  * Modelos de visualização do front-end. `WatchStatus`, `TripType`, `AlertRuleType`
@@ -12,7 +12,7 @@ import type { FareSummaryView } from '@flight-watch/contracts';
 export type WatchStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
 export type TripType = 'ONE_WAY' | 'ROUND_TRIP';
 export type AlertRuleType =
-  'TARGET_PRICE' | 'PERCENTAGE_DROP' | 'ABSOLUTE_DROP' | 'NEW_OBSERVED_LOW';
+  'TARGET_PRICE' | 'PERCENTAGE_DROP' | 'ABSOLUTE_DROP' | 'NEW_OBSERVED_LOW' | 'LOW_PRICE';
 export type ReferenceStrategy =
   'previous_valid_observation' | 'first_valid_observation' | 'lowest_valid_observation';
 export type SearchExecutionOutcome =
@@ -90,7 +90,8 @@ export interface WatchSummary {
   currency: string;
   currentPrice: Money | null;
   lowestPrice: Money | null;
-  targetAmountMinor: number | null;
+  /** SPEC-039: resumo do alerta de preço baixo (calculado pela API). */
+  lowPrice: WatchLowPrice | null;
   lastCheck: LastCheck | null;
   createdAt: string;
   expiresAt: string | null;
