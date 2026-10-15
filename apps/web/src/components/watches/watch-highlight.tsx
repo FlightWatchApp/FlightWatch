@@ -1,12 +1,11 @@
-import Link from 'next/link';
 import { RouteLine } from '@/components/brand/route-line';
-import { PurchaseButton } from '@/components/purchase/purchase-button';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { Freshness } from '@/components/ui/freshness';
 import type { WatchDetail } from '@/lib/api/types';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
 import { sortChronologically } from '@/lib/domain/price-history';
-import { isAtLowestObservedPrice, isTargetReached } from '@/lib/domain/watch-price';
+import { isAtLowestObservedPrice, isBelowTypicalPrice } from '@/lib/domain/watch-price';
 import styles from './watch-highlight.module.css';
 
 export interface WatchHighlightProps {
@@ -18,27 +17,28 @@ const CHART_HEIGHT = 72;
 
 /**
  * Card de destaque da home logada: o monitoramento mais relevante agora —
- * preço desejado atingido primeiro, depois menor preço já visto, senão só o
+ * preço bem abaixo do normal primeiro, depois menor preço já visto, senão só o
  * mais recente. Nada aqui é inventado: os dois sinais vêm de
  * `lib/domain/watch-price.ts`, já usados no `WatchCard`; a mini-curva é o
  * `priceHistory` real do próprio Watch (mesmo dado de `/watches/:id`).
  */
 export function WatchHighlight({ watch }: WatchHighlightProps) {
-  const targetReached = isTargetReached(watch);
+  const belowTypical = isBelowTypicalPrice(watch);
   const atLowest = isAtLowestObservedPrice(watch);
+  const typical = watch.lowPrice?.typicalAmountMinor ?? null;
 
-  const heading = targetReached
-    ? 'Preço desejado atingido!'
+  const heading = belowTypical
+    ? 'Bem abaixo do normal!'
     : atLowest
       ? 'Menor preço já observado'
       : 'Acompanhando de perto';
 
   const subtext =
-    targetReached && watch.targetAmountMinor !== null && watch.currentPrice
+    belowTypical && typical !== null && watch.currentPrice
       ? `${formatMoney({
-          amountMinor: watch.targetAmountMinor - watch.currentPrice.amountMinor,
+          amountMinor: typical - watch.currentPrice.amountMinor,
           currency: watch.currentPrice.currency,
-        })} abaixo do preço que você definiu.`
+        })} abaixo do preço normal desta viagem.`
       : atLowest
         ? 'Esse é o menor preço que o sistema já viu nesta rota.'
         : 'O sistema está observando esta rota de perto.';
@@ -70,18 +70,11 @@ export function WatchHighlight({ watch }: WatchHighlightProps) {
         )}
 
         <div className={styles.actions}>
-          {watch.currentOffer ? (
-            <PurchaseButton
-              href={watch.currentOffer.purchaseUrl}
-              status={watch.currentOffer.status}
-              watchId={watch.id}
-              context={`${watch.origin} para ${watch.destination}`}
-              inverse
-            />
-          ) : null}
-          <Link href={`/watches/${watch.id}`} className={styles.detailsLink}>
-            Ver detalhes e histórico
-          </Link>
+          <ViewOfferLink
+            href={`/watches/${watch.id}`}
+            context={`${watch.origin} para ${watch.destination}`}
+            inverse
+          />
         </div>
       </div>
 
@@ -99,13 +92,10 @@ export function WatchHighlight({ watch }: WatchHighlightProps) {
             <p className={styles.statValue}>{tripLabel}</p>
           </div>
           <div>
-            <p className={styles.statLabel}>Preço desejado</p>
+            <p className={styles.statLabel}>Preço normal</p>
             <p className={styles.statValue}>
-              {watch.targetAmountMinor !== null && watch.currentPrice
-                ? formatMoney({
-                    amountMinor: watch.targetAmountMinor,
-                    currency: watch.currentPrice.currency,
-                  })
+              {typical !== null
+                ? formatMoney({ amountMinor: typical, currency: watch.currency })
                 : '—'}
             </p>
           </div>

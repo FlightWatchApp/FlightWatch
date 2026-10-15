@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
   // Governança de agentes de IA já vive em AGENTS.md;
   // evita um AGENTS.md/CLAUDE.md duplicado e divergente gerado em apps/web.
   agentRules: false,
+  // SPEC-038: logos das companhias pelo nosso domínio (/_next/image) — o navegador
+  // não fala com o CDN da fonte e a CSP continua só com o próprio site.
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'pics.avs.io', pathname: '/120/120/**' }],
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api/client';
 import { listPromotions, type PromotionSort } from '@/lib/api/promotions';
 import { formatAbsoluteDateTime } from '@/lib/domain/freshness';
 import { promotionFeedState, type PromotionFeedResult } from '@/lib/domain/promotion';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
 import { LegacyOpportunities } from './legacy-opportunities';
 import { ORIGIN_COOKIE_NAME, normalizeOriginCode } from './origin';
 import { OriginPicker } from './origin-picker';
@@ -153,6 +154,7 @@ export default async function OpportunitiesPage({
             originName={originName}
             promotions={response.promotions}
             renderedAt={new Date().toISOString()}
+            offerPages={routePagesEnabled()}
           />
         </>
       )}

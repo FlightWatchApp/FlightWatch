@@ -1,5 +1,6 @@
 import type { PromotionItem } from '@flight-watch/contracts';
 import { RouteLine } from '@/components/brand/route-line';
+import { ViewOfferLink } from '@/components/offer/view-offer-link';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { IconArrowDownRight, IconClock } from '@/components/ui/icon';
 import { formatStops } from '@/lib/domain/flight-format';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
+import { offerPath } from '@/lib/domain/route-url';
 import {
   promotionAgeLabel,
   promotionDiscountLabel,
@@ -22,6 +24,11 @@ export interface PromotionCardProps {
   renderedAt: string;
   /** SPEC-016: destacado quando o marcador correspondente é selecionado no mapa. */
   selected?: boolean;
+  /**
+   * SPEC-038: página da oferta ligada (mesmo interruptor da página da rota, só
+   * no servidor). Ligada: "Ver oferta"; desligada: compra direto, como antes.
+   */
+  offerPages?: boolean;
 }
 
 /**
@@ -35,6 +42,7 @@ export function PromotionCard({
   promotion,
   renderedAt,
   selected = false,
+  offerPages = false,
 }: PromotionCardProps) {
   const { price, reference } = promotion;
   const age = promotionAgeLabel(promotion.observedAt, new Date(renderedAt));
@@ -90,7 +98,16 @@ export function PromotionCard({
         </details>
 
         <div className={styles.actions}>
-          {promotion.purchaseUrl ? (
+          {offerPages && !promotion.returnDate ? (
+            <ViewOfferLink
+              href={offerPath(
+                { code: origin, name: originName },
+                { code: promotion.destination, name: promotion.destinationName },
+                promotion.departureDate,
+              )}
+              context={`${originName} para ${promotion.destinationName} por ${priceText}`}
+            />
+          ) : promotion.purchaseUrl ? (
             <PurchaseButton
               href={promotion.purchaseUrl}
               status="CURRENT"
@@ -101,7 +118,7 @@ export function PromotionCard({
             <span className={styles.purchaseUnavailable}>Link do parceiro indisponível</span>
           )}
         </div>
-        <PurchaseNote />
+        {!(offerPages && !promotion.returnDate) && <PurchaseNote />}
       </Card>
     </article>
   );

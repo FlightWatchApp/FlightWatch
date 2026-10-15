@@ -2,13 +2,15 @@ import { randomUUID, createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { logEvent } from '@flight-watch/observability';
 import {
-  type AlertRuleInput,
   type CreateWatchRequest,
   type CreateWatchResponse,
   type ListWatchesResponse,
   type WatchDetailResponse,
   type WatchListItem as WatchListItemView,
   type WatchLifecycleAction,
+  type WatchLowPrice,
+  type WatchPreviewQuery,
+  type WatchPreviewResponse,
   CreateWatchError,
   WatchLifecycleError,
 } from '@flight-watch/contracts';
@@ -36,7 +38,12 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
+import { LowPriceService, summarize } from './low-price.service.js';
 import { isSupportedCurrencyAndMarket } from './supported-catalog.js';
+
+// SPEC-039: a prévia usa o mesmo mercado e moeda do web (únicos suportados hoje).
+const PREVIEW_CURRENCY = 'BRL';
+const PREVIEW_MARKET = 'BR';
 
 // Placeholder até o produto definir o limite real por plano (PRODUCT.md §10).
 const MAX_ACTIVE_WATCHES_PER_USER = 20;
@@ -77,41 +84,27 @@ function hashRequest(request: CreateWatchRequest): string {
   return createHash('sha256').update(canonicalJsonStringify(request)).digest('hex');
 }
 
-// DOMAIN.md §3.3: target_price não tem referência; as demais regras relativas
-// usam a observação anterior, exceto new_observed_low, que compara contra o
-// menor preço observado (lowest_valid_observation existe no domínio exatamente
-// para isso). A spec não deixa o cliente escolher a estratégia em v1 — este é
-// o default assumido, documentado aqui por não estar explícito no SPEC-001.
-function referenceStrategyForRuleType(
-  type: AlertRuleInput['type'],
-): 'PREVIOUS_VALID_OBSERVATION' | 'LOWEST_VALID_OBSERVATION' | null {
-  switch (type) {
-    case 'TARGET_PRICE':
-      return null;
-    case 'NEW_OBSERVED_LOW':
-      return 'LOWEST_VALID_OBSERVATION';
-    case 'PERCENTAGE_DROP':
-    case 'ABSOLUTE_DROP':
-      return 'PREVIOUS_VALID_OBSERVATION';
-  }
-}
+// SPEC-039: mesmo cooldown que as regras do lançamento usavam (SPEC-035).
+const LOW_PRICE_COOLDOWN_SECONDS = 43_200;
 
-function alertRuleCreateData(rule: AlertRuleInput): Prisma.AlertRuleCreateWithoutWatchInput {
-  const base = {
-    type: rule.type,
-    cooldownSeconds: rule.cooldownSeconds,
-    referenceStrategy: referenceStrategyForRuleType(rule.type),
+/**
+ * SPEC-039: única regra de Watches novos. A porcentagem vem da configuração e
+ * fica gravada na regra; a linha de base (datas próximas) é a do momento da
+ * criação e nunca é recalculada.
+ */
+function lowPriceRuleCreateData(
+  dropPercent: number,
+  baselineAmountMinor: number | null,
+  now: Date,
+): Prisma.AlertRuleCreateWithoutWatchInput {
+  return {
+    type: 'LOW_PRICE',
+    dropPercent,
+    cooldownSeconds: LOW_PRICE_COOLDOWN_SECONDS,
+    ...(baselineAmountMinor !== null
+      ? { baselineAmountMinor, baselineSource: 'NEARBY_DATES', baselineComputedAt: now }
+      : {}),
   };
-  switch (rule.type) {
-    case 'TARGET_PRICE':
-      return { ...base, targetAmountMinor: rule.amountMinor };
-    case 'PERCENTAGE_DROP':
-      return { ...base, dropPercent: rule.percent };
-    case 'ABSOLUTE_DROP':
-      return { ...base, dropAmountMinor: rule.dropAmountMinor };
-    case 'NEW_OBSERVED_LOW':
-      return base;
-  }
 }
 
 function toCreateWatchResponse(
@@ -146,6 +139,7 @@ function toCreateWatchResponse(
       amountMinor: rule.targetAmountMinor,
       percent: rule.dropPercent,
       dropAmountMinor: rule.dropAmountMinor,
+      baselineAmountMinor: rule.baselineAmountMinor,
     })),
     lastObservation: null,
     createdAt: watch.createdAt.toISOString(),
@@ -212,8 +206,7 @@ function toCurrentOffer(
 type WatchListItemBase = Omit<WatchListItemView, 'originName' | 'destinationName'>;
 type WatchDetailBase = Omit<WatchDetailResponse, 'originName' | 'destinationName'>;
 
-function toWatchListItem(item: WatchListItem): WatchListItemBase {
-  const targetPriceRule = item.alertRules.find((rule) => rule.type === 'TARGET_PRICE');
+function toWatchListItem(item: WatchListItem, lowPrice: WatchLowPrice | null): WatchListItemBase {
   // A query em listWatchesForUser já filtra SCHEDULED/RUNNING, então o status
   // aqui é sempre uma das 5 chaves conhecidas — mas o índice de Record ainda
   // pode devolver undefined pro TS (noUncheckedIndexedAccess), então trata como
@@ -245,7 +238,7 @@ function toWatchListItem(item: WatchListItem): WatchListItemBase {
           currency: item.lowestObservation.currency,
         }
       : null,
-    targetAmountMinor: targetPriceRule?.targetAmountMinor ?? null,
+    lowPrice,
     lastCheck:
       item.latestExecution && lastCheckOutcome
         ? { at: item.latestExecution.at.toISOString(), outcome: lastCheckOutcome }
@@ -257,9 +250,12 @@ function toWatchListItem(item: WatchListItem): WatchListItemBase {
 }
 
 /** SPEC-009 §7: mesma forma de `toWatchListItem`, com `priceHistory` a mais. */
-function toWatchDetailResponse(item: WatchDetailItem): WatchDetailBase {
+function toWatchDetailResponse(
+  item: WatchDetailItem,
+  lowPrice: WatchLowPrice | null,
+): WatchDetailBase {
   return {
-    ...toWatchListItem(item),
+    ...toWatchListItem(item, lowPrice),
     priceHistory: item.priceHistory.map((point) => ({
       id: point.id,
       observedAt: point.observedAt.toISOString(),
@@ -275,7 +271,24 @@ export class WatchesService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly places: PlacesService,
+    private readonly lowPrice: LowPriceService,
   ) {}
+
+  /** SPEC-039: resumo `lowPrice` de cada item, em lote. */
+  private lowPriceSummaries(items: readonly WatchListItem[]): Promise<(WatchLowPrice | null)[]> {
+    return this.lowPrice.summaries(
+      items.map((item) => ({
+        searchTargetId: item.searchTarget.id,
+        currency: item.searchTarget.currency,
+        alertRules: item.alertRules,
+      })),
+    );
+  }
+
+  private async toListItem(item: WatchListItem): Promise<WatchListItemBase> {
+    const [lowPrice] = await this.lowPriceSummaries([item]);
+    return toWatchListItem(item, lowPrice ?? null);
+  }
 
   // PRODUCT.md §7.3, sem SPEC-00X própria — ver nota em
   // packages/contracts/src/watches/list-watches.ts.
@@ -284,7 +297,10 @@ export class WatchesService {
     query: { limit?: number | undefined; cursor?: string | undefined } = {},
   ): Promise<ListWatchesResponse> {
     const { items, nextCursor } = await listWatchesForUser(this.prisma.client, userId, query);
-    const watches = await this.places.withRouteNames(items.map(toWatchListItem));
+    const lowPrices = await this.lowPriceSummaries(items);
+    const watches = await this.places.withRouteNames(
+      items.map((item, index) => toWatchListItem(item, lowPrices[index] ?? null)),
+    );
     // SPEC-018 §8: mede cobertura real do CTA de compra — "existe preço" mas
     // "não existe link mostrável" é um dado operacional distinto de "sem
     // observação nenhuma" (esse segundo caso não é contado aqui).
@@ -331,7 +347,10 @@ export class WatchesService {
     }
     this.metrics.watchDetailFetchTotal.inc({ result: 'success' });
     logEvent({ event: 'watch_detail_fetch', watchId, result: 'success', correlationId });
-    const [named] = await this.places.withRouteNames([toWatchDetailResponse(item)]);
+    const [lowPrice] = await this.lowPriceSummaries([item]);
+    const [named] = await this.places.withRouteNames([
+      toWatchDetailResponse(item, lowPrice ?? null),
+    ]);
     if (!named) {
       throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found');
     }
@@ -401,7 +420,7 @@ export class WatchesService {
       if (!current) {
         throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found');
       }
-      return { item: toWatchListItem(current), result: 'idempotent_noop' };
+      return { item: await this.toListItem(current), result: 'idempotent_noop' };
     }
     if (!config.from.includes(currentStatus.status)) {
       throw new WatchLifecycleError(
@@ -430,7 +449,7 @@ export class WatchesService {
         throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found after transition');
       }
       if (afterRace.watch.status === config.to) {
-        return { item: toWatchListItem(afterRace), result: 'idempotent_noop' };
+        return { item: await this.toListItem(afterRace), result: 'idempotent_noop' };
       }
       throw new WatchLifecycleError(
         'INVALID_WATCH_TRANSITION',
@@ -442,7 +461,84 @@ export class WatchesService {
     if (!updated) {
       throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found after transition');
     }
-    return { item: toWatchListItem(updated), result: 'success' };
+    return { item: await this.toListItem(updated), result: 'success' };
+  }
+
+  /**
+   * SPEC-039 §"Tela de criação": preço normal, menor já observado e preço de
+   * hoje da viagem, antes de criar o Watch. Viagem que ninguém monitora ainda
+   * só tem as datas próximas. Não cria nada.
+   */
+  async previewWatch(query: WatchPreviewQuery): Promise<WatchPreviewResponse> {
+    const request = {
+      origin: query.origin,
+      destination: query.destination,
+      currency: PREVIEW_CURRENCY,
+      market: PREVIEW_MARKET,
+    };
+    const route = await this.resolveRoute(request);
+    const returnDate = query.returnDate ?? null;
+
+    let canonical: ReturnType<typeof computeSearchTargetFingerprintV1>;
+    try {
+      canonical = computeSearchTargetFingerprintV1({
+        origin: route.origin,
+        destination: route.destination,
+        departureDate: query.departureDate,
+        returnDate,
+        tripType: query.tripType,
+        cabin: 'ECONOMY',
+        adults: 1,
+        currency: PREVIEW_CURRENCY,
+        market: PREVIEW_MARKET,
+      });
+    } catch (error) {
+      if (error instanceof InvalidSearchTargetInputError) {
+        throw new CreateWatchError('INVALID_WATCH_INPUT', error.message);
+      }
+      throw error;
+    }
+
+    const [nearby, target] = await Promise.all([
+      this.lowPrice.nearbyDates({
+        origin: route.origin,
+        destination: route.destination,
+        tripType: query.tripType,
+        departureDate: query.departureDate,
+        returnDate,
+        currency: PREVIEW_CURRENCY,
+        market: PREVIEW_MARKET,
+      }),
+      this.prisma.client.searchTarget.findUnique({
+        where: { fingerprint: canonical.fingerprint },
+        select: { id: true },
+      }),
+    ]);
+    const references = target
+      ? await this.lowPrice.referencesFor(target.id, PREVIEW_CURRENCY)
+      : undefined;
+    const latest = target
+      ? await this.prisma.client.priceObservation.findFirst({
+          where: { searchTargetId: target.id, currency: PREVIEW_CURRENCY },
+          orderBy: { observedAt: 'desc' },
+          select: { totalAmountMinor: true },
+        })
+      : null;
+    const summary = summarize(
+      { dropPercent: this.lowPrice.dropPercent, baselineAmountMinor: nearby.baselineAmountMinor },
+      references,
+    );
+    this.metrics.watchPreviewTotal.inc({ source: summary.typicalSource?.toLowerCase() ?? 'none' });
+
+    return {
+      currency: PREVIEW_CURRENCY,
+      dropPercent: summary.dropPercent,
+      typicalAmountMinor: summary.typicalAmountMinor,
+      typicalSource: summary.typicalSource,
+      lowestAmountMinor: summary.lowestAmountMinor,
+      currentAmountMinor: latest?.totalAmountMinor ?? nearby.departureDayAmountMinor,
+      days: nearby.days,
+    };
   }
 
   /** SPEC-001 §13: `watch_create_total{result}` — envolve o método inteiro pra não perder nenhum ponto de saída. */
@@ -518,12 +614,29 @@ export class WatchesService {
       throw error;
     }
 
+    // SPEC-039: linha de base das datas próximas, antes da transação (pode
+    // consultar a fonte). Sem dados, o Watch nasce sem linha de base.
+    const now = new Date();
+    const nearby = await this.lowPrice.nearbyDates(
+      {
+        origin: route.origin,
+        destination: route.destination,
+        tripType: request.tripType,
+        departureDate: request.departureDate,
+        returnDate: request.returnDate,
+        currency: request.currency,
+        market: request.market,
+      },
+      now,
+    );
+
     const watch = await this.createWatchInTransaction(
       userId,
       { ...request, origin: route.origin, destination: route.destination },
       canonical,
       idempotencyKey,
       requestHash,
+      lowPriceRuleCreateData(this.lowPrice.dropPercent, nearby.baselineAmountMinor, now),
     );
 
     return this.toNamedCreateWatchResponse(watch);
@@ -535,7 +648,7 @@ export class WatchesService {
    * lados (GRU → CGH) ou moeda/mercado fora do suportado → UNSUPPORTED_SEARCH.
    */
   private async resolveRoute(
-    request: CreateWatchRequest,
+    request: Pick<CreateWatchRequest, 'origin' | 'destination' | 'currency' | 'market'>,
   ): Promise<{ origin: string; destination: string }> {
     const [origin, destination] = await Promise.all([
       this.places.resolveCity(request.origin),
@@ -568,6 +681,7 @@ export class WatchesService {
     canonical: ReturnType<typeof computeSearchTargetFingerprintV1>,
     idempotencyKey: string | undefined,
     requestHash: string,
+    alertRule: Prisma.AlertRuleCreateWithoutWatchInput,
   ): Promise<WatchWithRelations> {
     try {
       return await withSearchTargetRaceRetry(() =>
@@ -607,7 +721,7 @@ export class WatchesService {
               notificationChannelId: request.notificationChannelId,
               status: 'ACTIVE',
               expiresAt: computeWatchExpiresAt(request.departureDate),
-              alertRules: { create: request.alertRules.map(alertRuleCreateData) },
+              alertRules: { create: [alertRule] },
             },
             include: { alertRules: true, searchTarget: true },
           });

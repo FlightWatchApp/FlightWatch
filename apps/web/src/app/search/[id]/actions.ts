@@ -24,13 +24,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 /**
  * SPEC-014 §"Comportamento": "monitorar" exige confirmação explícita (o
- * clique + preencher o preço-alvo no modal já é essa confirmação) — abrir a
- * página de resultado nunca cria Watch sozinho.
+ * clique no modal já é essa confirmação) — abrir a página de resultado nunca
+ * cria Watch sozinho. SPEC-039: sem preço desejado.
  */
-export async function deriveWatchAction(
-  offerId: string,
-  targetAmountMinor: number,
-): Promise<DeriveWatchActionResult> {
+export async function deriveWatchAction(offerId: string): Promise<DeriveWatchActionResult> {
   const user = await getCurrentUser();
   if (!user) {
     // login/actions.ts sempre redireciona pra "/" no sucesso — não existe
@@ -44,7 +41,6 @@ export async function deriveWatchAction(
 
   try {
     const watch = await deriveWatchFromOffer(offerId, {
-      targetAmountMinor,
       notificationChannelId: user.notificationChannelId,
     });
     try {

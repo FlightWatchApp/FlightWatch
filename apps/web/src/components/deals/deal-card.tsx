@@ -8,17 +8,15 @@ import { PurchaseButton } from '@/components/purchase/purchase-button';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { FormField } from '@/components/ui/form-field';
 import { Freshness } from '@/components/ui/freshness';
 import { IconClock } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { formatDuration, formatStops } from '@/lib/domain/flight-format';
 import { Modal } from '@/components/ui/modal';
-import { TextInput } from '@/components/ui/text-input';
 import { WatchCreatedSummary } from '@/components/watches/watch-created-summary';
 import type { OpportunityItem, WatchDetail } from '@/lib/api/types';
 import { formatDate } from '@/lib/domain/freshness';
-import { formatMoney, parseAmountMinor } from '@/lib/domain/money';
+import { formatMoney } from '@/lib/domain/money';
 import { DealBadge } from './deal-badge';
 import styles from './deal-card.module.css';
 
@@ -40,7 +38,6 @@ export interface DealCardProps {
 export function DealCard({ opportunity, selected = false, compact = false }: DealCardProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
-  const [desiredPrice, setDesiredPrice] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [createdWatch, setCreatedWatch] = useState<WatchDetail | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -59,26 +56,18 @@ export function DealCard({ opportunity, selected = false, compact = false }: Dea
   })}`;
 
   function handleConfirm(): void {
-    const targetAmountMinor = parseAmountMinor(desiredPrice);
-    if (targetAmountMinor === null) {
-      setFormError('Informe um preço desejado válido, maior que zero.');
-      return;
-    }
     setFormError(null);
     startTransition(() => {
       void (async () => {
-        const result = await monitorOpportunityAction(
-          {
-            origin: opportunity.origin,
-            destination: opportunity.destination,
-            tripType: opportunity.tripType,
-            market: opportunity.market,
-            departureDate: opportunity.departureDate,
-            returnDate: opportunity.returnDate,
-            currency: offer.currency,
-          },
-          targetAmountMinor,
-        );
+        const result = await monitorOpportunityAction({
+          origin: opportunity.origin,
+          destination: opportunity.destination,
+          tripType: opportunity.tripType,
+          market: opportunity.market,
+          departureDate: opportunity.departureDate,
+          returnDate: opportunity.returnDate,
+          currency: offer.currency,
+        });
         if (result.success && result.watch) {
           setCreatedWatch(result.watch);
         } else if (result.success && result.watchId) {
@@ -178,26 +167,9 @@ export function DealCard({ opportunity, selected = false, compact = false }: Dea
           ) : (
             <>
               <p className={styles.modalIntro}>
-                O sistema consulta essa rota periodicamente e avisa por e-mail quando o preço
-                observado atingir o valor que você definir.
+                O sistema acompanha essa viagem e avisa por e-mail quando observar um preço bem
+                abaixo do normal ou o menor preço já observado pelo Flight Watch.
               </p>
-              <FormField
-                label="Preço desejado"
-                hint="Avisamos quando o preço atingir esse valor ou menos."
-                required
-              >
-                {(field) => (
-                  <TextInput
-                    id={field.id}
-                    aria-describedby={field.describedBy}
-                    invalid={field.invalid}
-                    inputMode="decimal"
-                    placeholder="800,00"
-                    value={desiredPrice}
-                    onChange={(event) => setDesiredPrice(event.target.value)}
-                  />
-                )}
-              </FormField>
               {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
               <div className={styles.modalActions}>
                 <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={isPending}>

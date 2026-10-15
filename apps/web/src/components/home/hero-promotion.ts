@@ -2,7 +2,7 @@ import type { PromotionHighlight, PromotionItem } from '@flight-watch/contracts'
 import { listPromotionHighlights, listPromotions } from '@/lib/api/promotions';
 import type { PriceChartDay } from '@/lib/domain/price-chart';
 import { routePagesEnabled } from '@/lib/domain/route-flag';
-import { routePath } from '@/lib/domain/route-url';
+import { offerPath, routePath } from '@/lib/domain/route-url';
 
 /** Promoção real do cartão da página inicial, com os preços por data da rota. */
 export interface HeroPromotion {
@@ -15,6 +15,8 @@ export interface HeroPromotion {
   renderedAt: string;
   /** Página da rota (SPEC-033); null com a página desligada. */
   routeHref: string | null;
+  /** SPEC-038: página da oferta (só ida, com a página da rota ligada); senão null. */
+  offerHref: string | null;
 }
 
 export interface HomePromotions {
@@ -72,6 +74,14 @@ export function heroFrom(
           { code: promotion.destination, name: promotion.destinationName },
         )
       : null,
+    offerHref:
+      routePagesEnabled() && !promotion.returnDate
+        ? offerPath(
+            { code: origin, name: originName },
+            { code: promotion.destination, name: promotion.destinationName },
+            promotion.departureDate,
+          )
+        : null,
   };
 }
 

@@ -77,11 +77,14 @@ export async function findLowestValidObservation(
   });
 }
 
-/** SPEC-005 §7: cooldown conta a partir do último AlertEvent enfileirado/notificado da mesma regra. */
+/**
+ * SPEC-005 §7: cooldown conta a partir do último AlertEvent enfileirado/notificado da mesma regra.
+ * SPEC-039: o preço desse alerta decide o "só cai mais".
+ */
 export async function findLastQueuedOrNotifiedAlertEvent(
   tx: Prisma.TransactionClient,
   params: { watchId: string; alertRuleId: string },
-): Promise<{ createdAt: Date } | null> {
+): Promise<{ createdAt: Date; currentAmountMinor: number; currency: string } | null> {
   return tx.alertEvent.findFirst({
     where: {
       watchId: params.watchId,
@@ -89,7 +92,7 @@ export async function findLastQueuedOrNotifiedAlertEvent(
       status: { in: ['QUEUED', 'NOTIFIED'] },
     },
     orderBy: { createdAt: 'desc' },
-    select: { createdAt: true },
+    select: { createdAt: true, currentAmountMinor: true, currency: true },
   });
 }
 

@@ -15,7 +15,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
-    "bench": "tsx src/__benchmarks__/fan-out-benchmark.ts"
+    "bench": "tsx src/__benchmarks__/fan-out-benchmark.ts",
+    "backfill:low-price": "tsx prisma/backfill-low-price.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -32,7 +32,8 @@ afterAll(async () => {
 
 async function seedWatchWithRule(
   ruleData: Partial<{
-    type: 'TARGET_PRICE' | 'PERCENTAGE_DROP' | 'ABSOLUTE_DROP' | 'NEW_OBSERVED_LOW';
+    type: 'TARGET_PRICE' | 'PERCENTAGE_DROP' | 'ABSOLUTE_DROP' | 'NEW_OBSERVED_LOW' | 'LOW_PRICE';
+    baselineAmountMinor: number | null;
     targetAmountMinor: number | null;
     dropPercent: number | null;
     dropAmountMinor: number | null;
@@ -91,6 +92,7 @@ async function seedWatchWithRule(
       dropPercent: ruleData.dropPercent ?? null,
       dropAmountMinor: ruleData.dropAmountMinor ?? null,
       referenceStrategy: ruleData.referenceStrategy ?? null,
+      baselineAmountMinor: ruleData.baselineAmountMinor ?? null,
       cooldownSeconds: ruleData.cooldownSeconds ?? 3600,
     },
   });
@@ -427,5 +429,123 @@ describe('evaluatePriceObservedJob', () => {
       },
     });
     expect(suppressedNotificationRequests).toBe(0);
+  });
+});
+
+describe('LOW_PRICE (SPEC-039)', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const daysAgo = (days: number) => new Date(Date.now() - days * DAY);
+
+  async function seedHistory(targetId: string, amounts: number[]) {
+    for (const [index, amount] of amounts.entries()) {
+      await createObservation(targetId, amount, daysAgo(index + 1));
+    }
+  }
+
+  async function lowPriceEvents(watchId: string) {
+    return prisma.alertEvent.findMany({ where: { watchId }, orderBy: { createdAt: 'asc' } });
+  }
+
+  it('dispara 15% abaixo da mediana do histórico próprio e não dispara a 14%', async () => {
+    const { target, watch } = await seedWatchWithRule({ type: 'LOW_PRICE', dropPercent: 15 });
+    // menor preço por dia: mediana 100000 (preço normal), menor já observado 80000.
+    await seedHistory(target.id, [100_000, 80_000, 110_000, 100_000, 120_000]);
+
+    const notCheap = await createObservation(target.id, 86_000);
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, notCheap.id));
+    expect(await lowPriceEvents(watch.id)).toHaveLength(0);
+
+    const cheap = await createObservation(target.id, 85_000);
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, cheap.id));
+    const [event] = await lowPriceEvents(watch.id);
+    expect(event?.status).toBe('QUEUED');
+    expect(event?.triggerType).toBe('LOW_PRICE');
+    expect(event?.referenceAmountMinor).toBe(100_000);
+    expect(event?.justification).toMatchObject({
+      reasons: ['BELOW_TYPICAL'],
+      typicalSource: 'HISTORY',
+      typicalAmountMinor: 100_000,
+      thresholdAmountMinor: 85_000,
+    });
+  });
+
+  it('com menos de 5 dias de histórico usa a linha de base das datas próximas', async () => {
+    const { target, watch } = await seedWatchWithRule({
+      type: 'LOW_PRICE',
+      dropPercent: 15,
+      baselineAmountMinor: 50_000,
+    });
+    await seedHistory(target.id, [60_000, 61_000]);
+    const observation = await createObservation(target.id, 42_500);
+
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, observation.id));
+
+    const [event] = await lowPriceEvents(watch.id);
+    expect(event?.justification).toMatchObject({
+      typicalSource: 'NEARBY_DATES',
+      typicalAmountMinor: 50_000,
+    });
+  });
+
+  it('menor já observado vale para observações anteriores à criação do Watch', async () => {
+    const { target, watch } = await seedWatchWithRule(
+      { type: 'LOW_PRICE', dropPercent: 15 },
+      { startsAt: new Date() },
+    );
+    await createObservation(target.id, 40_000, daysAgo(10));
+    const equal = await createObservation(target.id, 40_000);
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, equal.id));
+    expect(await lowPriceEvents(watch.id)).toHaveLength(0);
+
+    const lower = await createObservation(target.id, 39_999);
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, lower.id));
+    const [event] = await lowPriceEvents(watch.id);
+    expect(event?.justification).toMatchObject({ reasons: ['LOWEST_OBSERVED'] });
+  });
+
+  it('depois de um alerta, só avisa de novo se o preço cair abaixo do alertado', async () => {
+    const { target, watch } = await seedWatchWithRule({
+      type: 'LOW_PRICE',
+      dropPercent: 15,
+      baselineAmountMinor: 50_000,
+      cooldownSeconds: 0,
+    });
+    const first = await createObservation(target.id, 40_000, daysAgo(0.02));
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, first.id));
+
+    // Igual ao alertado (e ainda 20% abaixo do normal): não avisa de novo.
+    const same = await createObservation(target.id, 40_000, daysAgo(0.01));
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, same.id));
+    expect(await lowPriceEvents(watch.id)).toHaveLength(1);
+
+    const lower = await createObservation(target.id, 39_000);
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, lower.id));
+    const events = await lowPriceEvents(watch.id);
+    expect(events.map((event) => event.currentAmountMinor)).toEqual([40_000, 39_000]);
+  });
+
+  it('o mesmo job processado três vezes gera um alerta só', async () => {
+    const { target, watch } = await seedWatchWithRule({
+      type: 'LOW_PRICE',
+      dropPercent: 15,
+      baselineAmountMinor: 50_000,
+    });
+    const observation = await createObservation(target.id, 40_000);
+    const job = fakeJob(target.id, observation.id);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await evaluatePriceObservedJob({ prisma, metrics }, job);
+    }
+
+    expect(await lowPriceEvents(watch.id)).toHaveLength(1);
+  });
+
+  it('sem histórico nem linha de base, não dispara', async () => {
+    const { target, watch } = await seedWatchWithRule({ type: 'LOW_PRICE', dropPercent: 15 });
+    const observation = await createObservation(target.id, 1_000);
+
+    await evaluatePriceObservedJob({ prisma, metrics }, fakeJob(target.id, observation.id));
+
+    expect(await lowPriceEvents(watch.id)).toHaveLength(0);
   });
 });

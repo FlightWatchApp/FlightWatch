@@ -1,5 +1,4 @@
 import type { FlightSearchResponse, PriceCalendarResponse } from '@flight-watch/contracts';
-import { buildLaunchAlertRules } from '@/lib/domain/alert-rules';
 import { apiFetch } from './client';
 import type { FlightSearchResult } from './types';
 
@@ -65,11 +64,10 @@ export async function getPriceCalendar(input: {
 }
 
 export interface DeriveWatchFromOfferInput {
-  targetAmountMinor: number;
   notificationChannelId: string;
 }
 
-/** Regras do escopo de lançamento — ver `buildLaunchAlertRules`. */
+/** SPEC-039: sem regras do cliente — a API cria o alerta de preço baixo. */
 export async function deriveWatchFromOffer(
   offerId: string,
   input: DeriveWatchFromOfferInput,
@@ -77,7 +75,6 @@ export async function deriveWatchFromOffer(
   return apiFetch<{ id: string }>(`/v1/offers/${offerId}/watch`, {
     method: 'POST',
     body: JSON.stringify({
-      alertRules: buildLaunchAlertRules(input.targetAmountMinor),
       notificationChannelId: input.notificationChannelId,
     }),
   });

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -87,8 +87,66 @@ async function chooseCity(form: Locator, label: string, query: string, optionNam
   await form.getByRole('option', { name: optionName }).first().click();
 }
 
+/**
+ * Preço do provedor simulado (packages/providers, `deterministicPriceMinor`):
+ * mesma semente na busca e no calendário, então o teste sabe o preço de cada
+ * data sem rede.
+ */
+function simulatedPriceMinor(origin: string, destination: string, date: string): number {
+  const value = createHash('sha256').update(`${origin}|${destination}|${date}`).digest();
+  return 40_000 + (value.readUInt32BE(0) % 80_000);
+}
+
+function monthDays(month: string): string[] {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const count = new Date(Date.UTC(year ?? 0, monthNumber ?? 1, 0)).getUTCDate();
+  return Array.from(
+    { length: count },
+    (_, index) => `${month}-${String(index + 1).padStart(2, '0')}`,
+  );
+}
+
+function shiftMonth(month: string, delta: number): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(Date.UTC(year ?? 0, (monthNumber ?? 1) - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+
+/**
+ * SPEC-039: uma data cujo preço simulado já fica pelo menos 15% abaixo da
+ * mediana das datas próximas (mesma conta de `nearbyDatesBaseline`) — a
+ * primeira observação do monitoramento dispara o alerta de preço baixo.
+ */
+export function cheapSimulatedDate(origin: string, destination: string): string {
+  const today = isoDateInDays(0);
+  for (let days = 30; days <= 120; days += 1) {
+    const date = isoDateInDays(days);
+    const month = date.slice(0, 7);
+    const previous = shiftMonth(month, -1);
+    const months = [
+      ...(previous >= today.slice(0, 7) ? [previous] : []),
+      month,
+      shiftMonth(month, 1),
+    ];
+    const nearby = months
+      .flatMap(monthDays)
+      .filter((day) => day >= today && day !== date)
+      .map((day) => simulatedPriceMinor(origin, destination, day))
+      .sort((a, b) => a - b);
+    const middle = Math.floor(nearby.length / 2);
+    const median =
+      nearby.length % 2 === 1
+        ? (nearby[middle] ?? 0)
+        : Math.floor(((nearby[middle - 1] ?? 0) + (nearby[middle] ?? 0)) / 2);
+    if (simulatedPriceMinor(origin, destination, date) * 100 <= median * 85) return date;
+  }
+  throw new Error('nenhuma data barata no provedor simulado');
+}
+
 /** Busca SP → Rio (simulado) e devolve com os resultados na tela. */
-export async function searchSaoPauloRio(page: Page): Promise<void> {
+export async function searchSaoPauloRio(
+  page: Page,
+  departureDate = isoDateInDays(40),
+): Promise<void> {
   await page.goto('/search');
   // O diálogo "Criar monitoramento" também mora na página: escopo no formulário da busca.
   const form = page.locator('form').filter({
@@ -96,16 +154,16 @@ export async function searchSaoPauloRio(page: Page): Promise<void> {
   });
   await chooseCity(form, 'Origem', 'São Paulo', /São Paulo/);
   await chooseCity(form, 'Destino', 'Rio de Janeiro', /Rio de Janeiro/);
-  await form.getByLabel('Data de ida').fill(isoDateInDays(40));
+  await form.getByLabel('Data de ida').fill(departureDate);
   await form.getByRole('button', { name: 'Buscar passagens' }).click();
   await expect(page).toHaveURL(/searchId=/);
 }
 
-/** Do resultado da busca: abre "Monitorar preço" na primeira oferta e confirma. */
-export async function monitorFirstOffer(page: Page, desiredPrice: string): Promise<void> {
+/** Do resultado da busca: abre "Monitorar preço" na primeira oferta e confirma (SPEC-039: sem preço). */
+export async function monitorFirstOffer(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Monitorar preço' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Monitorar este preço' });
-  await dialog.getByLabel('Preço desejado').fill(desiredPrice);
+  await expect(dialog.getByLabel('Preço desejado')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Confirmar monitoramento' }).click();
   await expect(page.getByRole('dialog', { name: 'Monitoramento criado' })).toBeVisible();
 }

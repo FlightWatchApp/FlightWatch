@@ -30,7 +30,7 @@ const routePlaceSchema = z.object({
   airports: z.array(z.object({ code: z.string(), name: z.string() })),
 });
 
-const routeDaySchema = z.object({
+export const routeDaySchema = z.object({
   date: z.string(),
   amountMinor: z.number().int(),
   stops: z.number().int(),

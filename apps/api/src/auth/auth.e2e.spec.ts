@@ -133,7 +133,6 @@ describe('POST /v1/auth/register (e2e, Postgres real via Testcontainers)', () =>
         adults: 1,
         currency: 'BRL',
         market: 'BR',
-        alertRules: [{ type: 'TARGET_PRICE', amountMinor: 250_000, cooldownSeconds: 3600 }],
         notificationChannelId: registerResponse.body.user.notificationChannelId,
       });
 

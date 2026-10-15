@@ -478,3 +478,109 @@ describe('TravelpayoutsFlightProvider.cheapestByDestination (SPEC-032 AC-1)', ()
     expect((error as ProviderError).retryAfterMs).toBe(30_000);
   });
 });
+
+describe('flightDetailsByDay (SPEC-038)', () => {
+  /** Formato real de aviasales/v3/prices_for_dates (sondagem de 2026-10-14, SAO → RIO). */
+  function detail(overrides: Record<string, unknown> = {}) {
+    return {
+      flight_number: '4193',
+      link: '/search/SAO2911RIO1?t=AD17959470001795950600000060GRUSDU_b65',
+      origin_airport: 'GRU',
+      destination_airport: 'SDU',
+      departure_at: '2026-11-29T10:10:00-03:00',
+      airline: 'AD',
+      destination: 'RIO',
+      origin: 'SAO',
+      price: 182,
+      gate: 'Kupi.com',
+      return_transfers: 0,
+      duration: 60,
+      duration_to: 60,
+      duration_back: 0,
+      transfers: 0,
+      ...overrides,
+    };
+  }
+  const query = { originIata: 'SAO', destinationIata: 'RIO', month: '2026-11', currency: 'BRL' };
+
+  it('fica com o voo mais barato de cada dia, com companhia, voo, horário e aeroportos', async () => {
+    const { fn, calls } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          detail(),
+          detail({ price: 150, flight_number: 6052, departure_at: '2026-11-29T20:40:00-03:00' }),
+          detail({ departure_at: '2026-11-08T06:20:00-03:00', airline: 'G3', price: 199 }),
+        ],
+      },
+    });
+    const provider = new TravelpayoutsFlightProvider({
+      token: TOKEN,
+      timeoutMs: 1000,
+      fetchFn: fn,
+      now: () => NOW,
+    });
+
+    const days = await provider.flightDetailsByDay(query);
+
+    expect(days).toEqual([
+      expect.objectContaining({ date: '2026-11-08', carrierCode: 'G3', amountMinor: 19_900 }),
+      {
+        date: '2026-11-29',
+        carrierCode: 'AD',
+        flightNumber: '6052',
+        departureAt: '2026-11-29T20:40:00-03:00',
+        originAirport: 'GRU',
+        destinationAirport: 'SDU',
+        durationMinutes: 60,
+        stops: 0,
+        amountMinor: 15_000,
+      },
+    ]);
+    expect(calls[0]?.url).toContain('/aviasales/v3/prices_for_dates?');
+    expect(calls[0]?.url).toContain('departure_at=2026-11');
+    expect(calls[0]?.url).not.toContain(TOKEN);
+    expect(calls[0]?.headers['X-Access-Token']).toBe(TOKEN);
+  });
+
+  it('descarta entrada malformada, de outro mês ou sem companhia, sem derrubar as outras', async () => {
+    const { fn } = fakeFetch({
+      body: {
+        success: true,
+        data: [
+          detail({ airline: '' }),
+          detail({ price: 0 }),
+          detail({ departure_at: 'amanhã' }),
+          detail({ departure_at: '2026-12-01T10:00:00-03:00' }),
+          detail({ departure_at: '2026-11-30T23:30:00-03:00', flight_number: null }),
+        ],
+      },
+    });
+    const provider = new TravelpayoutsFlightProvider({
+      token: TOKEN,
+      timeoutMs: 1000,
+      fetchFn: fn,
+      now: () => NOW,
+    });
+
+    const days = await provider.flightDetailsByDay(query);
+
+    // A data é a local da partida (23:30 em -03:00 continua dia 30).
+    expect(days).toEqual([expect.objectContaining({ date: '2026-11-30', flightNumber: null })]);
+  });
+
+  it('429 vira RATE_LIMITED com Retry-After, como as outras consultas', async () => {
+    const { fn } = fakeFetch({ status: 429, headers: { 'retry-after': '30' } });
+    const provider = new TravelpayoutsFlightProvider({
+      token: TOKEN,
+      timeoutMs: 1000,
+      fetchFn: fn,
+      now: () => NOW,
+    });
+
+    await expect(provider.flightDetailsByDay(query)).rejects.toMatchObject({
+      errorClass: 'RATE_LIMITED',
+      retryAfterMs: 30_000,
+    });
+  });
+});

@@ -134,3 +134,8 @@
     align-items: flex-start;
   }
 }
+
+.alertRule {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}

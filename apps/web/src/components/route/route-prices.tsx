@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import type { GetRouteResponse } from '@flight-watch/contracts';
 import { PriceByDateChart } from '@/components/charts/price-by-date-chart';
@@ -10,6 +11,7 @@ import { formatMoney } from '@/lib/domain/money';
 import { monthsLabel, shortDate } from '@/lib/domain/price-chart';
 import { promotionAgeLabel, promotionDiscountLabel } from '@/lib/domain/promotion';
 import { cheapestDates, routePriceNotice } from '@/lib/domain/route-page';
+import { offerPath } from '@/lib/domain/route-url';
 import styles from './route-page.module.css';
 
 /** Largo e baixo: a página tem a largura toda; o cartão inicial usa o padrão. */
@@ -24,9 +26,11 @@ export interface RoutePricesProps {
 /**
  * SPEC-033: o bloco que a FlightConnections não tem — menor preço, promoção
  * da rota (só do cache), preço por data e as datas mais baratas. Escolher
- * uma data abre a busca dela (SPEC-014), onde o monitoramento já existe.
+ * uma data abre a página da oferta dela (SPEC-038); em ida e volta, a busca
+ * (SPEC-014), onde o monitoramento já existe.
  */
 export function RoutePrices({ route, renderedAt }: RoutePricesProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { prices, promotion } = route;
   const notice = routePriceNotice(prices.status);
@@ -34,6 +38,10 @@ export function RoutePrices({ route, renderedAt }: RoutePricesProps) {
   const best = cheapestDates(prices.days, 5);
 
   function searchDate(date: string): void {
+    if (route.tripType === 'ONE_WAY') {
+      router.push(offerPath(route.origin, route.destination, date));
+      return;
+    }
     const form = new FormData();
     form.set('origin', route.origin.code);
     form.set('destination', route.destination.code);

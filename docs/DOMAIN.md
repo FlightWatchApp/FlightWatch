@@ -104,7 +104,16 @@ Tipos iniciais:
 - `target_price`: preço observado menor ou igual ao alvo;
 - `percentage_drop`: queda percentual mínima sobre a referência;
 - `absolute_drop`: queda monetária mínima sobre a referência;
-- `new_observed_low`: novo menor preço válido do Watch.
+- `new_observed_low`: novo menor preço válido do Watch;
+- `low_price` (SPEC-039): preço pelo menos `drop_percent`% abaixo do preço
+  normal da viagem (mediana do menor preço de cada dia nos últimos 30 dias,
+  com 5+ dias; senão a linha de base das datas próximas gravada na criação)
+  ou abaixo do menor preço da viagem nos últimos 90 dias; depois de um
+  alerta, só dispara de novo abaixo do preço alertado.
+
+Desde a SPEC-039, `low_price` é a única regra de Watches novos: o usuário não
+escolhe tipo, valor nem porcentagem. As outras continuam no modelo para
+auditoria dos alertas já enviados (regras antigas ficam `enabled = false`).
 
 Campos:
 

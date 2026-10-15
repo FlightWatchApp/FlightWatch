@@ -19,6 +19,8 @@ export interface PromotionsClientProps {
   originName: string;
   promotions: PromotionItem[];
   renderedAt: string;
+  /** SPEC-038: página da oferta ligada (decidido no servidor). */
+  offerPages: boolean;
 }
 
 /** SPEC-032 + SPEC-016: lista e mapa dos destinos; marcador destaca o cartão. */
@@ -27,6 +29,7 @@ export function PromotionsClient({
   originName,
   promotions,
   renderedAt,
+  offerPages,
 }: PromotionsClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -84,6 +87,7 @@ export function PromotionsClient({
             }}
           >
             <PromotionCard
+              offerPages={offerPages}
               origin={origin}
               originName={originName}
               promotion={promotion}

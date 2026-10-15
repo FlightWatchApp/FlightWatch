@@ -6,18 +6,26 @@ import {
   findLastQueuedOrNotifiedAlertEvent,
   findLowestValidObservation,
   findOrCreateAlertEvent,
+  findLowPriceReferences,
   findPreviousValidObservation,
   selectActiveWatchesPage,
   withUniqueConstraintRetry,
+  type LowPriceReferences,
   type WatchForEvaluation,
 } from '@flight-watch/database';
 import {
+  LOW_PRICE_HISTORY_WINDOW_DAYS,
+  LOW_PRICE_LOWEST_WINDOW_DAYS,
   computeAlertEventDeduplicationKey,
   createMoney,
   evaluateAbsoluteDropRule,
+  evaluateLowPriceRule,
   evaluateNewObservedLowRule,
   evaluatePercentageDropRule,
   evaluateTargetPriceRule,
+  lowPriceDropPercentIsValid,
+  resolveTypicalPrice,
+  type Money,
 } from '@flight-watch/domain';
 import type { PriceObservedJob } from '@flight-watch/queue';
 import type { AlertWorkerMetrics } from './metrics.js';
@@ -54,6 +62,21 @@ export async function evaluatePriceObservedJob(
     return; // observação inexistente — nada a avaliar.
   }
 
+  // SPEC-039: referências do preço baixo são da viagem, não do Watch — uma
+  // consulta por observação, só se algum Watch tiver a regra (H09).
+  let lowPriceReferences: Promise<LowPriceReferences> | null = null;
+  const loadLowPriceReferences = (): Promise<LowPriceReferences> => {
+    lowPriceReferences ??= findLowPriceReferences(prisma, {
+      searchTargetId: data.searchTargetId,
+      currency: observation.currency,
+      until: observation.observedAt,
+      excludeObservationId: observation.id,
+      historyWindowDays: LOW_PRICE_HISTORY_WINDOW_DAYS,
+      lowestWindowDays: LOW_PRICE_LOWEST_WINDOW_DAYS,
+    });
+    return lowPriceReferences;
+  };
+
   let cursor: string | null = null;
   for (;;) {
     const watches: WatchForEvaluation[] = await prisma.$transaction((tx) =>
@@ -73,15 +96,19 @@ export async function evaluatePriceObservedJob(
 
     for (const watch of watches) {
       for (const rule of watch.alertRules) {
-        await evaluateRule(
-          prisma,
-          metrics,
-          watch,
-          rule,
-          observation,
-          observation.observedAt,
-          data.correlationId,
-        );
+        if (rule.type === 'LOW_PRICE') {
+          await evaluateLowPrice(
+            prisma,
+            metrics,
+            watch,
+            rule,
+            observation,
+            await loadLowPriceReferences(),
+            data.correlationId,
+          );
+          continue;
+        }
+        await evaluateRule(prisma, metrics, watch, rule, observation, data.correlationId);
       }
     }
 
@@ -216,6 +243,8 @@ function evaluateRuleFormula(
       });
       return { triggered: result.triggered, computed: {} };
     }
+    case 'LOW_PRICE':
+      return null; // SPEC-039: avaliada por evaluateLowPrice, com referências da viagem.
   }
 }
 
@@ -225,7 +254,6 @@ async function evaluateRule(
   watch: WatchForEvaluation,
   rule: AlertRule,
   observation: PriceObservation,
-  observedAt: Date,
   correlationId: string,
 ): Promise<void> {
   const referenceObservation = await resolveReference(prisma, watch, rule, observation);
@@ -248,18 +276,51 @@ async function evaluateRule(
     return;
   }
 
+  const justification: Prisma.InputJsonValue = {
+    ...evaluation.computed,
+    referenceStrategy: rule.referenceStrategy,
+    referenceObservationId: referenceObservation?.id ?? null,
+  };
+  await persistAlertEvent(prisma, metrics, {
+    watch,
+    rule,
+    observation,
+    referenceAmountMinor: referenceObservation?.totalAmountMinor ?? null,
+    justification,
+    correlationId,
+  });
+}
+
+interface PersistAlertEventInput {
+  watch: WatchForEvaluation;
+  rule: AlertRule;
+  observation: PriceObservation;
+  referenceAmountMinor: number | null;
+  justification: Prisma.InputJsonValue;
+  correlationId: string;
+  /**
+   * SPEC-039: decisão final dentro da transação, com a regra travada (ex.: "só
+   * cai mais" lê o último alerta). Não roda em replay de um evento que já existe.
+   */
+  recheck?: (tx: Prisma.TransactionClient) => Promise<boolean>;
+}
+
+type PersistOutcome =
+  'queued' | 'suppressed' | 'idempotent_replay' | 'watch_skipped' | 'rechecked_out';
+
+async function persistAlertEvent(
+  prisma: PrismaClient,
+  metrics: AlertWorkerMetrics,
+  input: PersistAlertEventInput,
+): Promise<PersistOutcome> {
+  const { watch, rule, observation, correlationId, justification } = input;
+  const observedAt = observation.observedAt;
   const deduplicationKey = computeAlertEventDeduplicationKey({
     watchId: watch.id,
     alertRuleId: rule.id,
     priceObservationId: observation.id,
     ruleVersion: rule.ruleVersion,
   });
-
-  const justification: Prisma.InputJsonValue = {
-    ...evaluation.computed,
-    referenceStrategy: rule.referenceStrategy,
-    referenceObservationId: referenceObservation?.id ?? null,
-  };
 
   // findOrCreateAlertEvent pode perder uma corrida sob avaliação concorrente do
   // mesmo PriceObserved (redelivery do job sobreposto ao original) — envolve
@@ -291,6 +352,16 @@ async function evaluateRule(
           return { outcome: 'watch_skipped' as const, eventCreatedAt: null };
         }
 
+        if (input.recheck) {
+          const existing = await tx.alertEvent.findUnique({
+            where: { deduplicationKey },
+            select: { id: true },
+          });
+          if (!existing && !(await input.recheck(tx))) {
+            return { outcome: 'rechecked_out' as const, eventCreatedAt: null };
+          }
+        }
+
         const cooldownActive = await isCooldownActive(tx, watch.id, rule.id, rule.cooldownSeconds);
 
         const outcome = await findOrCreateAlertEvent(tx, {
@@ -299,7 +370,7 @@ async function evaluateRule(
           priceObservationId: observation.id,
           triggerType: rule.type,
           ruleVersion: rule.ruleVersion,
-          referenceAmountMinor: referenceObservation?.totalAmountMinor ?? null,
+          referenceAmountMinor: input.referenceAmountMinor,
           currentAmountMinor: observation.totalAmountMinor,
           currency: observation.currency,
           deduplicationKey,
@@ -335,11 +406,100 @@ async function evaluateRule(
 
   if (result.outcome === 'watch_skipped') {
     metrics.watchSkippedTotal.inc({ reason: 'not_active' });
-    return;
+    return result.outcome;
+  }
+  if (result.outcome === 'rechecked_out') {
+    return result.outcome;
   }
   metrics.eventsTotal.inc({ outcome: result.outcome });
   if (result.outcome !== 'idempotent_replay' && result.eventCreatedAt) {
     const lagSeconds = Math.max(0, (result.eventCreatedAt.getTime() - observedAt.getTime()) / 1000);
     metrics.eventLagSeconds.observe(lagSeconds);
+  }
+  return result.outcome;
+}
+
+/**
+ * SPEC-039: preço `dropPercent`% abaixo do normal ou abaixo do menor já
+ * observado da viagem. A decisão prévia (sem o último alerta) evita abrir
+ * transação à toa; a final, com a regra travada, aplica o "só cai mais".
+ */
+async function evaluateLowPrice(
+  prisma: PrismaClient,
+  metrics: AlertWorkerMetrics,
+  watch: WatchForEvaluation,
+  rule: AlertRule,
+  observation: PriceObservation,
+  references: LowPriceReferences,
+  correlationId: string,
+): Promise<void> {
+  const dropPercent = rule.dropPercent;
+  if (dropPercent === null || !lowPriceDropPercentIsValid(dropPercent)) {
+    metrics.rulesEvaluatedTotal.inc({ type: rule.type, result: 'not_triggered' });
+    return; // regra malformada — sem porcentagem válida, nada a decidir.
+  }
+  const currency = observation.currency;
+  const money = (amountMinor: number): Money => createMoney(amountMinor, currency);
+  const typical = resolveTypicalPrice({
+    dailyLows: references.dailyLows,
+    baselineAmountMinor: rule.baselineAmountMinor,
+  });
+  metrics.lowPriceReferenceTotal.inc({
+    source: typical ? (typical.source === 'HISTORY' ? 'history' : 'nearby_dates') : 'none',
+  });
+
+  const input = {
+    currentAmount: money(observation.totalAmountMinor),
+    typicalAmount: typical ? money(typical.amountMinor) : null,
+    lowestAmount:
+      references.lowestAmountMinor !== null ? money(references.lowestAmountMinor) : null,
+    dropPercent,
+  };
+  const preliminary = evaluateLowPriceRule({ ...input, lastAlertAmount: null });
+  if (!preliminary.triggered) {
+    metrics.rulesEvaluatedTotal.inc({
+      type: rule.type,
+      result: preliminary.noReference ? 'no_reference' : 'not_triggered',
+    });
+    return;
+  }
+
+  const justification: Prisma.InputJsonValue = {
+    reasons: preliminary.reasons,
+    dropPercent,
+    typicalAmountMinor: typical?.amountMinor ?? null,
+    typicalSource: typical?.source ?? null,
+    historyDays: typical?.historyDays ?? references.dailyLows.length,
+    lowestAmountMinor: references.lowestAmountMinor,
+    thresholdAmountMinor: preliminary.thresholdAmountMinor,
+  };
+
+  const outcome = await persistAlertEvent(prisma, metrics, {
+    watch,
+    rule,
+    observation,
+    referenceAmountMinor: typical?.amountMinor ?? references.lowestAmountMinor,
+    justification,
+    correlationId,
+    recheck: async (tx) => {
+      const last = await findLastQueuedOrNotifiedAlertEvent(tx, {
+        watchId: watch.id,
+        alertRuleId: rule.id,
+      });
+      const lastAlertAmount =
+        last && last.currency === currency ? money(last.currentAmountMinor) : null;
+      return evaluateLowPriceRule({ ...input, lastAlertAmount }).triggered;
+    },
+  });
+
+  metrics.rulesEvaluatedTotal.inc({
+    type: rule.type,
+    result: outcome === 'rechecked_out' ? 'not_triggered' : 'triggered',
+  });
+  if (outcome === 'queued' || outcome === 'suppressed') {
+    const [first, second] = preliminary.reasons;
+    metrics.lowPriceReasonTotal.inc({
+      reason: second ? 'both' : first === 'BELOW_TYPICAL' ? 'below_typical' : 'lowest_observed',
+    });
   }
 }

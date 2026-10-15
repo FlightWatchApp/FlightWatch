@@ -69,7 +69,6 @@ function watchBody(origin: string, destination: string, channelId: string) {
     adults: 1,
     currency: 'BRL',
     market: 'BR',
-    alertRules: [{ type: 'TARGET_PRICE', amountMinor: 80000, cooldownSeconds: 43200 }],
     notificationChannelId: channelId,
   };
 }

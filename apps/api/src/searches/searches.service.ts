@@ -361,7 +361,6 @@ export class SearchesService {
         adults: 1,
         currency: flightSearch.currency,
         market: flightSearch.market,
-        alertRules: body.alertRules,
         notificationChannelId: body.notificationChannelId,
       },
       idempotencyKey,

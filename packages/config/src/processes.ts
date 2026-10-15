@@ -130,6 +130,9 @@ export const apiConfig = {
     ...emailProvider,
     ...promotions,
     ...routePage,
+    // SPEC-039: quanto abaixo do preço normal dispara o alerta. Fixado na regra ao criar
+    // o Watch (só vale para Watches novos); o usuário não escolhe.
+    ALERT_LOW_PRICE_DROP_PERCENT: intField({ min: 5, max: 50, default: 15 }),
     RATE_LIMIT_WINDOW_MS: durationMsField(60_000),
     RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 10 }),
     // SPEC-025: rotas de autenticação, por rota e por IP do cliente.
