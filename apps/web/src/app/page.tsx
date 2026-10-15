@@ -6,22 +6,15 @@ import { Landing } from '@/components/home/landing';
 import { MemberHome } from '@/components/home/member-home';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
-import { listOpportunities } from '@/lib/api/opportunities';
 import { searchPlaces } from '@/lib/api/places';
-import type { OpportunityItem } from '@/lib/api/types';
 import { listWatches } from '@/lib/api/watches';
 import { matchesVisitorCity, visitorCityFromHeaders } from '@/lib/domain/visitor-city';
 import { ORIGIN_COOKIE_NAME, normalizeOriginCode } from './opportunities/origin';
+import { routePagesEnabled } from '@/lib/domain/route-flag';
 import { isBelowTypicalPrice } from '@/lib/domain/watch-price';
 
-/** PG-01/PG-02: promoções são um complemento da home — se o feed falhar, a página continua. */
-async function safeOpportunities(): Promise<OpportunityItem[]> {
-  try {
-    return await listOpportunities({ sort: 'best_value' });
-  } catch {
-    return [];
-  }
-}
+/** Cartões de promoção na home de quem está logado. */
+const MEMBER_PROMOTIONS = 3;
 
 /**
  * SPEC-034: cidade sugerida pelo acesso (cabeçalhos da Cloudflare), procurada
@@ -48,14 +41,16 @@ async function suggestedOrigin(): Promise<{ code: string; name: string } | null>
  */
 export default async function HomePage() {
   const user = await getCurrentUser();
+  // SPEC-032/034: a origem é a escolhida (cookie) ou, sem ela, a sugerida
+  // pelo acesso; a vitrine das cidades mais usadas vem sempre junto. Vale
+  // para visitante e para quem está logado.
+  const cookieStore = await cookies();
+  const chosen = normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
+  const suggestion = chosen ? null : await suggestedOrigin();
+  const origin = chosen ?? suggestion?.code ?? null;
+  const [promotions, showcase] = await Promise.all([loadHomePromotions(origin), loadShowcase()]);
+
   if (!user) {
-    // SPEC-032/034: a origem é a escolhida (cookie) ou, sem ela, a sugerida
-    // pelo acesso; a vitrine das cidades mais usadas vem sempre junto.
-    const cookieStore = await cookies();
-    const chosen = normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
-    const suggestion = chosen ? null : await suggestedOrigin();
-    const origin = chosen ?? suggestion?.code ?? null;
-    const [promotions, showcase] = await Promise.all([loadHomePromotions(origin), loadShowcase()]);
     return (
       <Landing
         heroPromotion={promotions?.hero ?? null}
@@ -76,7 +71,23 @@ export default async function HomePage() {
     }
     throw error;
   }
-  const opportunities = await safeOpportunities();
+  // Promoções da cidade primeiro; depois a vitrine, sem repetir destino.
+  const fromOrigin = promotions
+    ? [promotions.hero.promotion, ...promotions.more].map((promotion) => ({
+        origin: promotions.hero.origin,
+        originName: promotions.hero.originName,
+        promotion,
+      }))
+    : [];
+  const shown = new Set(fromOrigin.map((item) => item.promotion.destination));
+  const fromShowcase = showcase
+    .filter((promotion) => !shown.has(promotion.destination))
+    .map((promotion) => ({
+      origin: promotion.origin,
+      originName: promotion.originName,
+      promotion,
+    }));
+  const memberPromotions = [...fromOrigin, ...fromShowcase].slice(0, MEMBER_PROMOTIONS);
 
   const active = watches.filter((watch) => watch.status === 'ACTIVE' || watch.status === 'PAUSED');
   const belowTypical = watches.filter(
@@ -93,7 +104,10 @@ export default async function HomePage() {
       <MemberHome
         userEmail={user.email}
         notificationChannelVerified={user.notificationChannelVerified}
-        opportunities={opportunities}
+        promotions={memberPromotions}
+        originName={promotions?.hero.originName ?? null}
+        offerPages={routePagesEnabled()}
+        renderedAt={new Date().toISOString()}
         monitoredCount={active.length}
         belowTypicalCount={belowTypical}
         currentOfferCount={active.filter((watch) => watch.currentOffer !== null).length}

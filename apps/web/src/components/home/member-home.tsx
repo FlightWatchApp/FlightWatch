@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import { DealCard } from '@/components/deals/deal-card';
+import type { PromotionItem } from '@flight-watch/contracts';
+import { PromotionCard } from '@/components/promotions/promotion-card';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import buttonStyles from '@/components/ui/button.module.css';
 import {
@@ -11,7 +12,6 @@ import {
   IconShield,
   IconUser,
 } from '@/components/ui/icon';
-import type { OpportunityItem } from '@/lib/api/types';
 import styles from './member-home.module.css';
 
 const primaryLg = [buttonStyles.button, buttonStyles.primary, buttonStyles.lg].join(' ');
@@ -20,7 +20,14 @@ const secondaryLg = [buttonStyles.button, buttonStyles.secondary, buttonStyles.l
 export interface MemberHomeProps {
   userEmail: string;
   notificationChannelVerified: boolean;
-  opportunities: OpportunityItem[];
+  /** SPEC-032/034: da cidade da pessoa e, depois, da vitrine — cada uma com a origem. */
+  promotions: { origin: string; originName: string; promotion: PromotionItem }[];
+  /** Cidade das promoções do topo da lista; null quando são só da vitrine. */
+  originName: string | null;
+  /** SPEC-038: página da oferta ligada (decidido no servidor). */
+  offerPages: boolean;
+  /** Instante da renderização no servidor: a idade não muda na hidratação. */
+  renderedAt: string;
   monitoredCount: number;
   /** SPEC-039: monitoramentos ativos com preço bem abaixo do normal. */
   belowTypicalCount: number;
@@ -38,12 +45,14 @@ const delay = (ms: number) => ({ '--reveal-delay': `${ms}ms` }) as CSSProperties
 export function MemberHome({
   userEmail,
   notificationChannelVerified,
-  opportunities,
+  promotions,
+  originName,
+  offerPages,
+  renderedAt,
   monitoredCount,
   belowTypicalCount,
   currentOfferCount,
 }: MemberHomeProps) {
-  const featured = opportunities.slice(0, 3);
   const firstName = firstNameFromEmail(userEmail);
 
   return (
@@ -112,30 +121,37 @@ export function MemberHome({
           <div>
             <p className={styles.sectionKicker}>O que está valendo a pena agora</p>
             <h2 id="member-promotions-title" className={styles.sectionTitle}>
-              Promoções observadas por parceiros
+              {originName ? `Promoções saindo de ${originName}` : 'Destaques do Brasil'}
             </h2>
             <p className={styles.sectionLead}>
-              Preços encontrados em sites parceiros, comparados com o histórico que o sistema já
-              observou.
+              Datas bem abaixo das outras datas próximas da mesma rota
+              {originName ? ', e depois os destaques das cidades mais usadas do país' : ''}. Cada
+              cartão diz de onde sai.
             </p>
           </div>
           <Link href="/opportunities" className={styles.sectionLink}>
             Ver todas →
           </Link>
         </div>
-        {featured.length > 0 ? (
+        {promotions.length > 0 ? (
           <>
             <div className={styles.dealGrid}>
-              {featured.map((opportunity) => (
-                <DealCard key={opportunity.searchTargetId} opportunity={opportunity} compact />
+              {promotions.map((item) => (
+                <PromotionCard
+                  key={`${item.origin}-${item.promotion.destination}`}
+                  origin={item.origin}
+                  originName={item.originName}
+                  promotion={item.promotion}
+                  renderedAt={renderedAt}
+                  offerPages={offerPages}
+                />
               ))}
             </div>
-            <PurchaseNote />
+            {!offerPages && <PurchaseNote />}
           </>
         ) : (
           <p className={styles.emptyDeals}>
-            Ainda não há uma promoção destacada. Você pode buscar uma rota ou abrir a área de
-            oportunidades para ver o feed completo.
+            Nenhuma promoção agora. Escolha a sua cidade na página de promoções ou busque uma rota.
           </p>
         )}
       </section>
