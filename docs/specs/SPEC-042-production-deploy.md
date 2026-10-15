@@ -89,6 +89,38 @@ rede interna do compose: postgres, redis, api, workers, web, umami
   5 min e avisa por e-mail — de fora, porque o próprio servidor não avisa
   que caiu.
 
+## Frequência das consultas e cota da fonte
+
+Decisão do intervalo de polling para o beta (CLAUDE.md §1.3 — continua
+`PROPOSTO` até medir com tráfego real).
+
+- **Custo de uma verificação:** 1 chamada a `v2/prices/latest` (rota + mês),
+  sem custo em dinheiro.
+- **Limite da fonte:** 300 chamadas/minuto para `v2/prices/latest`; acima
+  disso, 429 e bloqueio até o fim do minuto. A Travelpayouts recomenda
+  guardar o resultado por 24 h
+  ([API rate limits](https://support.travelpayouts.com/hc/en-us/articles/4402565416594),
+  consultado em 2026-10-15).
+- **Frescor da fonte:** mediana de ≈ 1 dia de idade do preço (ADR-008).
+- **Intervalo mantido: 4 h por SearchTarget** (`DEFAULT_CHECK_INTERVAL_SECONDS`).
+  Seis chamadas por rota/dia. Com 1.000 monitoramentos distintos, isso dá
+  6 mil chamadas/dia (≈ 4/min em média), muito longe do limite. Mais
+  devagar não economiza nada que importe e atrasa o aviso nas rotas
+  populares, que mudam várias vezes por dia. O mesmo preço não vira nova
+  observação (`price_observation_total{result="unchanged"}`, SPEC-030).
+- **O risco é o pico, não o total:** depois de uma subida ou de uma queda,
+  o scheduler enfileira tudo o que venceu de uma vez. O price-worker permitia
+  5/s (300/min), sozinho no teto, e a API usa o mesmo token para promoções,
+  página da rota, calendário e página da oferta. Produção usa
+  `PRICE_WORKER_RATE_LIMIT_PER_SECOND=2` e `CAPACITY=5` (120/min), o que deixa
+  180/min para a API e ainda cobre ≈ 28 mil SearchTargets a cada 4 h. O
+  limitador é por processo: com mais de um price-worker, dividir esse valor
+  entre eles.
+- **Medir no beta:** a razão `unchanged / (success + unchanged)` em
+  `price_observation_total` e os 429 (`provider_call_total{result="RATE_LIMITED"}`). Mais de 90 %
+  `unchanged` depois de duas semanas → subir para 6–12 h. Qualquer 429 →
+  baixar o ritmo antes de mexer no intervalo.
+
 ## Critérios de aceitação
 
 - **AC-1** Com o `.env.production` preenchido, `bin/update.sh` sobe tudo e o
