@@ -30,6 +30,9 @@ model User {
   // nunca é persistido). Um pedido novo substitui o anterior; apagado ao usar.
   passwordResetTokenHash String?    @unique
   passwordResetExpiresAt DateTime?
+  // SPEC-040: cidade de partida escolhida pela pessoa (código de cidade do
+  // catálogo, SPEC-029). Apagada na exclusão da conta (SPEC-027).
+  homeCityCode           String?
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
 

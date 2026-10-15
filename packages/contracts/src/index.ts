@@ -24,3 +24,4 @@ export * from './promotions/list-promotions.js';
 export * from './routes/get-route.js';
 export * from './routes/get-route-offer.js';
 export * from './auth/captcha.js';
+export * from './me/overview.js';

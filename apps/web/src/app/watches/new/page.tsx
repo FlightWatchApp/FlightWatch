@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/lib/api/auth';
 import { readSessionToken } from '@/lib/auth/session';
 import { NewWatchForm } from './new-watch-form';
 
@@ -13,5 +14,6 @@ export default async function NewWatchPage() {
     redirect('/login');
   }
 
-  return <NewWatchForm />;
+  const user = await getCurrentUser().catch(() => null);
+  return <NewWatchForm initialOrigin={user?.homeCity ?? null} />;
 }

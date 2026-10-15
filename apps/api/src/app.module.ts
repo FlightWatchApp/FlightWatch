@@ -11,6 +11,7 @@ import { RoutesModule } from './routes/routes.module.js';
 import { SearchesModule } from './searches/searches.module.js';
 import { ThrottlingModule } from './throttling/throttling.module.js';
 import { WatchesModule } from './watches/watches.module.js';
+import { MeModule } from './me/me.module.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WatchesModule } from './watches/watches.module.js';
     PlacesModule,
     PromotionsModule,
     RoutesModule,
+    MeModule,
   ],
 })
 export class AppModule {}

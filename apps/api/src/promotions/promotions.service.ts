@@ -10,6 +10,7 @@ import {
   type ListPromotionHighlightsResponse,
   type ListPromotionsQuery,
   type ListPromotionsResponse,
+  type PromotionHighlight,
   PROMOTION_CURRENCY,
   PROMOTION_MARKET,
   promotionItemSchema,
@@ -227,22 +228,7 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
       this.metrics.promotionHighlightsRequestsTotal.inc({ result: 'disabled' });
       return { status: 'DISABLED', generatedAt: now.toISOString(), promotions: [] };
     }
-    const origins = await this.places.searchableCities(
-      this.config.PROMOTION_SHOWCASE_ORIGIN_CITIES,
-    );
-    const feeds = await Promise.all(
-      [...origins.values()].map(async (origin) => ({
-        origin,
-        feed: await this.readFeed(feedKey(origin.code, 'ONE_WAY')),
-      })),
-    );
-    const candidates = feeds.flatMap(({ origin, feed }) =>
-      (feed?.promotions ?? []).map((promotion) => ({
-        ...promotion,
-        origin: origin.code,
-        originName: origin.name,
-      })),
-    );
+    const candidates = await this.cachedCandidates(this.config.PROMOTION_SHOWCASE_ORIGIN_CITIES);
     const promotions = selectHighlights(candidates, query.limit, now).map((promotion) => ({
       ...promotion,
       purchaseUrl: this.purchaseUrl(promotion.origin, promotion),
@@ -251,6 +237,44 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
       result: promotions.length > 0 ? 'ok' : 'empty',
     });
     return { status: 'OK', generatedAt: now.toISOString(), promotions };
+  }
+
+  /**
+   * SPEC-040: promoções já em cache, saindo das cidades dadas, que chegam num
+   * dos destinos da pessoa — uma por destino, pela mesma seleção da vitrine.
+   * Nunca calcula nem chama a fonte.
+   */
+  async cachedForDestinations(
+    originCodes: readonly string[],
+    destinations: ReadonlySet<string>,
+    limit: number,
+  ): Promise<PromotionHighlight[]> {
+    if (!this.config.PROMOTION_ENGINE_ENABLED || destinations.size === 0) return [];
+    const candidates = (await this.cachedCandidates(originCodes)).filter((promotion) =>
+      destinations.has(promotion.destination),
+    );
+    return selectHighlights(candidates, limit, new Date()).map((promotion) => ({
+      ...promotion,
+      purchaseUrl: this.purchaseUrl(promotion.origin, promotion),
+    }));
+  }
+
+  /** Feeds só de ida em cache das cidades dadas, cada promoção com a sua origem. */
+  private async cachedCandidates(originCodes: readonly string[]) {
+    const origins = await this.places.searchableCities([...new Set(originCodes)]);
+    const feeds = await Promise.all(
+      [...origins.values()].map(async (origin) => ({
+        origin,
+        feed: await this.readFeed(feedKey(origin.code, 'ONE_WAY')),
+      })),
+    );
+    return feeds.flatMap(({ origin, feed }) =>
+      (feed?.promotions ?? []).map((promotion) => ({
+        ...promotion,
+        origin: origin.code,
+        originName: origin.name,
+      })),
+    );
   }
 
   /**

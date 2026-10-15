@@ -1,8 +1,10 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { deleteAccount } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
+import { updateHomeCity } from '@/lib/api/me';
 import { clearSessionCookie } from '@/lib/auth/session';
 
 export interface DeleteAccountActionResult {
@@ -37,4 +39,30 @@ export async function deleteAccountAction(input: {
   // redirect() lança internamente — fica fora do try/catch.
   await clearSessionCookie();
   redirect('/account/deleted');
+}
+
+export interface HomeCityActionResult {
+  success: boolean;
+  homeCity?: { code: string; name: string } | null;
+  error?: string;
+}
+
+/** SPEC-040: cidade de partida da conta (null remove). */
+export async function updateHomeCityAction(code: string | null): Promise<HomeCityActionResult> {
+  try {
+    const result = await updateHomeCity(code);
+    revalidatePath('/', 'layout');
+    return { success: true, homeCity: result.homeCity };
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'UNSUPPORTED_CITY') {
+      return { success: false, error: 'Escolha uma cidade da lista.' };
+    }
+    if (error instanceof ApiError && error.code === 'RATE_LIMITED') {
+      return {
+        success: false,
+        error: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
+      };
+    }
+    return { success: false, error: 'Não foi possível salvar a cidade agora.' };
+  }
 }

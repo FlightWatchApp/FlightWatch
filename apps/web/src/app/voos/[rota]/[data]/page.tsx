@@ -3,10 +3,14 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import type { GetRouteOfferResponse } from '@flight-watch/contracts';
 import { OfferHighlight } from '@/components/offer/offer-highlight';
+import layout from '@/components/offer/offer-layout.module.css';
+import { PersonalPanels } from '@/components/personal/personal-panels';
 import styles from '@/components/route/route-page.module.css';
 import { EmptyState } from '@/components/ui/empty-state';
 import { IconAlertTriangle, IconClock, IconRoute } from '@/components/ui/icon';
 import { ApiError } from '@/lib/api/client';
+import { getCurrentUser } from '@/lib/api/auth';
+import { getMeOverview } from '@/lib/api/me';
 import { getRouteOffer } from '@/lib/api/routes';
 import { formatDate } from '@/lib/domain/freshness';
 import { isOfferDate } from '@/lib/domain/offer';
@@ -56,6 +60,9 @@ export default async function OfferPage({ params }: Params) {
   const routeHref = routePath(offer.origin, offer.destination);
   const renderedAt = new Date().toISOString();
   const { price } = offer;
+  // SPEC-040: painéis pessoais só com sessão; falha deixa a oferta sozinha.
+  const user = await getCurrentUser();
+  const overview = user ? await getMeOverview().catch(() => null) : null;
 
   return (
     <div className={`container ${styles.page}`}>
@@ -67,41 +74,50 @@ export default async function OfferPage({ params }: Params) {
         › <span aria-current="page">{formatDate(offer.date)}</span>
       </nav>
 
-      {price ? (
-        <OfferHighlight offer={{ ...offer, price }} routeHref={routeHref} renderedAt={renderedAt} />
-      ) : (
-        <>
-          <div className={styles.header}>
-            <h1>
-              {offer.origin.name} para {offer.destination.name} em {formatDate(offer.date)}
-            </h1>
-          </div>
-          {offer.status === 'NO_PRICE' && (
-            <EmptyState
-              icon={<IconRoute size={32} />}
-              title="Não temos preço para este dia"
-              description="A fonte de preços não tem esta data agora. Veja as outras datas da rota."
-              action={<Link href={routeHref}>Ver todas as datas</Link>}
+      <div className={overview ? layout.withPanels : layout.main}>
+        <div className={layout.main}>
+          {price ? (
+            <OfferHighlight
+              offer={{ ...offer, price }}
+              routeHref={routeHref}
+              renderedAt={renderedAt}
             />
+          ) : (
+            <>
+              <div className={styles.header}>
+                <h1>
+                  {offer.origin.name} para {offer.destination.name} em {formatDate(offer.date)}
+                </h1>
+              </div>
+              {offer.status === 'NO_PRICE' && (
+                <EmptyState
+                  icon={<IconRoute size={32} />}
+                  title="Não temos preço para este dia"
+                  description="A fonte de preços não tem esta data agora. Veja as outras datas da rota."
+                  action={<Link href={routeHref}>Ver todas as datas</Link>}
+                />
+              )}
+              {offer.status === 'UPDATING' && (
+                <EmptyState
+                  icon={<IconClock size={32} />}
+                  title="Ainda atualizando os preços"
+                  description="Já consultamos muitas rotas hoje. Volte em alguns minutos ou veja as outras datas."
+                  action={<Link href={routeHref}>Ver todas as datas</Link>}
+                />
+              )}
+              {offer.status === 'UNAVAILABLE' && (
+                <EmptyState
+                  icon={<IconAlertTriangle size={32} />}
+                  title="Não conseguimos consultar os preços agora"
+                  description="A fonte de preços não respondeu. Tente de novo em alguns minutos."
+                  action={<Link href={routeHref}>Ver a rota</Link>}
+                />
+              )}
+            </>
           )}
-          {offer.status === 'UPDATING' && (
-            <EmptyState
-              icon={<IconClock size={32} />}
-              title="Ainda atualizando os preços"
-              description="Já consultamos muitas rotas hoje. Volte em alguns minutos ou veja as outras datas."
-              action={<Link href={routeHref}>Ver todas as datas</Link>}
-            />
-          )}
-          {offer.status === 'UNAVAILABLE' && (
-            <EmptyState
-              icon={<IconAlertTriangle size={32} />}
-              title="Não conseguimos consultar os preços agora"
-              description="A fonte de preços não respondeu. Tente de novo em alguns minutos."
-              action={<Link href={routeHref}>Ver a rota</Link>}
-            />
-          )}
-        </>
-      )}
+        </div>
+        {overview && <PersonalPanels overview={overview} offerPages layout="aside" />}
+      </div>
     </div>
   );
 }

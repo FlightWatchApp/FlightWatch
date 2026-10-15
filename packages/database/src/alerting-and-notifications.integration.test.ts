@@ -25,6 +25,11 @@ import {
   findLowPriceReferencesForTargets,
 } from './low-price-repository.js';
 import { backfillLowPriceRules, revertLowPriceRules } from './low-price-backfill.js';
+import {
+  countNotifiedAlertsForUser,
+  findBiggestLowPriceDrop,
+  findUserDestinations,
+} from './me-overview-repository.js';
 
 // SPEC-012: mesmo placeholder de apps/notification-worker/src/process-job.ts.
 const STALE_SENDING_THRESHOLD_MS = 5 * 60 * 1000;
@@ -663,5 +668,74 @@ describe('backfillLowPriceRules (SPEC-039)', () => {
       'TARGET_PRICE:true',
     ]);
     expect(await rulesOf(fresh.id)).toEqual(['LOW_PRICE:true']);
+  });
+});
+
+describe('me overview (SPEC-040)', () => {
+  async function notifiedAlert(
+    watchId: string,
+    ruleId: string,
+    targetId: string,
+    current: number,
+    justification: object,
+    status: 'NOTIFIED' | 'QUEUED' = 'NOTIFIED',
+  ) {
+    const observation = await createObservation(targetId, current, new Date());
+    await prisma.alertEvent.create({
+      data: {
+        watchId,
+        alertRuleId: ruleId,
+        priceObservationId: observation.id,
+        triggerType: 'LOW_PRICE',
+        ruleVersion: 1,
+        referenceAmountMinor: null,
+        currentAmountMinor: current,
+        currency: 'BRL',
+        deduplicationKey: randomUUID(),
+        status,
+        justification,
+      },
+    });
+  }
+
+  it('conta alertas enviados, acha a maior queda avisada e os destinos', async () => {
+    const { user, watch, rule, target } = await seedTargetWithWatch();
+    await notifiedAlert(watch.id, rule.id, target.id, 40_000, { typicalAmountMinor: 50_000 });
+    await notifiedAlert(watch.id, rule.id, target.id, 30_000, { typicalAmountMinor: 45_000 });
+    // Ainda não enviado e sem preço normal: não contam para a maior queda.
+    await notifiedAlert(
+      watch.id,
+      rule.id,
+      target.id,
+      1_000,
+      { typicalAmountMinor: 90_000 },
+      'QUEUED',
+    );
+    await notifiedAlert(watch.id, rule.id, target.id, 1_000, { reasons: ['LOWEST_OBSERVED'] });
+
+    expect(await countNotifiedAlertsForUser(prisma, user.id)).toBe(3);
+    expect(await findBiggestLowPriceDrop(prisma, user.id)).toMatchObject({
+      amountMinor: 15_000,
+      typicalAmountMinor: 45_000,
+      currentAmountMinor: 30_000,
+      originIata: 'DOU',
+      destinationIata: 'GRU',
+      departureDate: '2027-01-01',
+    });
+    expect(await findUserDestinations(prisma, user.id)).toEqual(['GRU']);
+  });
+
+  it('pessoa sem alertas nem Watches: zero, null e lista vazia', async () => {
+    const lonely = await prisma.user.create({
+      data: {
+        email: `${randomUUID()}@example.com`,
+        status: 'ACTIVE',
+        timezone: 'UTC',
+        passwordHash: 'not-a-real-hash',
+      },
+    });
+    expect(await countNotifiedAlertsForUser(prisma, lonely.id)).toBe(0);
+    expect(await findBiggestLowPriceDrop(prisma, lonely.id)).toBeNull();
+    expect(await findUserDestinations(prisma, lonely.id)).toEqual([]);
   });
 });

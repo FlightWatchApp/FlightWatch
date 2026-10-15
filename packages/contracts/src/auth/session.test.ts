@@ -7,6 +7,7 @@ const validUser = {
   status: 'ACTIVE' as const,
   notificationChannelId: '22222222-2222-2222-2222-222222222222',
   notificationChannelVerified: false,
+  homeCity: null,
 };
 
 describe('authenticatedUserSchema', () => {
@@ -30,6 +31,15 @@ describe('authenticatedUserSchema', () => {
     delete withoutField.notificationChannelVerified;
     const result = authenticatedUserSchema.safeParse(withoutField);
     expect(result.success).toBe(false);
+  });
+
+  // SPEC-040: cidade de partida da conta.
+  it('accepts a home city', () => {
+    const result = authenticatedUserSchema.safeParse({
+      ...validUser,
+      homeCity: { code: 'SAO', name: 'São Paulo' },
+    });
+    expect(result.success).toBe(true);
   });
 
   it('accepts notificationChannelVerified true', () => {
