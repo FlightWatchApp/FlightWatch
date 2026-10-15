@@ -35,7 +35,7 @@
     "@nestjs/testing": "^11.2.7",
     "@swc/core": "^1.7.42",
     "@testcontainers/postgresql": "^10.13.2",
-    "@testcontainers/redis": "^10.28.0",
+    "@testcontainers/redis": "^12.2.0",
     "@types/node": "^22.9.0",
     "@types/supertest": "^6.0.2",
     "nodemon": "^3.1.7",

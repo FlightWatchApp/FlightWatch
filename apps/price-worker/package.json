@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
-    "@testcontainers/redis": "^10.13.2",
+    "@testcontainers/redis": "^12.2.0",
     "@types/node": "^22.9.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
