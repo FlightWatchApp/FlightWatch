@@ -19,12 +19,17 @@ import styles from './page.module.css';
 // decisão de negócio. Cidades vêm do catálogo (SPEC-029).
 const SUPPORTED_CURRENCIES = ['BRL', 'USD'];
 
-export function SearchForm() {
+export interface SearchFormProps {
+  /** SPEC-040: cidade de partida da conta, já preenchida. */
+  initialOrigin?: SelectedPlace | null;
+}
+
+export function SearchForm({ initialOrigin = null }: SearchFormProps = {}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [origin, setOrigin] = useState<SelectedPlace | null>(null);
+  const [origin, setOrigin] = useState<SelectedPlace | null>(initialOrigin);
   const [destination, setDestination] = useState<SelectedPlace | null>(null);
   const [tripType, setTripType] = useState<TripType>('ONE_WAY');
   const [departureDate, setDepartureDate] = useState('');

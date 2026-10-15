@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import type { ListPromotionsResponse } from '@flight-watch/contracts';
 import { EmptyState } from '@/components/ui/empty-state';
 import { IconAlertTriangle, IconArrowDownRight, IconClock, IconRoute } from '@/components/ui/icon';
+import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { listPromotions, type PromotionSort } from '@/lib/api/promotions';
 import { formatAbsoluteDateTime } from '@/lib/domain/freshness';
@@ -52,9 +53,13 @@ export default async function OpportunitiesPage({
 }) {
   const { origin: originParam, sort, view } = await searchParams;
   const cookieStore = await cookies();
+  // SPEC-040: sem escolha na URL nem neste navegador, vale a cidade da conta.
+  const user = await getCurrentUser().catch(() => null);
   const origin =
     normalizeOriginCode(originParam) ??
-    normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
+    normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value) ??
+    user?.homeCity?.code ??
+    null;
   const activeSort = SORT_OPTIONS.find((option) => option.value === sort)?.value ?? 'score';
 
   const { result, response } = await loadFeed(origin, activeSort);

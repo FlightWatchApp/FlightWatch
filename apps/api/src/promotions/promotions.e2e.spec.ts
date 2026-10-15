@@ -273,6 +273,18 @@ describe('GET /v1/promotions — motor ligado', () => {
     expect(metrics).toContain('promotion_feed_requests_total{cache="miss",result="ok"} 1');
   });
 
+  // SPEC-040: promoções para os destinos da pessoa, só do cache (feed de SAO já calculado acima).
+  it('promoções para os destinos da pessoa vêm só do cache, uma por destino', async () => {
+    const service = app.get(PromotionsService);
+    const toRio = await service.cachedForDestinations(['SAO'], new Set(['RIO']), 3);
+    expect(toRio.map((item) => [item.origin, item.destination])).toEqual([['SAO', 'RIO']]);
+    expect(toRio[0]?.purchaseUrl).toMatch(/^https:\/\//);
+    expect(await service.cachedForDestinations(['SAO'], new Set(['LIS']), 3)).toEqual([]);
+    // Origem sem feed em cache: nada, e nenhuma chamada à fonte.
+    expect(await service.cachedForDestinations(['RIO'], new Set(['SAO']), 3)).toEqual([]);
+    expect(provider.candidateCalls).toEqual([]);
+  });
+
   // AC-6, EVAL-PROMO-005
   it('origem quente: 0 chamadas; o calendário da busca reaproveita o cache por rota-mês', async () => {
     const warm = await promotions(app, { origin: 'SAO' });

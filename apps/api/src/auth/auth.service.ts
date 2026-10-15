@@ -7,7 +7,7 @@ import {
   type RegisterRequest,
 } from '@flight-watch/contracts';
 import type { NotificationChannel, Prisma, PrismaClient, User } from '@flight-watch/database';
-import { isUniqueConstraintViolation } from '@flight-watch/database';
+import { findPlaceSummaries, isUniqueConstraintViolation } from '@flight-watch/database';
 import type { EmailSender } from '@flight-watch/notifications';
 import { renderPasswordResetEmail, renderVerificationEmail } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
@@ -35,13 +35,18 @@ const dummyPasswordHashPromise = hashPassword('dummy-password-for-timing-mitigat
 type Db = PrismaClient | Prisma.TransactionClient;
 type ChannelSummary = Pick<NotificationChannel, 'id' | 'verifiedAt'>;
 
-function toAuthenticatedUser(user: User, channel: ChannelSummary | null): AuthenticatedUser {
+function toAuthenticatedUser(
+  user: User,
+  channel: ChannelSummary | null,
+  homeCity: AuthenticatedUser['homeCity'],
+): AuthenticatedUser {
   return {
     id: user.id,
     email: user.email,
     status: user.status,
     notificationChannelId: channel?.id ?? null,
     notificationChannelVerified: channel?.verifiedAt != null,
+    homeCity,
   };
 }
 
@@ -340,6 +345,8 @@ export class AuthService {
           passwordResetExpiresAt: null,
           failedLoginAttempts: 0,
           lockedUntil: null,
+          // SPEC-040 AC-6: a cidade de partida também sai.
+          homeCityCode: null,
         },
       });
       await tx.session.deleteMany({ where: { userId } });
@@ -437,7 +444,17 @@ export class AuthService {
       where: { userId: user.id, type: 'EMAIL' },
       orderBy: { createdAt: 'asc' },
     });
-    return toAuthenticatedUser(user, channel);
+    return toAuthenticatedUser(user, channel, await this.homeCityOf(user));
+  }
+
+  /** SPEC-040: nome da cidade de partida pelo catálogo (o código continua se faltar o nome). */
+  private async homeCityOf(user: User): Promise<AuthenticatedUser['homeCity']> {
+    if (!user.homeCityCode) return null;
+    const names = await findPlaceSummaries(this.prisma.client, [user.homeCityCode]);
+    return {
+      code: user.homeCityCode,
+      name: names.get(user.homeCityCode)?.name ?? user.homeCityCode,
+    };
   }
 
   /**
@@ -491,7 +508,7 @@ export class AuthService {
     return {
       token,
       expiresAt: expiresAt.toISOString(),
-      user: toAuthenticatedUser(user, channel),
+      user: toAuthenticatedUser(user, channel, await this.homeCityOf(user)),
     };
   }
 }

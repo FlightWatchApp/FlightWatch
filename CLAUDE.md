@@ -378,6 +378,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - Searches/Offers (SPEC-014: busca de descoberta pública e derivação de Watch a partir de uma oferta);
 - Opportunities (SPEC-015: feed público de oportunidades, `Deal` computado em leitura);
 - Promotions (SPEC-032: feed público por origem; provedor e cache vêm do `PricingSourceModule`, global);
+- Me (SPEC-040: `GET /v1/me/overview` para os painéis pessoais e `PATCH /v1/me` para a cidade de partida; só banco e cache);
 - Routes (SPEC-033: página da rota e sitemap; orçamento e rate limit `pages` próprios; SPEC-038: oferta de um dia, `GET /v1/routes/:o/:d/offers/:date`, com o voo mais barato do dia via `FlightDetailsCache`);
 - Health;
 - Observability interna.

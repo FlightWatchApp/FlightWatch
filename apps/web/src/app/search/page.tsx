@@ -8,6 +8,7 @@ import { tripLengthDays } from '@/lib/domain/price-calendar';
 import { SearchForm } from './search-form';
 import { SearchResults } from './search-results';
 import styles from './page.module.css';
+import { getCurrentUser } from '@/lib/api/auth';
 
 /**
  * SPEC-014/PG-04: busca pública — ao contrário de `watches/new`, esta
@@ -36,6 +37,8 @@ export default async function SearchPage({
   }
 
   const calendar = search ? await loadCalendar(search) : null;
+  // SPEC-040: com sessão, a origem começa na cidade da conta.
+  const user = await getCurrentUser().catch(() => null);
 
   return (
     <div className={styles.page}>
@@ -55,7 +58,7 @@ export default async function SearchPage({
             className={`${styles.formCard} reveal`}
             style={{ '--reveal-delay': '100ms' } as CSSProperties}
           >
-            <SearchForm />
+            <SearchForm initialOrigin={user?.homeCity ?? null} />
           </div>
           {search && <SearchResults search={search} calendar={calendar} embedded />}
         </div>
