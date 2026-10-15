@@ -1,22 +1,28 @@
 import type { Metadata, Viewport } from 'next';
-import { Instrument_Sans, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import type { ReactElement, ReactNode } from 'react';
 import { FlightTrails } from '@/components/brand/flight-trails';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader } from '@/components/layout/site-header';
 import '@/styles/globals.css';
 
-/** DS-03: Instrument Sans para tudo — títulos e texto. */
-const instrumentSans = Instrument_Sans({
-  subsets: ['latin'],
+/**
+ * DS-03: Instrument Sans para tudo — títulos e texto. Arquivo no repositório
+ * (ver `fonts/README.md`): o build não depende de baixar do Google Fonts.
+ */
+const instrumentSans = localFont({
+  src: './fonts/instrument-sans-latin.woff2',
+  weight: '400 700',
+  style: 'normal',
   variable: '--font-instrument-sans',
   display: 'swap',
 });
 
 /** DS-03: JetBrains Mono só para código IATA e código técnico (classe `.iata`). */
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['500', '600'],
+const jetbrainsMono = localFont({
+  src: './fonts/jetbrains-mono-latin.woff2',
+  weight: '500 600',
+  style: 'normal',
   variable: '--font-jetbrains-mono',
   display: 'swap',
 });
