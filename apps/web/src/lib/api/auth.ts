@@ -50,10 +50,10 @@ export async function resendVerification(): Promise<void> {
 }
 
 /** SPEC-026: a API responde 202 exista a conta ou não. */
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(email: string, captchaToken?: string): Promise<void> {
   await apiFetch<undefined>('/v1/auth/password-reset/request', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, ...(captchaToken ? { captchaToken } : {}) }),
   });
 }
 

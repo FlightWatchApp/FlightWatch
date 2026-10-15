@@ -13,6 +13,7 @@ import type {
 } from '@flight-watch/contracts';
 import { AuthRateLimited } from './auth-throttler.guard.js';
 import { AuthService } from './auth.service.js';
+import { CaptchaGuard } from './captcha.js';
 import { AuthErrorFilter } from './auth-error.filter.js';
 import { CurrentSessionToken } from './current-session-token.decorator.js';
 import { CurrentUser } from './current-user.decorator.js';
@@ -35,6 +36,7 @@ export class AuthController {
   @Post('register')
   @HttpCode(201)
   @AuthRateLimited()
+  @UseGuards(CaptchaGuard)
   async register(@Body(RegisterValidationPipe) body: RegisterRequest): Promise<RegisterResponse> {
     return this.authService.register(body);
   }
@@ -42,6 +44,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   @AuthRateLimited()
+  @UseGuards(CaptchaGuard)
   async login(@Body(LoginValidationPipe) body: LoginRequest): Promise<LoginResponse> {
     return this.authService.login(body);
   }
@@ -86,10 +89,12 @@ export class AuthController {
     await this.authService.resendVerification(userId, correlationId);
   }
 
-  // SPEC-026: sem guard — quem esqueceu a senha não tem sessão. Sempre 202.
+  // SPEC-026: sem guard de sessão — quem esqueceu a senha não tem sessão. Sempre 202.
+  // SPEC-041: captcha antes de procurar o e-mail e de enviar qualquer coisa.
   @Post('password-reset/request')
   @HttpCode(202)
   @AuthRateLimited()
+  @UseGuards(CaptchaGuard)
   async requestPasswordReset(
     @Body(PasswordResetRequestValidationPipe) body: PasswordResetRequest,
     @CurrentCorrelationId() correlationId: string,

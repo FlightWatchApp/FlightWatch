@@ -14,16 +14,25 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_ALREADY_REGISTERED: 'Já existe uma conta com esse email.',
   INVALID_AUTH_INPUT: 'Alguns dados não são válidos — confira email e senha.',
   RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
+  CAPTCHA_REQUIRED: 'Confirme que você não é um robô e tente de novo.',
+  CAPTCHA_FAILED: 'Não conseguimos confirmar que você não é um robô. Tente de novo.',
 };
 
 export async function registerAction(input: {
   email: string;
   password: string;
   timezone: string;
+  /** SPEC-041: token do Turnstile, quando o captcha está ligado. */
+  captchaToken?: string | undefined;
 }): Promise<RegisterActionResult> {
   let session;
   try {
-    session = await register(input);
+    session = await register({
+      email: input.email,
+      password: input.password,
+      timezone: input.timezone,
+      ...(input.captchaToken ? { captchaToken: input.captchaToken } : {}),
+    });
   } catch (error) {
     if (error instanceof ApiError) {
       return {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { captchaTokenSchema } from './captcha.js';
 import { type AuthSessionResponse, authSessionResponseSchema } from './session.js';
 
 /**
@@ -18,6 +19,8 @@ export const registerRequestSchema = z
     email: emailSchema,
     password: passwordSchema,
     timezone: z.string().trim().min(1),
+    // SPEC-041: token do Cloudflare Turnstile; exigido pela API só com o captcha ligado.
+    captchaToken: captchaTokenSchema.optional(),
   })
   .strict();
 
