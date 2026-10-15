@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { captchaTokenSchema } from './captcha.js';
 import { type AuthSessionResponse, authSessionResponseSchema } from './session.js';
 
 const emailSchema = z.string().trim().toLowerCase().email();
@@ -10,6 +11,8 @@ export const loginRequestSchema = z
     // (SPEC-007 §6), então não repetimos aqui os limites de política de senha
     // de registro (que podem mudar sem invalidar logins de senhas já existentes).
     password: z.string().min(1).max(256),
+    // SPEC-041: token do Cloudflare Turnstile; exigido pela API só com o captcha ligado.
+    captchaToken: captchaTokenSchema.optional(),
   })
   .strict();
 

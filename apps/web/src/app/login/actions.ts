@@ -16,15 +16,23 @@ const ERROR_MESSAGES: Record<string, string> = {
     'Conta temporariamente bloqueada por excesso de tentativas. Tente novamente mais tarde.',
   INVALID_AUTH_INPUT: 'Alguns dados não são válidos — confira email e senha.',
   RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
+  CAPTCHA_REQUIRED: 'Confirme que você não é um robô e tente de novo.',
+  CAPTCHA_FAILED: 'Não conseguimos confirmar que você não é um robô. Tente de novo.',
 };
 
 export async function loginAction(input: {
   email: string;
   password: string;
+  /** SPEC-041: token do Turnstile, quando o captcha está ligado. */
+  captchaToken?: string | undefined;
 }): Promise<LoginActionResult> {
   let session;
   try {
-    session = await login(input);
+    session = await login({
+      email: input.email,
+      password: input.password,
+      ...(input.captchaToken ? { captchaToken: input.captchaToken } : {}),
+    });
   } catch (error) {
     if (error instanceof ApiError) {
       return {

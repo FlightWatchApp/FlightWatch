@@ -139,6 +139,9 @@ export const apiConfig = {
     AUTH_RATE_LIMIT_WINDOW_MS: durationMsField(10 * 60 * 1000),
     AUTH_RATE_LIMIT_MAX: intField({ min: 1, max: 10_000, default: 20 }),
     INTERNAL_API_SECRET: secretField(32),
+    // SPEC-041: segredo do Cloudflare Turnstile. Sem ele o captcha fica desligado
+    // (desenvolvimento, testes); obrigatório com APP_ENV=production.
+    TURNSTILE_SECRET_KEY: optionalSecretField(16),
   },
   localDefaults: {
     DATABASE_URL: LOCAL_DATABASE_URL,
@@ -222,9 +225,11 @@ export const ALL_CONFIG_DEFINITIONS = {
 /**
  * Chaves do `.env.example` validadas fora deste pacote (SPEC-024 AC-7):
  * - `AFFILIATE_TRACKING_PARAMS`: parser próprio da SPEC-020 na API;
- * - `API_BASE_URL`: lida pelo `apps/web` (config do web fica para a spec de deploy).
+ * - `API_BASE_URL`: lida pelo `apps/web` (config do web fica para a spec de deploy);
+ * - `TURNSTILE_SITE_KEY`: chave pública do captcha, lida pelo `apps/web` (SPEC-041).
  */
 export const KEYS_VALIDATED_ELSEWHERE: readonly string[] = [
   'AFFILIATE_TRACKING_PARAMS',
   'API_BASE_URL',
+  'TURNSTILE_SITE_KEY',
 ];

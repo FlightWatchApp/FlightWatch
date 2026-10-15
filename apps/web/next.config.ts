@@ -2,6 +2,9 @@ import type { NextConfig } from 'next';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+/** SPEC-041: script e iframe do captcha (Cloudflare Turnstile). */
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+
 /**
  * Política de conteúdo: tudo do próprio site, exceto as imagens dos mapas
  * (tiles do OpenStreetMap, SPEC-016/033). `unsafe-inline` em script é exigido
@@ -11,7 +14,9 @@ const isProduction = process.env.NODE_ENV === 'production';
  */
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProduction ? '' : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN}${isProduction ? '' : " 'unsafe-eval'"}`,
+  // SPEC-041: o widget do Turnstile roda num iframe da Cloudflare.
+  `frame-src ${TURNSTILE_ORIGIN}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
   "font-src 'self' data:",

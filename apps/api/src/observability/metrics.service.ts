@@ -47,6 +47,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-041. */
+  readonly authCaptchaTotal = new Counter({
+    name: 'auth_captcha_total',
+    help: 'Verificações de captcha nas rotas de conta — passed/missing/failed/unavailable (SPEC-041).',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
   /** SPEC-007 §13. */
   readonly authRegisterTotal = new Counter({
     name: 'auth_register_total',

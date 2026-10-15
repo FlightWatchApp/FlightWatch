@@ -16,6 +16,8 @@ type NodeEnv = (typeof NODE_ENVS)[number];
 /** Variáveis cujo valor `simulated` é proibido com `APP_ENV=production`. */
 const ADAPTER_KEYS = ['FLIGHT_PROVIDER', 'EMAIL_PROVIDER'] as const;
 const SIMULATED_ADAPTER = 'simulated';
+/** Opcionais em desenvolvimento, obrigatórias com `APP_ENV=production` (SPEC-041). */
+const PRODUCTION_REQUIRED_KEYS = ['TURNSTILE_SECRET_KEY'] as const;
 
 /** Só nestes ambientes valem os padrões apontando para o docker compose local. */
 const LOCAL_APP_ENVS: readonly AppEnv[] = ['development', 'test'];
@@ -156,6 +158,11 @@ export function loadConfig<Shape extends z.ZodRawShape>(
           key,
           message: 'adapter simulado não é permitido com APP_ENV=production',
         });
+      }
+    }
+    for (const key of PRODUCTION_REQUIRED_KEYS) {
+      if (key in definition.shape && !values[key]) {
+        issues.push({ key, message: 'obrigatória com APP_ENV=production' });
       }
     }
   }

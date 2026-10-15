@@ -102,7 +102,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Cloudflare</strong> e o <strong>provedor de hospedagem</strong>, que entregam e
-            rodam o site: processam os dados técnicos de cada acesso.
+            rodam o site: processam os dados técnicos de cada acesso. Nos formulários de cadastro,
+            entrada e nova senha, a Cloudflare também confere se quem envia é uma pessoa (captcha
+            Turnstile), a partir de dados técnicos do navegador.
           </li>
           <li>
             <strong>OpenStreetMap</strong>: nas páginas com mapa, seu navegador baixa as imagens do

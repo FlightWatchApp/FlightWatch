@@ -108,8 +108,33 @@ describe('E-mail real (checklist pré-lançamento #5) — EMAIL_PROVIDER=resend'
 describe('SPEC-024 AC-2 — trava de produção para adapters simulados', () => {
   it('rejeita FLIGHT_PROVIDER e EMAIL_PROVIDER simulados em produção', () => {
     const error = configErrorOf(() => loadConfig(apiConfig, { ...PRODUCTION_BASE }));
-    expect(keysOf(error).sort()).toEqual(['EMAIL_PROVIDER', 'FLIGHT_PROVIDER']);
+    expect(keysOf(error).sort()).toEqual([
+      'EMAIL_PROVIDER',
+      'FLIGHT_PROVIDER',
+      'TURNSTILE_SECRET_KEY',
+    ]);
     expect(error.message).toContain('APP_ENV=production');
+  });
+
+  // SPEC-041 AC-5: sem o segredo do captcha, a API não sobe em produção.
+  it('exige TURNSTILE_SECRET_KEY na API em produção, e só na API', () => {
+    const env = {
+      ...PRODUCTION_BASE,
+      FLIGHT_PROVIDER: 'travelpayouts',
+      TRAVELPAYOUTS_TOKEN: 'token-de-producao-0123456789',
+      EMAIL_PROVIDER: 'resend',
+      RESEND_API_KEY: 're_producao_0123456789abcdef',
+      EMAIL_FROM: 'Flight Watch <avisos@exemplo.com.br>',
+    };
+    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual([
+      'TURNSTILE_SECRET_KEY',
+    ]);
+    const config = loadConfig(apiConfig, {
+      ...env,
+      TURNSTILE_SECRET_KEY: '0x4AAAAAAA-segredo-de-producao',
+    });
+    expect(config.TURNSTILE_SECRET_KEY).toBe('0x4AAAAAAA-segredo-de-producao');
+    expect(loadConfig(priceWorkerConfig, env).APP_ENV).toBe('production');
   });
 
   it('rejeita o adapter simulado de cada worker em produção', () => {
@@ -382,7 +407,10 @@ describe('SPEC-030 AC-8 — provedor Travelpayouts', () => {
       TRAVELPAYOUTS_TOKEN: 'token-de-producao-0123456789',
     };
     expect(loadConfig(priceWorkerConfig, env).FLIGHT_PROVIDER).toBe('travelpayouts');
-    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual(['EMAIL_PROVIDER']);
+    expect(keysOf(configErrorOf(() => loadConfig(apiConfig, env)))).toEqual([
+      'EMAIL_PROVIDER',
+      'TURNSTILE_SECRET_KEY',
+    ]);
   });
 });
 
