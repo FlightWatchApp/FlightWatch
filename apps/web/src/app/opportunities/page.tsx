@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import type { ListPromotionsResponse } from '@flight-watch/contracts';
+import { loadShowcase } from '@/components/home/hero-promotion';
+import { PromotionCard } from '@/components/promotions/promotion-card';
+import { PurchaseNote } from '@/components/purchase/purchase-note';
 import { EmptyState } from '@/components/ui/empty-state';
 import { IconAlertTriangle, IconArrowDownRight, IconClock, IconRoute } from '@/components/ui/icon';
 import { getCurrentUser } from '@/lib/api/auth';
@@ -43,7 +46,8 @@ async function loadFeed(origin: string | null, sort: PromotionSort): Promise<Fee
 /**
  * SPEC-032: a pessoa escolhe de onde sai e vê as melhores promoções a partir
  * dali. Origem na URL (link compartilhável) ou no cookie de preferência;
- * sem nenhuma das duas, a página pede a cidade. Motor desligado na API
+ * sem nenhuma das duas, a página pede a cidade e mostra a vitrine "Destaques do
+ * Brasil" (SPEC-034), que também cobre cidade sem promoção ou fonte fora. Motor desligado na API
  * (`DISABLED`) volta ao feed da SPEC-015 (rollback).
  */
 export default async function OpportunitiesPage({
@@ -72,6 +76,10 @@ export default async function OpportunitiesPage({
       </div>
     );
   }
+
+  // Só lê cache na API (SPEC-034): sem custo de fonte. Com feed pronto, não aparece.
+  const showcase = state === 'READY' ? [] : await loadShowcase();
+  const renderedAt = new Date().toISOString();
 
   const selectedOrigin = response ? { code: response.origin, name: response.originName } : null;
   const originName = response?.originName ?? '';
@@ -104,7 +112,11 @@ export default async function OpportunitiesPage({
         <EmptyState
           icon={<IconRoute size={32} />}
           title="De onde você sai?"
-          description="Escolha a sua cidade de partida para ver as promoções a partir dela."
+          description={
+            showcase.length > 0
+              ? 'Escolha a sua cidade de partida para ver as promoções a partir dela. Enquanto isso, veja os destaques do Brasil abaixo.'
+              : 'Escolha a sua cidade de partida para ver as promoções a partir dela.'
+          }
         />
       )}
 
@@ -158,10 +170,37 @@ export default async function OpportunitiesPage({
             origin={response.origin}
             originName={originName}
             promotions={response.promotions}
-            renderedAt={new Date().toISOString()}
+            renderedAt={renderedAt}
             offerPages={routePagesEnabled()}
           />
         </>
+      )}
+
+      {showcase.length > 0 && (
+        <section className={styles.showcase} aria-labelledby="showcase-title">
+          <div>
+            <h2 id="showcase-title" className={styles.showcaseTitle}>
+              Destaques do Brasil
+            </h2>
+            <p className={styles.subtitle}>
+              As melhores promoções saindo das cidades mais usadas do país. Cada cartão diz de onde
+              sai.
+            </p>
+          </div>
+          <div className={styles.list}>
+            {showcase.map((promotion) => (
+              <PromotionCard
+                key={`${promotion.origin}-${promotion.destination}`}
+                origin={promotion.origin}
+                originName={promotion.originName}
+                promotion={promotion}
+                renderedAt={renderedAt}
+                offerPages={routePagesEnabled()}
+              />
+            ))}
+          </div>
+          {!routePagesEnabled() && <PurchaseNote />}
+        </section>
       )}
     </div>
   );

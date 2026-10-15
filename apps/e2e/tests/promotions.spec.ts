@@ -48,3 +48,14 @@ test('cidade sugerida pelo acesso aparece como sugestão e não vira cookie', as
   expect((await context.cookies()).some((cookie) => cookie.name === 'fw_origin')).toBe(false);
   await context.close();
 });
+
+// SPEC-034: /opportunities sem cidade também mostra a vitrine, não só o pedido de cidade.
+test('página de promoções sem cidade mostra os Destaques do Brasil', async ({ page }) => {
+  await page.goto('/opportunities');
+  await expect(page.getByRole('heading', { name: 'De onde você sai?' })).toBeVisible();
+  const showcase = page.getByRole('region', { name: 'Destaques do Brasil' });
+  // Cada cartão diz de onde sai ("São Paulo para …").
+  await expect(
+    showcase.getByRole('article', { name: /^Promoção São Paulo para / }).first(),
+  ).toBeVisible();
+});
