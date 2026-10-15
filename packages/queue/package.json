@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@flight-watch/database": "workspace:*",
-    "bullmq": "^5.28.1",
+    "bullmq": "^6.3.12",
     "ioredis": "^5.4.1"
   },
   "devDependencies": {
