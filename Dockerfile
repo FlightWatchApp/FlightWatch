@@ -23,6 +23,10 @@ FROM base AS build
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 RUN pnpm fetch --frozen-lockfile
 COPY . .
+# SPEC-042: lidos pelo web no build (páginas estáticas, robots.txt, script da
+# estatística). Não são segredos. Sem UMAMI_WEBSITE_ID, estatística desligada.
+ARG WEB_BASE_URL=http://localhost:3100
+ARG UMAMI_WEBSITE_ID=""
 RUN pnpm install --frozen-lockfile --offline \
   && pnpm build
 

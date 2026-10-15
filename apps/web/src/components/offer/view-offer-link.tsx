@@ -27,7 +27,7 @@ export function ViewOfferLink({ href, context, size = 'md', inverse = false }: V
     .filter(Boolean)
     .join(' ');
   return (
-    <Link href={href} prefetch={false} className={classes}>
+    <Link href={href} prefetch={false} className={classes} data-umami-event="ver-oferta">
       Ver oferta
       <IconChevronRight size={size === 'sm' ? 14 : 16} />
       {context && <span className="visually-hidden">, {context}</span>}

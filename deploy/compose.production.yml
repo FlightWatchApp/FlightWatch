@@ -1,0 +1,183 @@
+# SPEC-042 — produção num servidor só. Uso (sempre a partir da raiz do repo):
+#
+#   docker compose --env-file deploy/.env.production -f deploy/compose.production.yml up -d
+#
+# ou simplesmente deploy/bin/update.sh. Nenhum serviço publica porta: o acesso
+# de fora entra pelo Cloudflare Tunnel (serviço `cloudflared`). Para ver o site
+# antes de apontar o DNS, use também deploy/compose.preview.yml.
+
+name: flightwatch
+
+x-app: &app
+  build: &app-build
+    context: ..
+    # Lidos no build do web (Dockerfile). Mudou? deploy/bin/update.sh reconstrói.
+    args:
+      WEB_BASE_URL: ${WEB_BASE_URL:?defina no .env.production}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+  restart: unless-stopped
+  env_file: .env.production
+  environment: &app-env
+    NODE_ENV: production
+    APP_ENV: production
+    DATABASE_URL: postgresql://flight_watch:${POSTGRES_PASSWORD:?defina no .env.production}@postgres:5432/flight_watch
+    REDIS_URL: redis://:${REDIS_PASSWORD:?defina no .env.production}@redis:6379
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '5'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flight_watch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env.production}
+      POSTGRES_DB: flight_watch
+      # Lido por postgres-init/01-umami.sh na primeira inicialização do volume.
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:?defina no .env.production}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U flight_watch']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Fila do BullMQ sobrevive a reinício (appendonly); senha mesmo sem porta aberta.
+    # A senha vem do ambiente do contêiner (não fica na linha de comando do compose).
+    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$${REDIS_PASSWORD}" --no-auth-warning ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    logging: *logging
+
+  migrate:
+    build:
+      <<: *app-build
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://flight_watch:${POSTGRES_PASSWORD}@postgres:5432/flight_watch
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+  api:
+    <<: *app
+    build:
+      <<: *app-build
+      target: api
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  scheduler:
+    <<: *app
+    build:
+      <<: *app-build
+      target: scheduler
+
+  price-worker:
+    <<: *app
+    build:
+      <<: *app-build
+      target: price-worker
+
+  alert-worker:
+    <<: *app
+    build:
+      <<: *app-build
+      target: alert-worker
+
+  notification-worker:
+    <<: *app
+    build:
+      <<: *app-build
+      target: notification-worker
+
+  web:
+    build:
+      <<: *app-build
+      target: web
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      API_BASE_URL: http://api:3000
+      # SPEC-042: o web repassa a estatística ao Umami pela rede interna.
+      UMAMI_INTERNAL_URL: http://umami:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3100/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+  # SPEC-042: estatística de uso do beta, sem cookies (stats.<domínio> pelo túnel).
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.20.2
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?defina no .env.production}
+      DISABLE_TELEMETRY: '1'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+  # Cloudflare Tunnel: única entrada de fora. Rotas (hostname → serviço) ficam no
+  # painel da Cloudflare: flightwatch.com.br → http://web:3100,
+  # stats.flightwatch.com.br → http://umami:3000.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      # Conferido pelo bin/update.sh, que só liga o perfil `tunnel` com o token.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      web:
+        condition: service_healthy
+    logging: *logging
+    profiles: [tunnel]
+
+volumes:
+  postgres-data:
+  redis-data:

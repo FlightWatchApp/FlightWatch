@@ -1,0 +1,7 @@
+# SPEC-042: ver o site antes de apontar o DNS (ou num teste local). Publica o
+# web só no loopback do servidor — de fora, use um túnel SSH:
+#   ssh -L 3200:127.0.0.1:3200 usuario@servidor   e abra http://localhost:3200
+services:
+  web:
+    ports:
+      - '127.0.0.1:3200:3100'

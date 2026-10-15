@@ -228,7 +228,7 @@ export function CreateWatchModal({
               <Button type="button" variant="ghost" onClick={closeModal} disabled={isPending}>
                 Cancelar
               </Button>
-              <Button type="submit" loading={isPending}>
+              <Button type="submit" loading={isPending} data-umami-event="criar-monitoramento">
                 Confirmar monitoramento
               </Button>
             </div>
