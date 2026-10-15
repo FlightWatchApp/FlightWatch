@@ -1,6 +1,6 @@
 # Rascunho — assinatura, convite e grupos de WhatsApp
 
-Status: perguntas em aberto (owner, 2026-10-14) — retomar antes da SPEC-040.
+Status: perguntas em aberto (owner, 2026-10-14) — retomar numa spec própria (próximo número livre).
 
 ## Modelo proposto pelo owner
 
