@@ -125,3 +125,13 @@
 .originPicker {
   max-width: 28rem;
 }
+
+.showcase {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.showcaseTitle {
+  font-size: var(--text-xl);
+}
