@@ -189,7 +189,12 @@ export function NewWatchForm() {
           {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
 
           <div className={styles.actions}>
-            <Button type="submit" size="lg" loading={isPending}>
+            <Button
+              type="submit"
+              size="lg"
+              loading={isPending}
+              data-umami-event="criar-monitoramento"
+            >
               Criar monitoramento
             </Button>
           </div>

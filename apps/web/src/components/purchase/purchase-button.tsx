@@ -55,6 +55,8 @@ export function PurchaseButton({
       target="_blank"
       rel="noopener noreferrer sponsored"
       className={classes}
+      // SPEC-042: clique contado pela estatística do beta (sem dado pessoal).
+      data-umami-event={current ? 'comprar' : 'atualizar-preco'}
       onClick={() => {
         if (watchId) {
           // Best-effort (SPEC-018 §"Modos de falha"): não bloqueia nem desfaz a navegação.

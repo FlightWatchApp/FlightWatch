@@ -274,6 +274,7 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 ├── README.md
 ├── package.json · pnpm-lock.yaml · pnpm-workspace.yaml · turbo.json · .nvmrc
 ├── Dockerfile · docker-compose.yml   # um target por processo; perfil `stack` (SPEC-028)
+├── deploy/                       # produção num servidor (SPEC-042): compose, env modelo, bin/, README
 ├── apps/
 │   ├── web/src/
 │   │   ├── app/                  # App Router (rotas e server actions)
@@ -697,7 +698,9 @@ Regras transversais:
   orçamento diário do feed); Redis fora é falta de cache, nunca erro. Os e2e
   da API apontam para `redis://127.0.0.1:1` e usam `MemoryKeyValueStore`;
 - fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
-  e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`).
+  e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`, `UMAMI_INTERNAL_URL`;
+  `WEB_BASE_URL` e `UMAMI_WEBSITE_ID` também no **build** — argumentos do
+  Dockerfile e `env` do `build` no `turbo.json`, que filtra o resto).
 
 ### 10.3 Baseline a reconciliar com o código
 

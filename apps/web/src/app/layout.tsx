@@ -31,6 +31,10 @@ const jetbrainsMono = localFont({
 // links de e-mail — sem NEXT_PUBLIC_* nova (SPEC-021 §"Fora do escopo").
 const WEB_BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3100';
 
+// SPEC-042: estatística do beta (Umami) pelo próprio domínio (ver lib/stats-proxy.ts).
+// Sem o id, nenhum script é incluído (AC-5). O id vem do build (deploy/compose.production.yml).
+const UMAMI_WEBSITE_ID = process.env.UMAMI_WEBSITE_ID;
+
 const DESCRIPTION =
   'O Flight Watch observa o preço de rotas de voo e avisa quando ele cai. Monitoramento, promoções e histórico de preço — não vende nem emite passagens.';
 
@@ -70,6 +74,15 @@ export default function RootLayout({ children }: { children: ReactNode }): React
         <SiteHeader />
         <main id="main-content">{children}</main>
         <SiteFooter />
+        {UMAMI_WEBSITE_ID && (
+          // A query (tokens de e-mail) sai no proxy, não aqui: ver lib/stats-proxy.ts.
+          <script
+            defer
+            src="/stats/script.js"
+            data-website-id={UMAMI_WEBSITE_ID}
+            data-do-not-track="true"
+          />
+        )}
       </body>
     </html>
   );

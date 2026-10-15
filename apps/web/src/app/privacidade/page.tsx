@@ -93,6 +93,18 @@ export default function PrivacyPage() {
       </section>
 
       <section className={styles.section}>
+        <h2>Estatística de uso</h2>
+        <p>
+          Contamos as páginas visitadas e alguns cliques (como &ldquo;Ver oferta&rdquo; e
+          &ldquo;Comprar passagem&rdquo;) com o Umami, uma ferramenta de código aberto que roda no
+          nosso próprio servidor. Ela não usa cookies, não grava o seu IP e não identifica você:
+          vemos só totais, como o número de visitas por página, o navegador e o país ou cidade
+          aproximada. Se o seu navegador pedir para não ser rastreado (&ldquo;Do Not Track&rdquo;),
+          nada é contado.
+        </p>
+      </section>
+
+      <section className={styles.section}>
         <h2>Com quem compartilhamos</h2>
         <ul>
           <li>

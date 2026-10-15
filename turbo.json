@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["WEB_BASE_URL", "UMAMI_WEBSITE_ID"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "test": {
