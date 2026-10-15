@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { routeOfferFlightSchema } from '../routes/get-route-offer.js';
 import { iataCodeSchema } from '../shared/trip-fields.js';
 
 /**
@@ -49,6 +50,11 @@ export const promotionItemSchema = z.object({
   observedAt: z.string(),
   score: z.number().int().min(0).max(100),
   scoreVersion: z.literal(1),
+  /**
+   * SPEC-038: voo mais barato que a fonte viu no dia (companhia, horário), só
+   * para exibição. null sem detalhe; feeds em cache de antes não têm o campo.
+   */
+  flight: routeOfferFlightSchema.nullable().default(null),
   purchaseUrl: z.string().nullable(),
 });
 
