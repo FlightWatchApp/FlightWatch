@@ -1,6 +1,6 @@
 # SPEC-040 — Painéis pessoais na página da oferta e na home logada
 
-Status: draft — aguardando revisão do owner
+Status: implemented (owner aprovou D1, D2 e D3 em 2026-10-14)
 Owner: Discovery
 Dependências: SPEC-008 (ciclo do Watch), SPEC-032/034 (promoções e vitrine),
 SPEC-038 (página da oferta), SPEC-039 (alerta de preço baixo, `lowPrice`)
@@ -15,7 +15,7 @@ destinos que ela acompanha e o atalho para buscar uma nova passagem. Cada
 painel só aparece quando há dado para ele — quem acabou de se cadastrar vê
 pouco, quem usa muito vê tudo.
 
-## Decisões a confirmar (owner)
+## Decisões do owner (2026-10-14: D1, D2 e D3 aprovadas como abaixo)
 
 - **D1** Onde: na página da oferta (logado) **e** na home logada, com os
   mesmos componentes. Na página da oferta, numa coluna lateral no desktop e
@@ -95,10 +95,13 @@ Só números que o banco tem, cada um com o rótulo exato do que é:
 ## Contrato da API
 
 - `GET /v1/me/overview` (autenticado): `homeCity` (`{ code, name }` ou
-  null), `activeWatches` (até 3, mesmo formato resumido da listagem, com
-  `lowPrice`), `activeCount`, `alertsSent`, `belowTypicalNow`,
-  `biggestDrop` (`{ amountMinor, percent, route, date }` ou null),
-  `destinationPromotions` (até 3, formato do `/v1/promotions/highlights`).
+  null), `activeWatches` (até 3, mesmo formato da listagem, com `lowPrice`),
+  `watchCount`, `activeCount`, `alertsSent`, `belowTypicalNow`,
+  `biggestDrop` (`{ amountMinor, percent, currency, origin, destination,
+departureDate }` ou null), `destinationPromotions` (até 3, formato do
+  `/v1/promotions/highlights`).
+- `GET /v1/auth/me` ganha `homeCity` (aditivo): o web sabe a cidade em toda
+  página (busca, novo monitoramento, home e promoções) sem outra chamada.
   Uma chamada por página; só banco e cache, nunca a fonte de preços.
 - `PATCH /v1/me` (autenticado): `{ homeCityCode: string | null }`, validado
   no catálogo (SPEC-029). Rate limit `auth` como as outras rotas da conta.
@@ -167,4 +170,26 @@ Só números que o banco tem, cada um com o rótulo exato do que é:
 
 ## Evidência de implementação
 
-Ainda não implementada.
+2026-10-14, branch `feat/personal-panels` (sobre `feat/offer-page`).
+
+- Banco: migração aditiva `20261015010000_user_home_city` (conferida com
+  `prisma migrate diff`); `countNotifiedAlertsForUser`,
+  `findBiggestLowPriceDrop` (preço normal da justificativa da SPEC-039),
+  `findUserDestinations` — 2 testes de integração.
+- API: `MeModule` (`GET /v1/me/overview`, `PATCH /v1/me` com rate limit
+  `auth`; aeroporto vira cidade; fora do catálogo → `400 UNSUPPORTED_CITY`);
+  `PromotionsService.cachedForDestinations` (só cache, sem fonte); exclusão
+  de conta apaga a cidade; métrica `me_overview_requests_total{panels}` —
+  5 e2e do `me` e 1 de promoções.
+- Web: `PersonalPanels` (monitoramentos ativos, resumo, promoções para os
+  seus destinos, buscar nova passagem) na coluna da página da oferta e na
+  seção "Seu espaço" da home logada; cidade em "Minha conta"; escolher
+  "Saindo de" logado grava na conta; busca e novo monitoramento abrem com a
+  cidade; home e promoções usam a cidade da conta sem cookie; Política de
+  Privacidade cita a cidade.
+- E2E (Playwright): 15/15, com `personal.spec.ts` (pessoa nova só com a
+  busca; cidade salva preenche a busca; com monitoramento, ativos e resumo).
+- Navegador (dados reais, usuário de desenvolvimento): os quatro painéis na
+  oferta e na home; promoção para o destino SAO → RIO R$ 177; busca e novo
+  monitoramento com "São Paulo (SAO)"; celular sem rolagem horizontal, sem
+  erro no console.

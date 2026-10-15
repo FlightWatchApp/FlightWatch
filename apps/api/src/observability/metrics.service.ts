@@ -202,6 +202,14 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** SPEC-040. */
+  readonly meOverviewRequestsTotal = new Counter({
+    name: 'me_overview_requests_total',
+    help: 'Painéis pessoais mostrados por requisição — 1 a 4 (SPEC-040).',
+    labelNames: ['panels'],
+    registers: [this.registry],
+  });
+
   /** SPEC-038. */
   readonly offerPageRequestsTotal = new Counter({
     name: 'offer_page_requests_total',

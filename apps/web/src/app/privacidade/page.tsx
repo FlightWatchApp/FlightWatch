@@ -34,7 +34,8 @@ export default function PrivacyPage() {
         <ul>
           <li>
             <strong>Conta:</strong> e-mail, senha (guardada só como código irreversível, nunca o
-            texto da senha) e o fuso horário do seu navegador, para mostrar datas no seu horário.
+            texto da senha), o fuso horário do seu navegador, para mostrar datas no seu horário, e a
+            cidade de partida, se você escolher uma, para mostrar promoções saindo dela.
           </li>
           <li>
             <strong>Monitoramentos:</strong> rotas, datas, número de passageiros e os alertas que

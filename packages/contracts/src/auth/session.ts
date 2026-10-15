@@ -18,6 +18,8 @@ export const authenticatedUserSchema = z.object({
   status: userStatusSchema,
   notificationChannelId: z.string().uuid().nullable(),
   notificationChannelVerified: z.boolean(),
+  /** SPEC-040: cidade de partida da conta; null quando a pessoa não escolheu. */
+  homeCity: z.object({ code: z.string(), name: z.string() }).nullable(),
 });
 
 export const authSessionResponseSchema = z.object({

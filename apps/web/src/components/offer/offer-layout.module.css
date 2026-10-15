@@ -1,0 +1,20 @@
+/* SPEC-040: com sessão, a oferta à esquerda e os painéis pessoais à direita. */
+.withPanels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .withPanels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

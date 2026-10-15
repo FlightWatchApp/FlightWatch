@@ -7,6 +7,7 @@ import { MemberHome } from '@/components/home/member-home';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { searchPlaces } from '@/lib/api/places';
+import { getMeOverview } from '@/lib/api/me';
 import { listWatches } from '@/lib/api/watches';
 import { matchesVisitorCity, visitorCityFromHeaders } from '@/lib/domain/visitor-city';
 import { ORIGIN_COOKIE_NAME, normalizeOriginCode } from './opportunities/origin';
@@ -45,7 +46,9 @@ export default async function HomePage() {
   // pelo acesso; a vitrine das cidades mais usadas vem sempre junto. Vale
   // para visitante e para quem está logado.
   const cookieStore = await cookies();
-  const chosen = normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value);
+  // SPEC-040: sem escolha neste navegador, vale a cidade da conta.
+  const chosen =
+    normalizeOriginCode(cookieStore.get(ORIGIN_COOKIE_NAME)?.value) ?? user?.homeCity?.code ?? null;
   const suggestion = chosen ? null : await suggestedOrigin();
   const origin = chosen ?? suggestion?.code ?? null;
   const [promotions, showcase] = await Promise.all([loadHomePromotions(origin), loadShowcase()]);
@@ -88,6 +91,8 @@ export default async function HomePage() {
       promotion,
     }));
   const memberPromotions = [...fromOrigin, ...fromShowcase].slice(0, MEMBER_PROMOTIONS);
+  // SPEC-040: painéis pessoais; falha deixa a home sem eles.
+  const overview = await getMeOverview().catch(() => null);
 
   const active = watches.filter((watch) => watch.status === 'ACTIVE' || watch.status === 'PAUSED');
   const belowTypical = watches.filter(
@@ -105,6 +110,7 @@ export default async function HomePage() {
         userEmail={user.email}
         notificationChannelVerified={user.notificationChannelVerified}
         promotions={memberPromotions}
+        overview={overview}
         originName={promotions?.hero.originName ?? null}
         offerPages={routePagesEnabled()}
         renderedAt={new Date().toISOString()}

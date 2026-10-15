@@ -6,6 +6,7 @@ export * from './price-observation-repository.js';
 export * from './alert-event-repository.js';
 export * from './low-price-repository.js';
 export * from './low-price-backfill.js';
+export * from './me-overview-repository.js';
 export * from './notification-delivery-repository.js';
 export * from './watch-listing-repository.js';
 export * from './watch-lifecycle-repository.js';

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import type { PromotionItem } from '@flight-watch/contracts';
+import type { MeOverviewResponse, PromotionItem } from '@flight-watch/contracts';
+import { PersonalPanels } from '@/components/personal/personal-panels';
 import { PromotionCard } from '@/components/promotions/promotion-card';
 import { PurchaseNote } from '@/components/purchase/purchase-note';
 import buttonStyles from '@/components/ui/button.module.css';
@@ -26,6 +27,8 @@ export interface MemberHomeProps {
   originName: string | null;
   /** SPEC-038: página da oferta ligada (decidido no servidor). */
   offerPages: boolean;
+  /** SPEC-040: painéis pessoais; null se a API falhar. */
+  overview: MeOverviewResponse | null;
   /** Instante da renderização no servidor: a idade não muda na hidratação. */
   renderedAt: string;
   monitoredCount: number;
@@ -48,6 +51,7 @@ export function MemberHome({
   promotions,
   originName,
   offerPages,
+  overview,
   renderedAt,
   monitoredCount,
   belowTypicalCount,
@@ -111,6 +115,24 @@ export function MemberHome({
           </aside>
         </div>
       </section>
+
+      {overview && (
+        <section
+          className={`container ${styles.section} reveal`}
+          style={delay(120)}
+          aria-labelledby="member-space-title"
+        >
+          <div className={styles.sectionHead}>
+            <div>
+              <p className={styles.sectionKicker}>Seu espaço</p>
+              <h2 id="member-space-title" className={styles.sectionTitle}>
+                O que estamos acompanhando para você
+              </h2>
+            </div>
+          </div>
+          <PersonalPanels overview={overview} offerPages={offerPages} layout="grid" />
+        </section>
+      )}
 
       <section
         className={`container ${styles.section} reveal`}
