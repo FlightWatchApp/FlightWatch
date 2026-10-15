@@ -153,19 +153,29 @@ describe('selectEligibleSearchTargetsForUpdate', () => {
 
   // AC-002: duas réplicas do scheduler não pegam o mesmo target ao mesmo tempo.
   it('lets only one of two concurrent transactions lock the same eligible target', async () => {
-    const { target } = await seedTarget();
+    // O mais antigo da fila: as duas transações tentam este primeiro, mesmo com
+    // alvos elegíveis deixados pelos testes anteriores.
+    const { target } = await seedTarget({ nextCheckAt: new Date(Date.now() - 86_400_000) });
+
+    // Barreira: nenhuma transação termina antes de as duas terem selecionado.
+    // Com um `setTimeout` fixo, num CI lento a segunda podia começar depois do
+    // commit da primeira e achar o alvo já livre (falso negativo).
+    let selected = 0;
+    let releaseBoth!: () => void;
+    const bothSelected = new Promise<void>((resolve) => {
+      releaseBoth = resolve;
+    });
+    const lockAndWait = (tx: Parameters<typeof selectEligibleSearchTargetsForUpdate>[0]) =>
+      selectEligibleSearchTargetsForUpdate(tx, 1).then(async (rows) => {
+        selected += 1;
+        if (selected === 2) releaseBoth();
+        await bothSelected;
+        return rows;
+      });
 
     const results = await Promise.all([
-      prisma.$transaction(async (tx) => {
-        const rows = await selectEligibleSearchTargetsForUpdate(tx, 1);
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        return rows;
-      }),
-      prisma.$transaction(async (tx) => {
-        const rows = await selectEligibleSearchTargetsForUpdate(tx, 1);
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        return rows;
-      }),
+      prisma.$transaction(lockAndWait, { timeout: 15_000 }),
+      prisma.$transaction(lockAndWait, { timeout: 15_000 }),
     ]);
 
     const totalLocked = results.flat().filter((row) => row.id === target.id).length;
