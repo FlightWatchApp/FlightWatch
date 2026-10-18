@@ -1,6 +1,9 @@
 'use client';
 
 import L from 'leaflet';
+// O mapa da rota também aparece fora de /voos (ex.: detalhe do monitoramento):
+// traz o próprio CSS do Leaflet em vez de depender do layout da página.
+import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { greatCirclePath, type LatLng } from '@/lib/domain/route-map';
 import styles from './route-map.module.css';

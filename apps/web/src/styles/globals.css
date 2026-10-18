@@ -185,6 +185,13 @@ button {
   border: 0;
 }
 
+/* Mapas (Leaflet): as camadas e os controles do mapa usam z-index 400–1000.
+   Isolados no próprio mapa, não passam por cima do cabeçalho fixo (z-index 30)
+   ao rolar a página. */
+.leaflet-container {
+  isolation: isolate;
+}
+
 .skip-link {
   position: absolute;
   left: var(--space-4);

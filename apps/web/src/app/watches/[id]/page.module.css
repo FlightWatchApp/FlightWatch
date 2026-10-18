@@ -3,7 +3,6 @@
   flex-direction: column;
   gap: var(--space-6);
   padding-block: var(--space-8);
-  max-width: 40rem;
 }
 
 .back {
@@ -114,6 +113,13 @@
   align-items: stretch;
   gap: var(--space-3);
   margin-top: var(--space-4);
+}
+
+/* Com a página na largura do site, o botão de compra não se estica pela linha toda. */
+@media (min-width: 768px) {
+  .actionsRow {
+    max-width: 30rem;
+  }
 }
 
 .chartTitle {
