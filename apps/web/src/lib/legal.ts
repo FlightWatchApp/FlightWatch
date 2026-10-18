@@ -3,4 +3,4 @@
  * Mudou o texto de uma delas? Atualize a data.
  */
 export const LEGAL_CONTACT_EMAIL = 'contato@flightwatch.com.br';
-export const LEGAL_LAST_UPDATED = '14 de outubro de 2026';
+export const LEGAL_LAST_UPDATED = '17 de outubro de 2026';

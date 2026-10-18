@@ -3,7 +3,7 @@
 > Constituição operacional viva para agentes de IA e pessoas que trabalham neste repositório.
 
 **Versão documental:** 0.1  
-**Última atualização:** 2026-09-21  
+**Última atualização:** 2026-10-17  
 **Produto:** Flight Watch  
 **Idioma do produto e da documentação:** português brasileiro  
 **Timezone operacional humano:** `America/Campo_Grande`  
@@ -102,6 +102,10 @@ O Claude não deve aumentar este arquivo com detalhes efêmeros. Detalhes extens
   Redis (nada no banco), motor desligado por padrão
   (`PROMOTION_ENGINE_ENABLED`); `/opportunities` escolhe a origem e volta ao
   feed da SPEC-015 quando o motor está desligado.
+- SPEC-043 (Etapa 1) implementada e verificada: cadastro só com chave de
+  convite, conta de admin (`/admin`, `/v1/admin/*`), suspensão e cota mensal
+  de monitoramentos — evidência na spec. Etapa 2 (webhook de pagamento)
+  continua rascunho.
 - Primeira rota pública com rate limit real (`@nestjs/throttler`,
   `POST /v1/searches/flights`) — `RATE_LIMIT_WINDOW_MS`/`RATE_LIMIT_MAX`
   agora `VERIFICADO` (§10.2).
@@ -283,6 +287,7 @@ Esta árvore deve ser reconciliada com `rg --files` no início de tarefas estrut
 │   │   └── styles/
 │   ├── api/src/
 │   │   ├── auth/ watches/ searches/ opportunities/ promotions/ routes/ affiliate/
+│   │   ├── admin/ cli/           # SPEC-043: convites, pessoas, auditoria; comando `admin` no servidor
 │   │   ├── pricing-source/       # provedor, cache Redis (rota-mês) e Retry-After compartilhados
 │   │   ├── observability/
 │   │   ├── prisma/
@@ -379,6 +384,7 @@ Não criar cópias conflitantes. Rascunhos de spec ficam em `docs/roadmap/rascun
 - Searches/Offers (SPEC-014: busca de descoberta pública e derivação de Watch a partir de uma oferta);
 - Opportunities (SPEC-015: feed público de oportunidades, `Deal` computado em leitura);
 - Promotions (SPEC-032: feed público por origem; provedor e cache vêm do `PricingSourceModule`, global);
+- Admin (SPEC-043: `/v1/admin/*` — convites, pessoas, suspensão; `AdminGuard` lê o papel do banco e responde 404 a quem não é admin; auditoria na mesma transação; regras compartilhadas com o comando em `admin-core.ts`);
 - Me (SPEC-040: `GET /v1/me/overview` para os painéis pessoais e `PATCH /v1/me` para a cidade de partida; só banco e cache);
 - Routes (SPEC-033: página da rota e sitemap; orçamento e rate limit `pages` próprios; SPEC-038: oferta de um dia, `GET /v1/routes/:o/:d/offers/:date`, com o voo mais barato do dia via `FlightDetailsCache`);
 - Health;
@@ -596,6 +602,8 @@ Cada package deve exportar uma superfície pública pequena. Não importar arqui
 | `FlightSearch`/`FlightSearchOffer` | busca de descoberta pontual (SPEC-014)             | separado de SearchTarget/SearchExecution; não compartilha tabelas                   |
 | `Deal`                             | classificação de oportunidade computada (SPEC-015) | **não é model Prisma** — nunca persistido, recalculado a cada leitura (DR-019)      |
 | `Place`                            | cidade ou aeroporto do catálogo (SPEC-029)         | chave `(code, kind)`; nunca apagado, só `searchable=false`; nenhuma lista no código |
+| `AccessInvite`                     | chave de convite de uso único (SPEC-043)           | só o hash SHA-256 da chave; ligada ao e-mail; `FOR UPDATE` ao resgatar              |
+| `AdminAuditLog`                    | ação de admin (SPEC-043)                           | só ids e ação, na mesma transação da ação; nunca chave, e-mail ou payload           |
 | `Airline`                          | companhia do catálogo (SPEC-038)                   | código IATA de 2 caracteres; só nome para exibição; nenhuma lista no código         |
 | promoção (SPEC-032)                | conclusão sobre preços da fonte, por origem        | **não é model Prisma** — só cache Redis reconstruível; avaliação pura no domínio    |
 
@@ -698,6 +706,10 @@ Regras transversais:
 - a API usa `REDIS_URL` desde a SPEC-032 (cache de promoções e do calendário,
   orçamento diário do feed); Redis fora é falta de cache, nunca erro. Os e2e
   da API apontam para `redis://127.0.0.1:1` e usam `MemoryKeyValueStore`;
+- SPEC-043 (`VERIFICADO`, só a API): `INVITE_REQUIRED` (padrão `false`; `true`
+  no modelo de produção; `false` é o kill switch), `INVITE_TTL_DAYS` (30) e
+  `MONTHLY_WATCH_LIMIT` (5). O primeiro admin nasce pelo comando no servidor
+  (`deploy/bin/admin.sh`), nunca pelo site;
 - fora de `packages/config`: `AFFILIATE_TRACKING_PARAMS` (parser da SPEC-020)
   e as variáveis do `apps/web` (`WEB_BASE_URL`, `API_BASE_URL`, `UMAMI_INTERNAL_URL`;
   `WEB_BASE_URL` e `UMAMI_WEBSITE_ID` também no **build** — argumentos do

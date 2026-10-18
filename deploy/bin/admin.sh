@@ -12,4 +12,4 @@ source "$(dirname "$0")/_common.sh"
 require_env_file
 cd "$REPO_ROOT"
 
-compose exec -T api node dist/cli/admin.js "$@"
+compose exec -T api node apps/api/dist/cli/admin.js "$@"

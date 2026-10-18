@@ -42,6 +42,14 @@ export default function PrivacyPage() {
             enviamos para você.
           </li>
           <li>
+            <strong>Acesso por convite:</strong> o e-mail para o qual a chave de acesso foi enviada,
+            as datas de criação, validade e uso da chave (a chave em si não fica guardada, só uma
+            impressão irreversível dela) e quantos monitoramentos você criou no mês, para aplicar o
+            limite mensal. Quando um administrador age sobre a sua conta (liberar a chave, mudar o
+            limite, suspender o acesso), guardamos um registro com a ação e a data, sem o seu
+            e-mail.
+          </li>
+          <li>
             <strong>Sem conta:</strong> buscar e ver promoções não exige cadastro. Não associamos
             essas buscas a você.
           </li>
@@ -57,7 +65,14 @@ export default function PrivacyPage() {
             consultar preços das rotas que você monitora e avisar por e-mail quando a regra for
             atendida;
           </li>
-          <li>enviar e-mails da conta: confirmação de e-mail e redefinição de senha;</li>
+          <li>
+            enviar e-mails da conta: a chave de acesso, a confirmação de e-mail e a redefinição de
+            senha;
+          </li>
+          <li>
+            liberar o cadastro só a quem recebeu uma chave de acesso e aplicar o limite mensal de
+            monitoramentos;
+          </li>
           <li>proteger o site contra abuso, como tentativas repetidas de login.</li>
         </ul>
         <p>
@@ -139,10 +154,21 @@ export default function PrivacyPage() {
         <h2>Por quanto tempo</h2>
         <p>
           Os dados da conta ficam guardados enquanto ela existir. Ao excluir a conta, apagamos seu
-          e-mail e sua senha, encerramos suas sessões e cancelamos seus monitoramentos. Guardamos
-          apenas registros sem nenhum dado que identifique você, como &ldquo;um alerta de preço foi
-          enviado em tal data&rdquo;. Os preços de passagens observados não são dados pessoais e
-          continuam no sistema.
+          e-mail (inclusive o da chave de acesso) e sua senha, encerramos suas sessões e cancelamos
+          seus monitoramentos. Guardamos apenas registros sem nenhum dado que identifique você, como
+          &ldquo;um alerta de preço foi enviado em tal data&rdquo;. Os preços de passagens
+          observados não são dados pessoais e continuam no sistema.
+        </p>
+      </section>
+
+      <section className={styles.section}>
+        <h2>Suspensão do acesso</h2>
+        <p>
+          Se o acesso for suspenso (por exemplo, quando você exerce o direito de arrependimento em
+          até 7 dias), encerramos as suas sessões e pausamos os seus monitoramentos ativos. Seus
+          dados continuam guardados nas mesmas condições da conta, e você pode excluí-la quando
+          quiser. Se o acesso voltar, os monitoramentos continuam pausados até você retomar os que
+          quiser.
         </p>
       </section>
 
