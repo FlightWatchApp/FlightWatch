@@ -28,6 +28,7 @@ import { SessionAuthGuard } from './session-auth.guard.js';
       useFactory: (config: ApiConfig) => createEmailSender(config),
     },
   ],
-  exports: [AuthService, SessionAuthGuard],
+  // SPEC-043: o AdminModule envia o e-mail da chave pelo mesmo sender.
+  exports: [AuthService, SessionAuthGuard, EMAIL_SENDER],
 })
 export class AuthModule {}

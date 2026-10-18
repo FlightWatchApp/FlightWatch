@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from './admin/admin.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { ObservabilityModule } from './observability/observability.module.js';
@@ -28,6 +29,7 @@ import { MeModule } from './me/me.module.js';
     PromotionsModule,
     RoutesModule,
     MeModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

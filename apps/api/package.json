@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "admin": "node dist/cli/admin.js"
   },
   "dependencies": {
     "@flight-watch/config": "workspace:*",
