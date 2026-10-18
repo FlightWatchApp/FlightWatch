@@ -33,6 +33,8 @@ function isCurrent(pathname: string, item: NavItem): boolean {
 
 export interface MainNavProps {
   userEmail: string | null;
+  /** SPEC-043: link "Admin" só para admin (a área confere de novo no servidor). */
+  isAdmin?: boolean;
 }
 
 /**
@@ -40,12 +42,16 @@ export interface MainNavProps {
  * um painel aberto por botão (`aria-expanded`/`aria-controls`), fecha ao
  * trocar de rota e com Esc, com o foco voltando ao botão.
  */
-export function MainNav({ userEmail }: MainNavProps) {
+export function MainNav({ userEmail, isAdmin = false }: MainNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const items = userEmail ? MEMBER_ITEMS : PUBLIC_ITEMS;
+  const items = userEmail
+    ? isAdmin
+      ? [...MEMBER_ITEMS, { href: '/admin', label: 'Admin', match: ['/admin'] }]
+      : MEMBER_ITEMS
+    : PUBLIC_ITEMS;
 
   // Fecha o painel ao navegar — ajuste de estado derivado da rota durante o
   // render (padrão documentado pelo React), não um efeito com setState.

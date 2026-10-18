@@ -7,9 +7,17 @@ const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
+  /** SPEC-043: dados do erro quando a API manda (ex.: limite e dia em que a cota volta). */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(status: number, code: string | undefined, message: string) {
+  constructor(
+    status: number,
+    code: string | undefined,
+    message: string,
+    details?: Record<string, unknown>,
+  ) {
     super(message);
+    this.details = details;
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
@@ -19,6 +27,7 @@ export class ApiError extends Error {
 interface ErrorBody {
   code?: string;
   message?: string;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -54,6 +63,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       response.status,
       body?.code,
       body?.message ?? `request failed with status ${response.status}`,
+      body?.details,
     );
   }
 

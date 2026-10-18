@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/select';
 import { TextInput } from '@/components/ui/text-input';
 import { IconPlus } from '@/components/ui/icon';
 import type { TripType, WatchDetail } from '@/lib/api/types';
-import { createWatchAction } from '@/app/watches/new/actions';
+import { createWatchAction, watchQuotaLabelAction } from '@/app/watches/new/actions';
 import { LowPricePreview } from './low-price-preview';
 import { WatchCreatedSummary } from './watch-created-summary';
 import styles from './create-watch-modal.module.css';
@@ -31,6 +31,7 @@ export function CreateWatchModal({
   const [open, setOpen] = useState(false);
   const [createdWatch, setCreatedWatch] = useState<WatchDetail | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [origin, setOrigin] = useState<SelectedPlace | null>(null);
@@ -44,6 +45,8 @@ export function CreateWatchModal({
     setFormError(null);
     setCreatedWatch(null);
     setOpen(true);
+    // SPEC-043: cota do mês, consultada ao abrir (a página não a carrega).
+    void watchQuotaLabelAction().then(setQuota);
   }
 
   function closeModal(): void {
@@ -122,7 +125,7 @@ export function CreateWatchModal({
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
             <p className={styles.intro}>
               Escolha a rota e as datas. Avisamos por e-mail quando observarmos um preço bem abaixo
-              do normal para essa viagem.
+              do normal para essa viagem.{quota && <> Você usou {quota}.</>}
             </p>
 
             <div className={styles.row}>

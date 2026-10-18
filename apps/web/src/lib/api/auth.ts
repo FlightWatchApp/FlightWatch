@@ -4,9 +4,15 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  RegistrationInfoResponse,
   VerifyEmailResponse,
 } from '@flight-watch/contracts';
 import { ApiError, apiFetch } from './client';
+
+/** SPEC-043: se o cadastro exige chave de convite (a API é a única fonte). */
+export async function getRegistrationInfo(): Promise<RegistrationInfoResponse> {
+  return apiFetch<RegistrationInfoResponse>('/v1/auth/registration');
+}
 
 export async function register(input: RegisterRequest): Promise<RegisterResponse> {
   return apiFetch<RegisterResponse>('/v1/auth/register', {

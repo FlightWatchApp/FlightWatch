@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type FormEvent, useState, useTransition } from 'react';
+import { type FormEvent, useEffect, useState, useSyncExternalStore, useTransition } from 'react';
 import { AuthShell } from '@/components/account/auth-shell';
 import { Turnstile } from '@/components/account/turnstile';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,33 @@ import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { TextInput } from '@/components/ui/text-input';
+import { parseInviteFragment } from '@/lib/domain/invite-link';
 import { registerAction } from './actions';
 import styles from './page.module.css';
 
 // SPEC-007 §5: placeholder, política de senha ainda não definida pelo produto.
 const PASSWORD_MIN_LENGTH = 10;
 
-/** SPEC-041: `siteKey` do Turnstile vem do servidor; null = captcha desligado. */
-export function RegisterForm({ siteKey }: { siteKey: string | null }) {
+function subscribeToHash(onChange: () => void): () => void {
+  window.addEventListener('hashchange', onChange);
+  return () => window.removeEventListener('hashchange', onChange);
+}
+
+function readHash(): string {
+  return window.location.hash;
+}
+
+/**
+ * SPEC-041: `siteKey` do Turnstile vem do servidor; null = captcha desligado.
+ * SPEC-043: `inviteRequired` mostra o campo da chave de acesso.
+ */
+export function RegisterForm({
+  siteKey,
+  inviteRequired,
+}: {
+  siteKey: string | null;
+  inviteRequired: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   // O token vale uma vez: trocar a key recomeça o widget depois de cada tentativa.
@@ -24,8 +43,26 @@ export function RegisterForm({ siteKey }: { siteKey: string | null }) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // SPEC-043: o link do e-mail traz a chave e o e-mail no fragmento (#), que o
+  // navegador não envia ao servidor. Preenche os campos uma vez e limpa a barra
+  // de endereço (a chave não fica no histórico nem em captura de tela).
+  const hash = useSyncExternalStore(subscribeToHash, readHash, () => '');
+  const fragment = parseInviteFragment(hash);
+  const [seeded, setSeeded] = useState(false);
+  if (fragment && !seeded) {
+    setSeeded(true);
+    setInviteCode(fragment.code);
+    if (fragment.email) setEmail(fragment.email);
+  }
+  useEffect(() => {
+    if (fragment) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [fragment]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -33,6 +70,10 @@ export function RegisterForm({ siteKey }: { siteKey: string | null }) {
 
     if (!email.trim()) {
       setFormError('Informe seu email.');
+      return;
+    }
+    if (inviteRequired && !inviteCode.trim()) {
+      setFormError('Informe a chave de acesso que você recebeu por e-mail.');
       return;
     }
     if (password.length < PASSWORD_MIN_LENGTH) {
@@ -53,6 +94,7 @@ export function RegisterForm({ siteKey }: { siteKey: string | null }) {
       void (async () => {
         const result = await registerAction({
           captchaToken: captchaToken ?? undefined,
+          ...(inviteRequired ? { inviteCode } : {}),
           email,
           password,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -68,7 +110,7 @@ export function RegisterForm({ siteKey }: { siteKey: string | null }) {
 
   return (
     <AuthShell
-      title="Criar conta grátis"
+      title={inviteRequired ? 'Criar conta' : 'Criar conta grátis'}
       subtitle="Monitore rotas e receba um e-mail quando o preço ficar bem abaixo do normal."
       footer={
         <>
@@ -91,6 +133,28 @@ export function RegisterForm({ siteKey }: { siteKey: string | null }) {
               />
             )}
           </FormField>
+
+          {inviteRequired && (
+            <FormField
+              label="Chave de acesso"
+              hint="Enviada por e-mail quando o acesso foi liberado. Pode digitar com ou sem hífen."
+              required
+            >
+              {(field) => (
+                <TextInput
+                  id={field.id}
+                  aria-describedby={field.describedBy}
+                  invalid={field.invalid}
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value)}
+                />
+              )}
+            </FormField>
+          )}
 
           <FormField label="Senha" hint={`Mínimo de ${PASSWORD_MIN_LENGTH} caracteres.`} required>
             {(field) => (

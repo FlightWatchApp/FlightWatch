@@ -20,7 +20,14 @@ import styles from './page.module.css';
 const SUPPORTED_CURRENCIES = ['BRL', 'USD'];
 
 /** SPEC-040: `initialOrigin` é a cidade de partida da conta, já preenchida. */
-export function NewWatchForm({ initialOrigin = null }: { initialOrigin?: SelectedPlace | null }) {
+export function NewWatchForm({
+  initialOrigin = null,
+  quota = null,
+}: {
+  initialOrigin?: SelectedPlace | null;
+  /** SPEC-043: "3 de 5 neste mês", ou null sem limite. */
+  quota?: string | null;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
@@ -85,6 +92,7 @@ export function NewWatchForm({ initialOrigin = null }: { initialOrigin?: Selecte
           Escolha a rota e as datas. Você recebe um e-mail quando observarmos um preço bem abaixo do
           normal para essa viagem — sem precisar adivinhar um valor.
         </p>
+        {quota && <p className={styles.subtitle}>Você usou {quota}.</p>}
       </div>
 
       <Card>

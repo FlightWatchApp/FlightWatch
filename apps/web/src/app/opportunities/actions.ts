@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
+import { describeWatchCreateError } from '@/lib/api/watch-errors';
 import { createWatch } from '@/lib/api/watches';
 import { getWatch } from '@/lib/api/watches';
 import type { WatchDetail } from '@/lib/api/types';
@@ -64,7 +65,10 @@ export async function monitorOpportunityAction(
     if (error instanceof ApiError) {
       return {
         success: false,
-        error: ERROR_MESSAGES[error.code ?? ''] ?? 'Não foi possível criar o monitoramento.',
+        error:
+          describeWatchCreateError(error) ??
+          ERROR_MESSAGES[error.code ?? ''] ??
+          'Não foi possível criar o monitoramento.',
       };
     }
     return { success: false, error: 'Não foi possível criar o monitoramento.' };

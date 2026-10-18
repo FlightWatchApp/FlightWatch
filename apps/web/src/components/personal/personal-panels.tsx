@@ -10,6 +10,7 @@ import buttonStyles from '@/components/ui/button.module.css';
 import { IconSearch } from '@/components/ui/icon';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
+import { quotaLabel } from '@/lib/domain/watch-quota';
 import { promotionDiscountLabel } from '@/lib/domain/promotion';
 import { offerPath } from '@/lib/domain/route-url';
 import { isBelowTypicalPrice } from '@/lib/domain/watch-price';
@@ -90,6 +91,9 @@ function ActiveWatchesPanel({ overview }: { overview: MeOverviewResponse }) {
         <Link href="/watches" className={styles.more}>
           Ver todos ({overview.watchCount}) →
         </Link>
+      )}
+      {quotaLabel(overview.watchQuota) && (
+        <p className={styles.quota}>Criados {quotaLabel(overview.watchQuota)}.</p>
       )}
     </section>
   );

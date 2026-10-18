@@ -1,4 +1,5 @@
 import { connection } from 'next/server';
+import { getRegistrationInfo } from '@/lib/api/auth';
 import { RegisterForm } from './register-form';
 
 /**
@@ -7,5 +8,12 @@ import { RegisterForm } from './register-form';
  */
 export default async function RegisterPage() {
   await connection();
-  return <RegisterForm siteKey={process.env.TURNSTILE_SITE_KEY || null} />;
+  // SPEC-043: se a API não responder, mostra o campo (a API recusa sem chave se for exigida).
+  const { inviteRequired } = await getRegistrationInfo().catch(() => ({ inviteRequired: true }));
+  return (
+    <RegisterForm
+      siteKey={process.env.TURNSTILE_SITE_KEY || null}
+      inviteRequired={inviteRequired}
+    />
+  );
 }
