@@ -8,6 +8,7 @@ import type {
   PasswordResetRequest,
   RegisterRequest,
   RegisterResponse,
+  RegistrationInfoResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
 } from '@flight-watch/contracts';
@@ -32,6 +33,12 @@ import { VerifyEmailValidationPipe } from './verify-email.pipe.js';
 @UseFilters(AuthErrorFilter)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  // SPEC-043: público; o web usa para mostrar ou não o campo "Chave de acesso".
+  @Get('registration')
+  registration(): RegistrationInfoResponse {
+    return this.authService.registrationInfo();
+  }
 
   @Post('register')
   @HttpCode(201)

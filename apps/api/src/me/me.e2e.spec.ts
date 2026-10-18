@@ -65,6 +65,7 @@ describe('GET /v1/me/overview (SPEC-040)', () => {
       .set(...auth(token));
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
+      watchQuota: { used: 0, limit: 5, resetsAt: expect.any(String) },
       homeCity: null,
       activeCount: 0,
       alertsSent: 0,

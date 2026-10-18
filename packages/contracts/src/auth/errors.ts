@@ -15,6 +15,11 @@ export const AUTH_ERROR_CODES = {
   // SPEC-026.
   INVALID_RESET_TOKEN: { status: 400, code: 'INVALID_RESET_TOKEN' },
   RESET_TOKEN_EXPIRED: { status: 400, code: 'RESET_TOKEN_EXPIRED' },
+  // SPEC-043: chave de convite ausente, inválida, vencida, revogada, já usada ou de outro
+  // e-mail — sempre a mesma resposta; o motivo só vai para a métrica.
+  INVITE_INVALID: { status: 400, code: 'INVITE_INVALID' },
+  // SPEC-043: acesso suspenso por um admin (ex.: arrependimento em 7 dias).
+  ACCESS_SUSPENDED: { status: 403, code: 'ACCESS_SUSPENDED' },
   // SPEC-025: excedeu AUTH_RATE_LIMIT_MAX por IP do cliente.
   RATE_LIMITED: { status: 429, code: 'RATE_LIMITED' },
 } as const;

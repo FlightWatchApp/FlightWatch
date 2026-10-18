@@ -55,6 +55,33 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * SPEC-043: chaves de convite. `source`: admin (site), cli (comando no servidor) ou web
+   * (cadastro). `result`: created, revoked, redeemed, rejected_invalid, rejected_expired,
+   * rejected_email_mismatch, rejected_used, rejected_missing. O motivo da recusa só existe aqui.
+   */
+  readonly accessInvitesTotal = new Counter({
+    name: 'access_invites_total',
+    help: 'Total de eventos de chave de convite, por origem e resultado (SPEC-043).',
+    labelNames: ['source', 'result'],
+    registers: [this.registry],
+  });
+
+  /** SPEC-043. */
+  readonly adminActionsTotal = new Counter({
+    name: 'admin_actions_total',
+    help: 'Total de ações de administração, por ação (SPEC-043).',
+    labelNames: ['action'],
+    registers: [this.registry],
+  });
+
+  /** SPEC-043. */
+  readonly watchMonthlyLimitReachedTotal = new Counter({
+    name: 'watch_monthly_limit_reached_total',
+    help: 'Criações de Watch recusadas por estourar a cota mensal (SPEC-043).',
+    registers: [this.registry],
+  });
+
   /** SPEC-007 §13. */
   readonly authRegisterTotal = new Counter({
     name: 'auth_register_total',

@@ -2,10 +2,12 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { MeOverviewResponse, UpdateMeResponse, WatchListItem } from '@flight-watch/contracts';
 import {
   countNotifiedAlertsForUser,
+  countWatchesCreatedSince,
   findBiggestLowPriceDrop,
   findPlaceSummaries,
   findUserDestinations,
 } from '@flight-watch/database';
+import { monthWindow } from '@flight-watch/domain';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
@@ -41,7 +43,10 @@ export class MeService {
   async overview(userId: string): Promise<MeOverviewResponse> {
     const db = this.prisma.client;
     const [user, list, alertsSent, drop, destinations] = await Promise.all([
-      db.user.findUniqueOrThrow({ where: { id: userId }, select: { homeCityCode: true } }),
+      db.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { homeCityCode: true, role: true, monthlyWatchLimit: true },
+      }),
       // Limite por usuário é 20 ativos (WatchesService): 100 cobre ativos e pausados.
       this.watches.listWatches(userId, { limit: 100 }),
       countNotifiedAlertsForUser(db, userId),
@@ -73,7 +78,19 @@ export class MeService {
       PANEL_SIZE,
     );
 
+    // SPEC-043: cota do mês do calendário em America/Campo_Grande; admin não tem limite.
+    const window = monthWindow(new Date());
+    const used = await countWatchesCreatedSince(db, userId, window.start);
+
     const response: MeOverviewResponse = {
+      watchQuota: {
+        used,
+        limit:
+          user.role === 'ADMIN'
+            ? null
+            : (user.monthlyWatchLimit ?? this.config.MONTHLY_WATCH_LIMIT),
+        resetsAt: window.resetsAt.toISOString(),
+      },
       homeCity: homeCityCode ? { code: homeCityCode, name: nameOf(homeCityCode) } : null,
       activeCount: active.length,
       alertsSent,

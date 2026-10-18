@@ -142,6 +142,11 @@ export const apiConfig = {
     // SPEC-041: segredo do Cloudflare Turnstile. Sem ele o captcha fica desligado
     // (desenvolvimento, testes); obrigatório com APP_ENV=production.
     TURNSTILE_SECRET_KEY: optionalSecretField(16),
+    // SPEC-043: cadastro só com chave de convite (false = kill switch), validade da
+    // chave e cota mensal padrão de monitoramentos criados.
+    INVITE_REQUIRED: booleanField(false),
+    INVITE_TTL_DAYS: intField({ min: 1, max: 90, default: 30 }),
+    MONTHLY_WATCH_LIMIT: intField({ min: 1, max: 100, default: 5 }),
   },
   localDefaults: {
     DATABASE_URL: LOCAL_DATABASE_URL,

@@ -7,7 +7,13 @@ import {
   type RegisterRequest,
 } from '@flight-watch/contracts';
 import type { NotificationChannel, Prisma, PrismaClient, User } from '@flight-watch/database';
-import { findPlaceSummaries, isUniqueConstraintViolation } from '@flight-watch/database';
+import {
+  claimAccessInvite,
+  findPlaceSummaries,
+  isUniqueConstraintViolation,
+  markAccessInviteRedeemed,
+} from '@flight-watch/database';
+import { normalizeInviteCode } from '@flight-watch/domain';
 import type { EmailSender } from '@flight-watch/notifications';
 import { renderPasswordResetEmail, renderVerificationEmail } from '@flight-watch/notifications';
 import { logEvent } from '@flight-watch/observability';
@@ -32,6 +38,24 @@ const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 // perceptivelmente mais rápido que login com senha errada. Calculado uma vez.
 const dummyPasswordHashPromise = hashPassword('dummy-password-for-timing-mitigation');
 
+const INVITE_INVALID_MESSAGE =
+  'Chave de acesso inválida, vencida ou já usada. Confira o e-mail em que você recebeu a chave.';
+
+/** SPEC-043: resposta única ao cliente; o motivo real só vai para a métrica. */
+class InviteRejectedError extends AuthError {
+  constructor(readonly reason: 'missing' | 'invalid' | 'expired' | 'email_mismatch' | 'used') {
+    super('INVITE_INVALID', INVITE_INVALID_MESSAGE);
+  }
+}
+
+const INVITE_REJECTION_BY_CLAIM = {
+  missing: 'invalid',
+  revoked: 'invalid',
+  used: 'used',
+  expired: 'expired',
+  email_mismatch: 'email_mismatch',
+} as const;
+
 type Db = PrismaClient | Prisma.TransactionClient;
 type ChannelSummary = Pick<NotificationChannel, 'id' | 'verifiedAt'>;
 
@@ -44,6 +68,7 @@ function toAuthenticatedUser(
     id: user.id,
     email: user.email,
     status: user.status,
+    role: user.role,
     notificationChannelId: channel?.id ?? null,
     notificationChannelVerified: channel?.verifiedAt != null,
     homeCity,
@@ -64,15 +89,32 @@ export class AuthService {
     try {
       const response = await this.doRegister(request);
       this.metrics.authRegisterTotal.inc({ result: 'success' });
+      if (this.config.INVITE_REQUIRED) {
+        this.metrics.accessInvitesTotal.inc({ source: 'web', result: 'redeemed' });
+      }
       return response;
     } catch (error) {
       const result = error instanceof AuthError ? error.errorCode.toLowerCase() : 'internal_error';
       this.metrics.authRegisterTotal.inc({ result });
+      if (error instanceof InviteRejectedError) {
+        this.metrics.accessInvitesTotal.inc({
+          source: 'web',
+          result: error.reason === 'invalid' ? 'rejected_invalid' : `rejected_${error.reason}`,
+        });
+      }
       throw error;
     }
   }
 
+  /** SPEC-043: o web decide se mostra o campo da chave. */
+  registrationInfo(): { inviteRequired: boolean } {
+    return { inviteRequired: this.config.INVITE_REQUIRED };
+  }
+
   private async doRegister(request: RegisterRequest): Promise<AuthSessionResponse> {
+    const inviteCodeHash = this.config.INVITE_REQUIRED
+      ? this.inviteCodeHashOf(request.inviteCode)
+      : null;
     const passwordHash = await hashPassword(request.password);
     const verificationToken = generateOpaqueToken();
     const verificationTokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
@@ -84,6 +126,18 @@ export class AuthService {
       // sem nenhuma sessão válida, e register() teria retornado sucesso sem
       // um token utilizável. Tudo ou nada, como o resto do fluxo de criação.
       result = await this.prisma.client.$transaction(async (tx) => {
+        // SPEC-043: a chave é conferida (e a linha travada) ANTES de olhar se o e-mail já
+        // tem conta — sem chave válida não dá para descobrir e-mails cadastrados.
+        const claim = inviteCodeHash
+          ? await claimAccessInvite(tx, {
+              codeHash: inviteCodeHash,
+              email: request.email,
+              now: new Date(),
+            })
+          : null;
+        if (claim && claim.outcome !== 'claimed') {
+          throw new InviteRejectedError(INVITE_REJECTION_BY_CLAIM[claim.outcome]);
+        }
         const createdUser = await tx.user.create({
           data: {
             email: request.email,
@@ -103,6 +157,13 @@ export class AuthService {
             verificationTokenExpiresAt,
           },
         });
+        if (claim?.outcome === 'claimed') {
+          await markAccessInviteRedeemed(tx, {
+            inviteId: claim.inviteId,
+            userId: createdUser.id,
+            now: new Date(),
+          });
+        }
         const session = await this.issueSession(tx, createdUser, channel);
         return session;
       });
@@ -120,6 +181,14 @@ export class AuthService {
       logEvent({ event: 'verification_email_send_failed', error });
     });
     return result;
+  }
+
+  private inviteCodeHashOf(inviteCode: string | undefined): string {
+    const normalized = inviteCode ? normalizeInviteCode(inviteCode) : '';
+    if (normalized === '') {
+      throw new InviteRejectedError('missing');
+    }
+    return hashOpaqueToken(normalized);
   }
 
   private async sendVerificationEmail(email: string, token: string): Promise<void> {
@@ -350,6 +419,11 @@ export class AuthService {
         },
       });
       await tx.session.deleteMany({ where: { userId } });
+      // SPEC-043: a chave usada guarda o e-mail da pessoa; sai junto com a conta.
+      await tx.accessInvite.updateMany({
+        where: { redeemedByUserId: userId },
+        data: { email: `deleted-${userId}@deleted.invalid` },
+      });
 
       const channels = await tx.notificationChannel.findMany({
         where: { userId },
@@ -417,6 +491,14 @@ export class AuthService {
       throw new AuthError('ACCOUNT_NOT_ACTIVE', 'account is not active');
     }
 
+    // SPEC-043: só depois da senha certa (não revela o estado a quem não a tem).
+    if (user.accessStatus === 'SUSPENDED') {
+      throw new AuthError(
+        'ACCESS_SUSPENDED',
+        'Seu acesso está suspenso. Fale com a gente em contato@flightwatch.com.br.',
+      );
+    }
+
     if (user.failedLoginAttempts > 0 || user.lockedUntil) {
       await this.prisma.client.user.update({
         where: { id: user.id },
@@ -467,9 +549,14 @@ export class AuthService {
   async validateSession(rawToken: string): Promise<string | null> {
     const session = await this.prisma.client.session.findUnique({
       where: { tokenHash: hashOpaqueToken(rawToken) },
-      include: { user: { select: { status: true } } },
+      include: { user: { select: { status: true, accessStatus: true } } },
     });
-    if (!session || session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') {
+    if (
+      !session ||
+      session.expiresAt <= new Date() ||
+      session.user.status !== 'ACTIVE' ||
+      session.user.accessStatus !== 'ACTIVE'
+    ) {
       return null;
     }
     return session.userId;

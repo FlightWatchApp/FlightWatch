@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { logEvent } from '@flight-watch/observability';
 import {
   type CreateWatchRequest,
@@ -18,6 +18,7 @@ import {
   InvalidSearchTargetInputError,
   computeSearchTargetFingerprintV1,
   resolveCurrentOfferStatus,
+  monthWindow,
   resolvePurchaseUrl,
 } from '@flight-watch/domain';
 import type { Prisma, WatchStatus } from '@flight-watch/database';
@@ -26,15 +27,18 @@ import {
   type PlaceSummary,
   SearchTargetFingerprintConflictError,
   findOrCreateSearchTarget,
+  countWatchesCreatedSince,
   findPlaceSummaries,
   getWatchDetailForUser,
   getWatchForUser,
   listWatchesForUser,
+  lockUserForWatchCreation,
   transitionWatchStatus,
   withSearchTargetRaceRetry,
   type WatchDetailItem,
   type WatchListItem,
 } from '@flight-watch/database';
+import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
@@ -272,6 +276,7 @@ export class WatchesService {
     private readonly metrics: MetricsService,
     private readonly places: PlacesService,
     private readonly lowPrice: LowPriceService,
+    @Inject(API_CONFIG) private readonly config: ApiConfig,
   ) {}
 
   /** SPEC-039: resumo `lowPrice` de cada item, em lote. */
@@ -555,6 +560,9 @@ export class WatchesService {
       const result =
         error instanceof CreateWatchError ? error.errorCode.toLowerCase() : 'internal_error';
       this.metrics.watchCreateTotal.inc({ result });
+      if (error instanceof CreateWatchError && error.errorCode === 'WATCH_MONTHLY_LIMIT_REACHED') {
+        this.metrics.watchMonthlyLimitReachedTotal.inc();
+      }
       throw error;
     }
   }
@@ -686,12 +694,24 @@ export class WatchesService {
     try {
       return await withSearchTargetRaceRetry(() =>
         this.prisma.client.$transaction(async (tx) => {
-          // Checagem de quota best-effort: sob concorrência alta, duas requisições
-          // podem ler a mesma contagem antes de qualquer uma commitar e as duas
-          // passarem. Não há trava atômica de contador ainda — limitação conhecida,
-          // aceitável para o MVP, não escondida (AC-008 exige não deixar Target
-          // órfão quando a quota estoura, o que esta ordem de checagem preserva;
-          // não exige quota infalível sob corrida).
+          // SPEC-043: trava a linha da pessoa antes de qualquer contagem — criações
+          // concorrentes dela passam uma de cada vez, então as cotas abaixo não correm.
+          const account = await lockUserForWatchCreation(tx, userId);
+          if (!account || account.accessStatus === 'SUSPENDED') {
+            throw new CreateWatchError('ACCESS_SUSPENDED', 'access is suspended');
+          }
+          if (account.role !== 'ADMIN') {
+            const window = monthWindow(new Date());
+            const used = await countWatchesCreatedSince(tx, userId, window.start);
+            const limit = account.monthlyWatchLimit ?? this.config.MONTHLY_WATCH_LIMIT;
+            if (used >= limit) {
+              throw new CreateWatchError(
+                'WATCH_MONTHLY_LIMIT_REACHED',
+                'monthly watch limit reached',
+                { limit, used, resetsAt: window.resetsAt.toISOString() },
+              );
+            }
+          }
           const activeCount = await tx.watch.count({ where: { userId, status: 'ACTIVE' } });
           if (activeCount >= MAX_ACTIVE_WATCHES_PER_USER) {
             throw new CreateWatchError(

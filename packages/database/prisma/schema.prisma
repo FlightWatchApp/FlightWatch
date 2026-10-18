@@ -33,6 +33,11 @@ model User {
   // SPEC-040: cidade de partida escolhida pela pessoa (código de cidade do
   // catálogo, SPEC-029). Apagada na exclusão da conta (SPEC-027).
   homeCityCode           String?
+  // SPEC-043: papel (só muda pelo comando no servidor), suspensão de acesso e
+  // cota mensal própria de monitoramentos (null = MONTHLY_WATCH_LIMIT).
+  role                   UserRole         @default(USER)
+  accessStatus           UserAccessStatus @default(ACTIVE)
+  monthlyWatchLimit      Int?
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
 
@@ -44,8 +49,62 @@ model User {
   // opcional ainda, então a busca de descoberta nunca associa um usuário.
   // O campo/relação já existem para não exigir migração quando isso mudar.
   flightSearches       FlightSearch[]
+  redeemedInvite       AccessInvite?
 
   @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserAccessStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AccessInviteStatus {
+  AVAILABLE
+  REDEEMED
+  REVOKED
+}
+
+// SPEC-043: chave de convite de uso único. Só o hash SHA-256 da chave
+// normalizada é persistido. "Vencida" é derivada (AVAILABLE + expiresAt passado).
+model AccessInvite {
+  id               String             @id @default(uuid())
+  codeHash         String             @unique
+  // Normalizado como o e-mail do cadastro.
+  email            String
+  status           AccessInviteStatus @default(AVAILABLE)
+  expiresAt        DateTime
+  // null = criada pelo comando no servidor.
+  createdByUserId  String?
+  redeemedAt       DateTime?
+  redeemedByUserId String?            @unique
+  revokedAt        DateTime?
+  createdAt        DateTime           @default(now())
+
+  redeemedBy User? @relation(fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([createdAt])
+  @@map("access_invites")
+}
+
+// SPEC-043: auditoria de ações de admin. Só ids — sem chave, e-mail ou payload.
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  // null = comando no servidor.
+  adminUserId String?
+  action      String
+  targetType  String
+  targetId    String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("admin_audit_log")
 }
 
 model Session {
@@ -267,6 +326,8 @@ model Watch {
   // de propósito à parte) o índice anterior — qualquer consulta que usava só
   // `[searchTargetId, status]` continua coberta pelo prefixo deste.
   @@index([searchTargetId, status, id])
+  // SPEC-043: contagem de monitoramentos criados no mês, por pessoa.
+  @@index([userId, createdAt])
   @@map("watches")
 }
 
