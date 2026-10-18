@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFoundOn404 } from '../not-found-on-404';
 import type { InviteState } from '@flight-watch/contracts';
 import { listInvites } from '@/lib/api/admin';
 import { InviteForm } from './invite-form';
@@ -21,7 +22,7 @@ export default async function InvitesPage({
 }) {
   const { state, cursor } = await searchParams;
   const activeState = FILTERS.find((filter) => filter.state === state)?.state;
-  const page = await listInvites({ state: activeState, cursor });
+  const page = await listInvites({ state: activeState, cursor }).catch(notFoundOn404);
 
   return (
     <div className={styles.section}>

@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { API_URL, PORTS, SHARED_ENV, WEB_URL } from './env';
+import { API_URL, INVITE_API_URL, INVITE_PORTS, PORTS, SHARED_ENV, WEB_URL } from './env';
 
 const worker = (name: string, metricsPort: number) => ({
   command: `pnpm --filter @flight-watch/${name} start`,
@@ -39,6 +39,22 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
     },
+    {
+      // SPEC-043: API com convite obrigatório e cota mensal pequena, só para invite-access.spec.ts.
+      command: '(pnpm --filter @flight-watch/api start)',
+      url: `${INVITE_API_URL}/health`,
+      env: {
+        ...SHARED_ENV,
+        SERVICE_NAME: 'api',
+        PORT: String(INVITE_PORTS.api),
+        METRICS_PORT: String(INVITE_PORTS.metrics),
+        INVITE_REQUIRED: 'true',
+        MONTHLY_WATCH_LIMIT: '2',
+        WEB_BASE_URL: `http://127.0.0.1:${INVITE_PORTS.web}`,
+      },
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
     worker('scheduler', PORTS.metrics[1]),
     worker('price-worker', PORTS.metrics[2]),
     worker('alert-worker', PORTS.metrics[3]),
@@ -47,6 +63,13 @@ export default defineConfig({
       command: `pnpm --filter @flight-watch/web exec next start --port ${PORTS.web} --hostname 127.0.0.1`,
       url: WEB_URL,
       env: { ...SHARED_ENV, API_BASE_URL: API_URL, NODE_ENV: 'production' },
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: `pnpm --filter @flight-watch/web exec next start --port ${INVITE_PORTS.web} --hostname 127.0.0.1`,
+      url: `http://127.0.0.1:${INVITE_PORTS.web}`,
+      env: { ...SHARED_ENV, API_BASE_URL: INVITE_API_URL, NODE_ENV: 'production' },
       reuseExistingServer: false,
       timeout: 120_000,
     },

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFoundOn404 } from '../not-found-on-404';
 import { listAdminUsers } from '@/lib/api/admin';
 import { PeopleTable } from './people-table';
 import styles from '../admin.module.css';
@@ -10,7 +11,7 @@ export default async function PeoplePage({
   searchParams: Promise<{ cursor?: string }>;
 }) {
   const { cursor } = await searchParams;
-  const page = await listAdminUsers(cursor);
+  const page = await listAdminUsers(cursor).catch(notFoundOn404);
 
   return (
     <section className={styles.section} aria-labelledby="people-list">
