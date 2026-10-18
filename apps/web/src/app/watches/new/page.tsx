@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/api/auth';
+import { getMeOverview } from '@/lib/api/me';
+import { quotaLabel } from '@/lib/domain/watch-quota';
 import { readSessionToken } from '@/lib/auth/session';
 import { NewWatchForm } from './new-watch-form';
 
@@ -15,5 +17,11 @@ export default async function NewWatchPage() {
   }
 
   const user = await getCurrentUser().catch(() => null);
-  return <NewWatchForm initialOrigin={user?.homeCity ?? null} />;
+  const overview = await getMeOverview().catch(() => null);
+  return (
+    <NewWatchForm
+      initialOrigin={user?.homeCity ?? null}
+      quota={overview ? quotaLabel(overview.watchQuota) : null}
+    />
+  );
 }

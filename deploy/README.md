@@ -129,6 +129,24 @@ crontab -e                    # e acrescente:
 com nome `gdrive`) e preencha `BACKUP_RCLONE_REMOTE=gdrive:flightwatch`. Rode
 o `restore-test.sh` uma vez por mês e depois de toda mudança de banco.
 
+## 8. Acesso por convite e o primeiro admin (SPEC-043)
+
+Com `INVITE_REQUIRED=true` (já no modelo de `.env.production`), só cria conta
+quem tem uma chave de convite. A primeira chave é a sua, gerada pelo terminal:
+
+```bash
+# 1. chave para o seu e-mail (aparece só aqui; vale INVITE_TTL_DAYS dias)
+deploy/bin/admin.sh invite --email voce@exemplo.com
+# 2. abra o link impresso e crie a conta
+# 3. torne a conta admin (único jeito: não existe caminho pelo site)
+deploy/bin/admin.sh promote --email voce@exemplo.com
+```
+
+Daí em diante, as chaves saem pelo site em `/admin/convites` (e a cota e a
+suspensão das pessoas em `/admin/pessoas`). `admin.sh demote --email …` tira o
+papel. Para subir **sem** exigir chave, ponha `INVITE_REQUIRED=false` e
+reinicie a `api` (nada é apagado).
+
 ## Dia a dia
 
 | Quero…                         | Comando                                                                 |

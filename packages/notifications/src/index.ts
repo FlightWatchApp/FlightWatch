@@ -7,3 +7,4 @@ export * from './simulated/in-memory-email-sender.js';
 export * from './simulated/file-outbox-email-sender.js';
 export * from './resend/resend-email-sender.js';
 export * from './factory.js';
+export * from './email/invite-email-template.js';

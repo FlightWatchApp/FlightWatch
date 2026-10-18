@@ -7,6 +7,15 @@ import { resolve } from 'node:path';
  */
 export const PORTS = { api: 3300, web: 3400, metrics: [9301, 9302, 9303, 9304, 9305] } as const;
 
+/**
+ * SPEC-043: segunda API + segundo web, no mesmo banco e nos mesmos workers, com
+ * INVITE_REQUIRED=true e cota mensal de 2. A pilha principal fica sem convite
+ * (o cadastro dos outros fluxos não muda).
+ */
+export const INVITE_PORTS = { api: 3310, web: 3410, metrics: 9306 } as const;
+export const INVITE_WEB_URL = `http://127.0.0.1:${INVITE_PORTS.web}`;
+export const INVITE_API_URL = `http://127.0.0.1:${INVITE_PORTS.api}`;
+
 export const WEB_URL = `http://127.0.0.1:${PORTS.web}`;
 export const API_URL = `http://127.0.0.1:${PORTS.api}`;
 

@@ -2,7 +2,10 @@
 
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/api/auth';
+import { getMeOverview } from '@/lib/api/me';
+import { quotaLabel } from '@/lib/domain/watch-quota';
 import { ApiError } from '@/lib/api/client';
+import { describeWatchCreateError } from '@/lib/api/watch-errors';
 import {
   getWatch,
   type CreateWatchInput,
@@ -57,6 +60,7 @@ export async function createWatchAction(
       return {
         success: false,
         error:
+          describeWatchCreateError(error) ??
           ERROR_MESSAGES[error.code ?? ''] ??
           'Não foi possível criar o monitoramento. Tente novamente.',
       };
@@ -75,6 +79,15 @@ export async function previewWatchAction(
 ): Promise<WatchPreviewResponse | null> {
   try {
     return await previewWatch(input);
+  } catch {
+    return null;
+  }
+}
+
+/** SPEC-043: "3 de 5 neste mês"; `null` sem limite (admin) ou se a consulta falhar. */
+export async function watchQuotaLabelAction(): Promise<string | null> {
+  try {
+    return quotaLabel((await getMeOverview()).watchQuota);
   } catch {
     return null;
   }

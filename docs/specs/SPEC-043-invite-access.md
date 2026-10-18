@@ -1,7 +1,7 @@
 # SPEC-043 — Acesso por convite, conta de admin e cota mensal de monitoramentos
 
-Status: approved — **Etapa 1** (owner, 2026-10-17). Etapa 2 (webhook de
-pagamento) continua rascunho, no fim deste arquivo.
+Status: implemented — **Etapa 1** (aprovada pelo owner em 2026-10-17; evidência
+no fim). Etapa 2 (webhook de pagamento) continua rascunho, no fim deste arquivo.
 Owner: Identity
 Dependências: SPEC-007/ADR-006 (cadastro e sessão), SPEC-008 (pausar Watch),
 SPEC-025 (rate limit por IP do cliente), SPEC-026 (redefinição de senha),
@@ -386,4 +386,65 @@ forma dos monitoramentos extras.
 
 ## Evidência de implementação
 
-Preenchida na implementação.
+Etapa 1, branch `feat/spec-043-invite-access` (2026-10-17). Gates rodados nesta
+máquina: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`
+(23 tarefas, incluindo os e2e de API e as integrações com PostgreSQL real via
+Testcontainers), `pnpm build`, `pnpm check:design`, `pnpm test:e2e` (17 testes
+Playwright, o antigo conjunto sem mudança + o novo) e `docker build` dos alvos
+`api` e `web`.
+
+| AC      | Onde está provado                                                                                                                                                                                           |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-1, 2 | `apps/api/src/auth/invite-access.e2e.spec.ts` (sem chave, errada, vencida, revogada, usada, outro e-mail; mesma mensagem; e-mail cadastrado não vaza)                                                       |
+| AC-3    | `packages/database/src/access-repository.integration.test.ts` e o e2e HTTP acima (duas requisições simultâneas, uma conta)                                                                                  |
+| AC-4    | e2e acima (`access_invites` e `admin_audit_log` não contêm a chave) e `apps/api/src/admin/admin.e2e.spec.ts`                                                                                                |
+| AC-5    | `pnpm test:e2e`: o conjunto antigo roda na pilha com `INVITE_REQUIRED` desligado, sem mudança                                                                                                               |
+| AC-6, 7 | `apps/api/src/admin/admin.e2e.spec.ts` (404 sem sessão e para `USER` em todas as rotas, rebaixado perde acesso, uma linha de auditoria por ação) e `apps/e2e/tests/invite-access.spec.ts` (404 em `/admin`) |
+| AC-8, 9 | `invite-access.e2e.spec.ts` (6ª recusada, cancelar não libera, mês seguinte, cota própria, admin sem cota, 1 vaga/2 pedidos) + integração do repositório                                                    |
+| AC-10   | `admin.e2e.spec.ts` e o Playwright (suspender pausa os Watches, apaga sessões, login `ACCESS_SUSPENDED`; reativar não retoma)                                                                               |
+| AC-11   | Playwright: o link do e-mail preenche e-mail e chave e a barra fica sem `#`; o fragmento nunca vai ao servidor do web                                                                                       |
+| AC-12   | `invite-access.e2e.spec.ts` e `apps/api/src/me/me.e2e.spec.ts` (`watchQuota`, `limit: null` para admin)                                                                                                     |
+
+Código: domínio `packages/domain/src/access/`; migração
+`20261017120000_invite_access` (gerada por `prisma migrate diff` contra as
+migrações anteriores); repositório `packages/database/src/access-repository.ts`;
+API `apps/api/src/admin/` e `apps/api/src/cli/`; web `apps/web/src/app/admin/`.
+
+### Onde a implementação decidiu além do texto da spec
+
+Nenhum comportamento aprovado foi trocado; estes pontos eram lacunas ou
+detalhes, e ficam registrados aqui para o owner confirmar:
+
+- **`AdminGuard` é autossuficiente** (valida a sessão e lê o papel): sem sessão
+  também responde 404, em vez de 401 do `SessionAuthGuard`. Assim a existência
+  das rotas não aparece nem para anônimos.
+- **Sessão de conta suspensa** é recusada também em `validateSession` (401
+  `UNAUTHENTICATED`), além de apagadas na suspensão — defesa em profundidade;
+  `ACCESS_SUSPENDED` em `createWatch` fica como segunda barreira.
+- **Admin não pode ser suspenso** (`400 INVALID_ADMIN_INPUT`): suspender o único
+  admin trancaria a administração.
+- **Métrica `access_invites_total`**: `source` ganhou o valor `web` para
+  `redeemed` e `rejected_*` (o cadastro não é nem `admin` nem `cli`). O comando
+  no servidor é um processo curto, sem listener de métricas: registra o evento
+  `admin_cli_*` no log (só ids) e a linha em `admin_audit_log`; o contador
+  `source="cli"` não existe.
+- **Comando `invite`** só imprime a chave e o link; não envia e-mail (é o plano B
+  com o site fora).
+- **Exclusão de conta (SPEC-027)** anonimiza também o `email` da chave usada
+  (`AccessInvite`), para o e-mail não sobrar na tabela.
+- **Cota na tela**: "3 de 5 neste mês" aparece no modal e no formulário de criar
+  monitoramento e no painel de monitoramentos ativos (`/v1/me/overview`).
+- **E2E**: a pilha ganhou uma segunda API/web (portas 3310/3410) com
+  `INVITE_REQUIRED=true` e `MONTHLY_WATCH_LIMIT=2`; o primeiro admin do teste
+  nasce pelo próprio comando `admin`, como no deploy.
+
+### Pendências
+
+- **Copy "grátis"**: o botão do cabeçalho e a landing ainda dizem "Criar conta
+  grátis". Com acesso pago isso pode induzir erro; o título do cadastro já muda
+  com `INVITE_REQUIRED`. Decisão de texto do owner.
+- **Política de Privacidade** atualizada (convite, suspensão, exclusão) e data
+  trocada para 17/10/2026 — alteração de política de privacidade pede revisão
+  humana (CLAUDE.md §21) antes de ir para produção. Os **Termos de Uso** não
+  foram tocados.
+- **Valor final da cota** (4 ou 5) segue em aberto; o padrão é 5.

@@ -14,7 +14,7 @@ export async function SiteHeader() {
         <Link href="/" className={styles.brand} aria-label="Flight Watch, página inicial">
           <Logo size="sm" animated inverse />
         </Link>
-        <MainNav userEmail={user?.email ?? null} />
+        <MainNav userEmail={user?.email ?? null} isAdmin={user?.role === 'ADMIN'} />
       </div>
     </header>
   );

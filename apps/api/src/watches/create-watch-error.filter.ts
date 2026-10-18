@@ -6,6 +6,10 @@ import { CreateWatchError } from '@flight-watch/contracts';
 export class CreateWatchErrorFilter implements ExceptionFilter {
   catch(exception: CreateWatchError, host: ArgumentsHost): void {
     const reply = host.switchToHttp().getResponse<FastifyReply>();
-    reply.status(exception.status).send({ code: exception.errorCode, message: exception.message });
+    reply.status(exception.status).send({
+      code: exception.errorCode,
+      message: exception.message,
+      ...(exception.details ? { details: exception.details } : {}),
+    });
   }
 }

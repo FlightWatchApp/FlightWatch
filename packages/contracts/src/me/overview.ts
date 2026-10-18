@@ -18,7 +18,17 @@ export type UpdateMeResponse = z.infer<typeof updateMeResponseSchema>;
  * chamada, só de banco e cache (nunca a fonte de preços). Só números que o
  * sistema sabe: nada de compra nem economia realizada.
  */
+/** SPEC-043: cota mensal de monitoramentos criados; `limit: null` = sem limite (admin). */
+export const watchQuotaSchema = z.object({
+  used: z.number().int(),
+  limit: z.number().int().nullable(),
+  /** Quando a cota volta (1º dia do mês seguinte, 00:00 em America/Campo_Grande), em UTC. */
+  resetsAt: z.string(),
+});
+export type WatchQuota = z.infer<typeof watchQuotaSchema>;
+
 export const meOverviewResponseSchema = z.object({
+  watchQuota: watchQuotaSchema,
   homeCity: cityRefSchema.nullable(),
   /** Watches `ACTIVE`. */
   activeCount: z.number().int(),

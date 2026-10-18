@@ -21,6 +21,8 @@ export const registerRequestSchema = z
     timezone: z.string().trim().min(1),
     // SPEC-041: token do Cloudflare Turnstile; exigido pela API só com o captcha ligado.
     captchaToken: captchaTokenSchema.optional(),
+    // SPEC-043: chave de convite; exigida pela API só com INVITE_REQUIRED=true.
+    inviteCode: z.string().max(64).optional(),
   })
   .strict();
 
@@ -28,3 +30,7 @@ export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
 export const registerResponseSchema = authSessionResponseSchema;
 export type RegisterResponse = AuthSessionResponse;
+
+/** SPEC-043: `GET /v1/auth/registration` — o web decide se mostra o campo da chave. */
+export const registrationInfoResponseSchema = z.object({ inviteRequired: z.boolean() });
+export type RegistrationInfoResponse = z.infer<typeof registrationInfoResponseSchema>;

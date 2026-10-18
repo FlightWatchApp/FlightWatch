@@ -172,3 +172,8 @@
 .searchButton {
   align-self: flex-start;
 }
+
+.quota {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}

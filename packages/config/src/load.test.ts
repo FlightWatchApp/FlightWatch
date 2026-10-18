@@ -243,6 +243,9 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       ROUTE_PAGE_MONTHS: 3,
       ROUTE_PAGE_RATE_LIMIT_MAX: 60,
       ALERT_LOW_PRICE_DROP_PERCENT: 15,
+      INVITE_REQUIRED: false,
+      INVITE_TTL_DAYS: 30,
+      MONTHLY_WATCH_LIMIT: 5,
       ROUTE_SITEMAP_ORIGIN_CITIES: [],
       ROUTE_SITEMAP_TTL_MINUTES: 360,
     });

@@ -14,6 +14,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIALS: 'Email ou senha incorretos.',
   ACCOUNT_LOCKED:
     'Conta temporariamente bloqueada por excesso de tentativas. Tente novamente mais tarde.',
+  ACCESS_SUSPENDED: 'Seu acesso está suspenso. Fale com a gente em contato@flightwatch.com.br.',
   INVALID_AUTH_INPUT: 'Alguns dados não são válidos — confira email e senha.',
   RATE_LIMITED: 'Muitas tentativas em pouco tempo. Espere alguns minutos e tente de novo.',
   CAPTCHA_REQUIRED: 'Confirme que você não é um robô e tente de novo.',
