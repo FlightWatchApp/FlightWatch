@@ -24,7 +24,8 @@ Para entender as regras do sistema:
 5. [`EVALS.md`](./EVALS.md) — cenários objetivos de correção, custo e resiliência.
 6. [`QUALITY-GATES.md`](./QUALITY-GATES.md) — condições para aceitar e publicar mudanças.
 7. [`specs/`](./specs/) — contrato de cada funcionalidade.
-8. [`../AGENTS.md`](../AGENTS.md) e [`../CLAUDE.md`](../CLAUDE.md) — regras para agentes de IA.
+8. [`../AGENTS.md`](../AGENTS.md) — regras para agentes de IA, lidas em toda sessão (o `CLAUDE.md` só o importa).
+9. [`ENGINEERING.md`](./ENGINEERING.md) — manual de engenharia, consultado por seção (antigo `CLAUDE.md`, mesma numeração).
 
 ## Regra de precedência
 
@@ -37,7 +38,7 @@ Em caso de divergência:
 5. `PRODUCT.md` rege escopo e objetivos de negócio.
 
 Nenhuma divergência é resolvida silenciosamente. A ordem completa, incluindo
-legislação e contratos externos, está em `CLAUDE.md` §0.2.
+legislação e contratos externos, está em `ENGINEERING.md` §0.2.
 
 ## Mapa
 
@@ -45,6 +46,7 @@ legislação e contratos externos, está em `CLAUDE.md` §0.2.
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `PRODUCT.md`, `DOMAIN.md`, `ARCHITECTURE.md` | fundação do produto e do sistema                                                                                       |
 | `GETTING-STARTED.md`, `WEB.md`, `API.md`     | onboarding, site e contratos HTTP                                                                                      |
+| `ENGINEERING.md`                             | manual de engenharia (antigo `CLAUDE.md`): estado, apps, env, observabilidade, hurdles, patterns, processo             |
 | `CONTRIBUTING.md`, `OPERATIONS.md`           | fluxo de contribuição e operação da stack                                                                              |
 | `PROJECT-STATUS.md`                          | retrato atual, limites e decisões antes de produção                                                                    |
 | `EVALS.md`, `QUALITY-GATES.md`               | catálogo de evals de domínio e gates de PR/release                                                                     |
@@ -57,7 +59,7 @@ legislação e contratos externos, está em `CLAUDE.md` §0.2.
 | `design-refactor/`                           | refactor web v2: specs de detalhe, decisões (`09-decisoes.md`), progresso, tasks e relatórios de eval                  |
 | `reviews/`                                   | code reviews independentes, citados pelas specs que corrigiram seus findings                                           |
 
-Status atual do projeto, bloqueios e decisões pendentes: `CLAUDE.md` §1.
+Status atual do projeto, bloqueios e decisões pendentes: `ENGINEERING.md` §1.
 
 ## Registros históricos
 

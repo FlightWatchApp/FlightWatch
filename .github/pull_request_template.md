@@ -30,4 +30,4 @@
 
 ## Riscos e pendências
 
-<!-- O que fica para depois, riscos conhecidos e docs (spec, ADR, CLAUDE.md, .env.example) atualizados. -->
+<!-- O que fica para depois, riscos conhecidos e docs (spec, ADR, AGENTS.md, docs/ENGINEERING.md, .env.example) atualizados. -->

@@ -1,8 +1,9 @@
 # Contribuindo com o Flight Watch
 
 Este projeto prioriza mudanças pequenas, rastreáveis e testáveis. As regras
-obrigatórias estão em [`AGENTS.md`](../AGENTS.md) e [`CLAUDE.md`](../CLAUDE.md);
-este guia resume o fluxo para uma pessoa colaboradora.
+obrigatórias estão em [`AGENTS.md`](../AGENTS.md) (o `CLAUDE.md` só o importa) e a
+referência completa em [`ENGINEERING.md`](./ENGINEERING.md); este guia resume o
+fluxo para uma pessoa colaboradora.
 
 ## Antes de codificar
 
