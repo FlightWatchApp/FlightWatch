@@ -36,7 +36,7 @@ jobs:
           if [ -n "$ANTHROPIC_API_KEY" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"
           else echo "Revisão por IA desligada: ANTHROPIC_API_KEY não cadastrada."; fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.key.outputs.enabled == 'true'
         with:
           fetch-depth: 1
