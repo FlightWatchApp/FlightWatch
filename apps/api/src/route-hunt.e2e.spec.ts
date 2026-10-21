@@ -102,6 +102,22 @@ const VALID: Record<string, unknown> = {
   notificationChannelId: '00000000-0000-0000-0000-000000000000',
 };
 
+/**
+ * Campos opcionais sem um valor válido simples (dependem de outro pedido, como
+ * `cursor`, ou de outro campo, como `returnDate`): ficam fora da base válida e
+ * só aparecem nas variações hostis.
+ */
+const OPTIONAL_WITHOUT_VALUE = new Set([
+  'cursor',
+  'returnDate',
+  'tripLengthDays',
+  'captchaToken',
+  'inviteCode',
+  'dealType',
+  'sort',
+  'scope',
+]);
+
 /** Campos de cada schema exportado cujo nome casa com `pattern` (desembrulha refine/transform). */
 function contractFields(pattern: RegExp): string[][] {
   const lists: string[][] = [];
@@ -268,6 +284,20 @@ describe('caça a erro 500 em todas as rotas da API', () => {
     expect(routes).toContainEqual({ method: 'POST', url: '/v1/auth/register' });
     expect(contractFields(/QuerySchema$/).length).toBeGreaterThan(5);
     expect(contractFields(/(Request|Body|Input)Schema$/).length).toBeGreaterThan(5);
+  });
+
+  it('todo campo de contrato tem valor válido ou é opcional declarado', () => {
+    // Campo novo sem valor em VALID deixa a base do contrato inválida: a caça só
+    // veria 400 e não chegaria ao código. Acrescente em VALID ou em
+    // OPTIONAL_WITHOUT_VALUE (apps/api/AGENTS.md, receita da rota nova).
+    const fields = [
+      ...contractFields(/QuerySchema$/),
+      ...contractFields(/(Request|Body|Input)Schema$/),
+    ].flat();
+    const missing = [...new Set(fields)].filter(
+      (field) => !(field in VALID) && !OPTIONAL_WITHOUT_VALUE.has(field),
+    );
+    expect(missing).toEqual([]);
   });
 
   it('nenhuma rota responde 500 nem vaza detalhe interno, para nenhuma identidade', async () => {

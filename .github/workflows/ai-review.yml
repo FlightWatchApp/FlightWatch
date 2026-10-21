@@ -1,0 +1,75 @@
+# Revisão por IA em todo PR (Claude Code), além dos gates do ci.yml.
+#
+# DESLIGADA até o owner cadastrar o segredo ANTHROPIC_API_KEY no repositório
+# (Settings → Secrets and variables → Actions). Sem o segredo, o job termina
+# em segundos sem fazer nada. Cada revisão consome créditos da API da Anthropic:
+# ligar é decisão de custo do owner (AGENTS.md › Autonomia e aprovação humana).
+# Exemplo oficial: https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md
+#
+# A revisão comenta; não aprova, não bloqueia e não faz merge.
+name: Revisão por IA
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Sem rascunho e sem PR do Dependabot (o CI já confere as atualizações).
+    if: github.event.pull_request.draft == false && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Segredo configurado?
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else echo "Revisão por IA desligada: ANTHROPIC_API_KEY não cadastrada."; fi
+
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.enabled == 'true'
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.key.outputs.enabled == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Revise este pull request do Flight Watch. O branch do PR já está no
+            diretório atual. Antes de comentar, leia o AGENTS.md da raiz e o
+            AGENTS.md de cada pasta tocada pelo PR (apps/api, apps/web,
+            packages/contracts, packages/database), e a spec citada no PR.
+
+            Procure, nesta ordem:
+            1. bugs: comportamento errado, erro não tratado que vira 500,
+               concorrência, idempotência, dinheiro em float, data e fuso;
+            2. segurança e privacidade: autorização por dono do recurso, dado
+               pessoal ou segredo em log, métrica, resposta ou fixture;
+            3. quebra das regras de ouro e das receitas dos AGENTS.md;
+            4. teste faltando para o comportamento novo ou para o bug corrigido;
+            5. divergência entre o código e a spec.
+
+            Não comente estilo que o lint ou o Prettier já conferem. Só aponte
+            problema que você consegue justificar com o código; se não achar
+            nada relevante, diga isso em um comentário curto. Escreva em
+            português do Brasil.
+            Use `gh pr comment` para o resumo e
+            `mcp__github_inline_comment__create_inline_comment` (com
+            `confirmed: true`) para cada problema numa linha específica.
+            Só publique comentários no GitHub; não responda em mensagens.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"

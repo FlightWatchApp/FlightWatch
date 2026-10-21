@@ -1140,6 +1140,11 @@ Os comandos exatos, por tipo de mudança, estão em [`AGENTS.md`](../AGENTS.md)
 `pnpm audit --prod --audit-level=high`, `pnpm lint`, `pnpm typecheck`, `pnpm test`,
 `pnpm check:design`, `pnpm build`, o e2e e o build das imagens Docker.
 
+Revisão por IA (`.github/workflows/ai-review.yml`): o Claude Code comenta em
+todo PR que não é rascunho, seguindo o `AGENTS.md` e os `AGENTS.md` das pastas
+tocadas. Comenta, não aprova nem bloqueia. Fica desligada até o owner cadastrar
+o segredo `ANTHROPIC_API_KEY` (custo por revisão).
+
 ## 19. Checklist pós-implementação
 
 ### Escopo e comportamento

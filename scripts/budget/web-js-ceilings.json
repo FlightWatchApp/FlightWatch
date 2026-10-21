@@ -1,0 +1,29 @@
+{
+  "_comentario": "Teto de JS (KB, gzip) no primeiro carregamento de cada página. Gerado por check-web-js.mjs --update; o PR que reduz o JS baixa o teto; subir exige decisão explicada no PR.",
+  "rotas": {
+    "/": 159,
+    "/_global-error": 134,
+    "/_not-found": 150,
+    "/account": 151,
+    "/account/deleted": 150,
+    "/admin": 150,
+    "/admin/convites": 152,
+    "/admin/pessoas": 152,
+    "/forgot-password": 152,
+    "/login": 152,
+    "/opportunities": 162,
+    "/privacidade": 150,
+    "/register": 153,
+    "/reset-password": 151,
+    "/search": 154,
+    "/search/[id]": 153,
+    "/termos": 150,
+    "/transparencia": 150,
+    "/verify-email": 150,
+    "/voos/[rota]": 155,
+    "/voos/[rota]/[data]": 159,
+    "/watches": 153,
+    "/watches/[id]": 157,
+    "/watches/new": 151
+  }
+}
