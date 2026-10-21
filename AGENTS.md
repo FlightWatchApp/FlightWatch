@@ -91,8 +91,11 @@ ainda; o agente é a garantia.
 3. Branch nova a partir da `main`. Uma spec (ou uma correção) por PR.
 4. Teste que falha pelo motivo certo → menor código que passa → refatorar.
    Bug sempre ganha teste de regressão.
-5. Mudou tela? Abrir no navegador (desktop e celular) e **olhar**; anexar o
-   print ao PR.
+5. Mudou tela? `pnpm screenshot /rota [/outra]` (com `--login` e
+   `SCREENSHOT_EMAIL`/`SCREENSHOT_PASSWORD` para páginas logadas): tira o print
+   em desktop e celular em `.local/screenshots/` e falha se houver erro no
+   console, rolagem horizontal ou algo cobrindo o cabeçalho. Depois **olhar**
+   os prints e anexar ao PR.
 6. Rodar "Antes de terminar". Revisar o diff inteiro.
 7. Atualizar a spec (evidência de implementação) e, se o mapa, as variáveis ou
    as regras mudaram, este arquivo ou `docs/ENGINEERING.md`.
@@ -103,6 +106,7 @@ ainda; o agente é a garantia.
 pnpm format:check && pnpm lint && pnpm typecheck   # sempre
 pnpm test                 # sempre que mexer em código (inclui integração: precisa de Docker)
 pnpm check:design         # se mexer em apps/web
+pnpm screenshot /rota     # se mexer em tela (precisa do site rodando; ver "Como trabalhar")
 pnpm build                # se mexer em web, contratos ou config
 pnpm test:e2e             # se mexer em jornada do usuário (cadastro, monitoramento, compra, admin)
 docker build --target web -t fw-web . && docker build --target api -t fw-api .
