@@ -66,20 +66,21 @@ Testes ficam junto do código: `*.test.ts` (unitário), `*.integration.test.ts`
 Cada regra diz o que a garante. "Revisão" = nenhuma verificação automática
 ainda; o agente é a garantia.
 
-| Regra                                                                                                   | Garantida por                                          |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Dinheiro em inteiro na menor unidade + moeda; nunca float; sem oferta nunca é zero                      | testes de domínio; revisão                             |
-| `Watch` (intenção da pessoa) ≠ `SearchTarget` (busca compartilhada); buscas iguais viram um só target   | `fingerprint @unique` no banco + testes                |
-| `PriceObservation` nunca é alterada; correção é um fato novo                                            | revisão                                                |
-| Todo efeito repetível tem chave idempotente única (execução, alerta, entrega)                           | `@unique` no schema + testes de replay                 |
-| Efeito externo nasce de outbox na mesma transação do dado                                               | revisão + testes de integração                         |
-| `packages/domain` não importa framework, ORM, fila ou SDK                                               | `package.json` do domain sem dependências (pnpm barra) |
-| Configuração só por `packages/config`; toda chave do `.env.example` é lida por um schema                | `env-example.test.ts`                                  |
-| Log e métrica sem e-mail, senha, token, chave de convite ou payload cru                                 | redação no logger (`observability`); revisão           |
-| `/metrics` nunca na porta pública; `/health` sem detalhe interno                                        | revisão                                                |
-| Texto do site: "menor preço observado", nunca "menor preço do mercado"/"garantido"                      | `pnpm check:design` (`check-copy`)                     |
-| Cor só por token; link de compra só pelo `PurchaseButton`                                               | `pnpm check:design`                                    |
-| Instante no banco em UTC; regra humana (cota do mês, cron) em `America/Campo_Grande`; relógio injetável | testes de domínio; revisão                             |
+| Regra                                                                                                   | Garantida por                                            |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Dinheiro em inteiro na menor unidade + moeda; nunca float; sem oferta nunca é zero                      | testes de domínio; revisão                               |
+| `Watch` (intenção da pessoa) ≠ `SearchTarget` (busca compartilhada); buscas iguais viram um só target   | `fingerprint @unique` no banco + testes                  |
+| `PriceObservation` nunca é alterada; correção é um fato novo                                            | revisão                                                  |
+| Todo efeito repetível tem chave idempotente única (execução, alerta, entrega)                           | `@unique` no schema + testes de replay                   |
+| Efeito externo nasce de outbox na mesma transação do dado                                               | revisão + testes de integração                           |
+| `packages/domain` não importa framework, ORM, fila ou SDK                                               | `package.json` do domain sem dependências (pnpm barra)   |
+| Configuração só por `packages/config`; toda chave do `.env.example` é lida por um schema                | `env-example.test.ts`                                    |
+| Log e métrica sem e-mail, senha, token, chave de convite ou payload cru                                 | redação no logger (`observability`); revisão             |
+| Nenhuma rota responde 500 a entrada inválida nem vaza stack, SQL ou Prisma no erro                      | `route-hunt.e2e.spec.ts` (todas as rotas, 3 identidades) |
+| `/metrics` nunca na porta pública; `/health` sem detalhe interno                                        | `route-hunt.e2e.spec.ts`                                 |
+| Texto do site: "menor preço observado", nunca "menor preço do mercado"/"garantido"                      | `pnpm check:design` (`check-copy`)                       |
+| Cor só por token; link de compra só pelo `PurchaseButton`                                               | `pnpm check:design`                                      |
+| Instante no banco em UTC; regra humana (cota do mês, cron) em `America/Campo_Grande`; relógio injetável | testes de domínio; revisão                               |
 
 ## Como trabalhar
 

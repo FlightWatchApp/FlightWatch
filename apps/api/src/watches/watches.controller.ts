@@ -24,6 +24,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { CurrentCorrelationId } from '../observability/correlation.js';
+import { SearchErrorFilter } from '../searches/search-error.filter.js';
 import { SearchThrottlerGuard } from '../searches/search-throttler.guard.js';
 import { AUTH_THROTTLER, SEARCH_THROTTLER } from '../throttling/throttling.module.js';
 import { CreateWatchErrorFilter } from './create-watch-error.filter.js';
@@ -51,8 +52,10 @@ export class WatchesController {
   // SPEC-039: antes de ':id' para a leitura ficar óbvia (o roteador já dá
   // prioridade ao caminho fixo).
   // Pode consultar o calendário da fonte: limite `pages`, como a página da rota.
+  // O guard sinaliza o excesso com SearchError: sem o filtro dele, virava 500.
   @Get('preview')
   @UseGuards(SearchThrottlerGuard)
+  @UseFilters(SearchErrorFilter)
   @SkipThrottle({ [AUTH_THROTTLER]: true, [SEARCH_THROTTLER]: true })
   async preview(
     @Query(WatchPreviewQueryPipe) query: WatchPreviewQuery,
