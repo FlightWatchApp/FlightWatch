@@ -18,6 +18,76 @@ export default tseslint.config(
     },
   },
   {
+    // Fronteiras entre pacotes (AGENTS.md › Regras de ouro): cada pacote expõe uma
+    // superfície pública pequena; ninguém importa arquivo interno de outro.
+    files: ['apps/*/src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts', 'packages/*/prisma/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@flight-watch/*/*'],
+              message: 'Importe só a entrada pública do pacote (@flight-watch/<pacote>).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Domínio e contratos não conhecem framework, banco, fila nem interface
+    // (CLAUDE.md §4.1, hoje docs/ENGINEERING.md §4.1).
+    files: ['packages/domain/src/**/*.ts', 'packages/contracts/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@flight-watch/*/*'],
+              message: 'Importe só a entrada pública do pacote (@flight-watch/<pacote>).',
+            },
+            {
+              group: [
+                '@nestjs/*',
+                '@prisma/*',
+                'prisma',
+                'bullmq',
+                'ioredis',
+                'react',
+                'react-dom',
+                'next',
+                'next/*',
+                '@flight-watch/database',
+                '@flight-watch/queue',
+                '@flight-watch/providers',
+                '@flight-watch/notifications',
+                '@flight-watch/observability',
+                '@flight-watch/config',
+              ],
+              message:
+                'Domínio e contratos são puros: sem framework, banco, fila, interface ou adapter.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Logs só pelo logger estruturado (logEvent, com redação de dados pessoais).
+    // console fica para testes, scripts e o comando `admin` do servidor.
+    files: ['apps/*/src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      '**/__benchmarks__/**',
+      'apps/api/src/cli/**',
+      'packages/observability/src/logger.ts',
+    ],
+    rules: { 'no-console': 'error' },
+  },
+  {
     // NestJS: classes injetáveis usadas só como tipo de parâmetro de construtor
     // (ex.: `constructor(private readonly x: FooService)`) ainda precisam de um
     // import de VALOR — o Nest resolve a injeção em tempo de execução lendo

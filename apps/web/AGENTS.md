@@ -39,7 +39,9 @@ visual: `docs/DESIGN-SYSTEM.md`.
 8. Movimento curto e com significado; movimento reduzido termina no estado final.
 9. Variável lida no build vai no `env` do `build` (`turbo.json`) e como `ARG` no
    `Dockerfile` (H15); variável `NEXT_PUBLIC_*` é pública por definição.
-10. `pnpm check:design` é catraca: baixar o teto que melhorou, nunca subir sem
-    decisão.
+10. `pnpm check:design` e `pnpm check:web-js` (depois do `pnpm build`) são
+    catracas: baixar o teto que melhorou (`check:web-js --update`), nunca subir
+    sem decisão explicada no PR. Biblioteca pesada só para uma tela vai em
+    import dinâmico (como o mapa), fora do primeiro carregamento.
 11. Mapa (Leaflet): só pelos componentes de `components/route` ou das
     oportunidades, que já trazem o CSS e o isolamento sob o cabeçalho.
