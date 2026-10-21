@@ -116,21 +116,25 @@ class CountingProvider implements FlightProvider {
     if (query.destinationIata === 'LIS' || this.emptyCalendarFor.has(query.destinationIata)) {
       return [];
     }
-    if (query.month !== MONTHS[0]) {
-      // Meses seguintes: muitas datas a R$ 1.000 (referência para a promoção).
-      return Array.from({ length: 20 }, (_, i) => ({
-        date: `${query.month}-${String(i + 1).padStart(2, '0')}`,
-        amountMinor: 100_000,
-        stops: 0,
-        observedAt: hoursAgo(2),
-      }));
-    }
-    return [
+    // As datas especiais (de ontem a daqui a 14 dias) valem no mês em que caírem:
+    // perto da virada do mês, parte delas já está no mês seguinte.
+    const special = [
       { date: isoDate(-1), amountMinor: 50_000, stops: 0, observedAt: hoursAgo(2) },
       { date: isoDate(10), amountMinor: 100_000, stops: 0, observedAt: hoursAgo(2) },
       { date: isoDate(12), amountMinor: 80_000, stops: 1, observedAt: hoursAgo(2) },
       { date: isoDate(14), amountMinor: 10_000, stops: 0, observedAt: hoursAgo(80) },
     ].filter((day) => day.date.startsWith(query.month));
+    if (query.month === MONTHS[0]) return special;
+    // Meses seguintes: muitas datas a R$ 1.000 (referência para a promoção), fora
+    // da janela das especiais — senão a data "sem preço" (daqui a 11 dias) ganharia
+    // preço quando cai no mês seguinte.
+    const filler = Array.from({ length: 20 }, (_, i) => ({
+      date: `${query.month}-${String(i + 1).padStart(2, '0')}`,
+      amountMinor: 100_000,
+      stops: 0,
+      observedAt: hoursAgo(2),
+    })).filter((day) => day.date < isoDate(-1) || day.date > isoDate(14));
+    return [...special, ...filler];
   }
 
   detailsCalls: string[] = [];
