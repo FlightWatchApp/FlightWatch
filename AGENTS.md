@@ -23,7 +23,7 @@ com cota mensal de monitoramentos (SPEC-043).
 | regra de negócio, estados, entidades   | `docs/DOMAIN.md`                                                              |
 | banco, filas, cache, processos         | `docs/ARCHITECTURE.md`, `docs/ENGINEERING.md` §6–§9                           |
 | variável de ambiente                   | `packages/config/src/processes.ts`, `.env.example`, `docs/ENGINEERING.md` §10 |
-| tela, componente, CSS, texto do site   | `docs/DESIGN-SYSTEM.md` e a seção "Web" abaixo                                |
+| tela, componente, CSS, texto do site   | `apps/web/AGENTS.md` e `docs/DESIGN-SYSTEM.md`                                |
 | logs, métricas, health                 | `docs/ENGINEERING.md` §11, ADR-007                                            |
 | deploy, servidor, backup               | `deploy/README.md`, SPEC-042                                                  |
 | estado do projeto, bloqueios, decisões | `docs/ENGINEERING.md` §1                                                      |
@@ -138,24 +138,17 @@ Orca, por exemplo).
 - Decisão só vale registrada no repositório (spec, ADR ou este arquivo), não em
   conversa.
 
-## Web (`apps/web`)
+## Regras por área
 
-1. Cor só por token de `apps/web/src/styles/tokens.css`; componentes de
-   `components/ui`.
-2. Em `*.module.css`, animação é `var(--keyframes-*)` ou `@keyframes` do próprio
-   módulo (o nome global some sem erro).
-3. Data e hora no cliente com fuso fixo (`DISPLAY_TIME_ZONE`); data de viagem em
-   UTC — formatar no fuso local quebra a hidratação.
-4. Link de compra só pelo `PurchaseButton`, sempre com `PurchaseNote` na página.
-5. Todo preço mostra a idade (`Freshness`); sem oferta é "—".
-6. Estados distintos: carregando, vazio, erro, desatualizado, sem oferta.
-7. Nenhum texto abaixo de 12 px; alvos ≥ 24 px (≥ 44 px no celular); sem
-   rolagem horizontal em 320 px. Teclado e foco visível funcionam.
-8. Movimento curto e com significado; movimento reduzido termina no estado final.
-9. Variável lida no build vai no `env` do `build` (`turbo.json`) e como `ARG` no
-   `Dockerfile` (H15).
-10. `pnpm check:design` é catraca: baixar o teto que melhorou, nunca subir sem
-    decisão.
+Cada área tem o seu `AGENTS.md`, com a receita do trabalho mais comum e as
+regras locais. Ler o da pasta antes de mexer nela:
+
+| Pasta                | Receita                                             |
+| -------------------- | --------------------------------------------------- |
+| `apps/api`           | rota nova (contrato, pipe, guards, filtro, teste)   |
+| `apps/web`           | página nova (dados, actions, estados, verificação)  |
+| `packages/contracts` | contrato novo (schema estrito, erros, exportação)   |
+| `packages/database`  | mudar o banco (migração aditiva) e repositório novo |
 
 ## Banco, integrações e segurança
 
@@ -196,7 +189,8 @@ para aquilo que foi aprovado, não para o próximo passo.
 - Editar migração já aplicada; acessar tabela de outro módulo contornando o repositório dele.
 - Alerta ou entrega sem chave idempotente; regra de alerta decidida por LLM.
 - Raspar site, copiar código, texto, marca ou imagem de outro produto
-  (inspiração em comportamento é permitida; asset de terceiro só com licença).
+  (inspiração em comportamento é permitida); recurso de terceiro (fonte,
+  imagem, dado) só com licença e listado em `ATTRIBUTION.md` no mesmo PR.
 - Expor `/metrics` publicamente; logar segredo, e-mail completo ou payload cru.
 - Refatoração ampla não pedida junto de uma feature.
 - Apagar ou sobrescrever trabalho local de outra pessoa.
