@@ -7,7 +7,8 @@
     "test": "echo 'E2E fora do gate padrão: rode pnpm test:e2e (precisa de PostgreSQL, Redis e dos pacotes compilados)'",
     "test:e2e": "node scripts/prepare.mjs && playwright test",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "@flight-watch/database": "workspace:*",
