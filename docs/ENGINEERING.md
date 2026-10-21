@@ -862,6 +862,20 @@ Campos proibidos ou redigidos: `password`, `passwordHash`, `token`, `tokenHash`,
 **Solução:** variável lida no build entra no `env` do `build` em `turbo.json` e como `ARG` no `Dockerfile` (SPEC-042).  
 **Prevenção:** variável nova do web: decidir se é de build ou de execução e documentar em §10.2.
 
+### H16 — Guard que sinaliza erro de domínio sem o filtro dele
+
+**Sintoma:** rota responde 500 quando o limite de pedidos estoura (ou outro guard recusa), em vez de 429/4xx.  
+**Causa:** o `SearchThrottlerGuard` lança `SearchError` (para manter o formato `{code, message}`), e só o `SearchErrorFilter` o transforma em resposta; reaproveitar o guard numa rota sem o filtro deixa o erro escapar (achado pela caça a erro 500 em `GET /v1/watches/preview`).  
+**Solução:** quem usa o guard registra o filtro (`@UseFilters(SearchErrorFilter)`).  
+**Prevenção:** `apps/api/src/route-hunt.e2e.spec.ts` bate em toda rota até passar dos limites.
+
+### H17 — Teste que depende do dia de hoje
+
+**Sintoma:** teste passa numa parte do mês e falha na outra (ou só na virada do ano), inclusive na `main` sem mudança nenhuma.  
+**Causa:** dado de teste com datas relativas a "hoje" (`hoje + 12 dias`) colocado num mês fixo (o corrente); perto do fim do mês a data cai no mês seguinte (visto em `routes.e2e.spec.ts`, 2026-10-21).  
+**Solução:** dado falso que segue a data para onde ela cair, ou relógio fixo.  
+**Prevenção:** teste com data relativa roda com o relógio simulado em datas de fronteira (dia 1, 15, 25, 31, 28/12, fevereiro): `vi.useFakeTimers({ toFake: ['Date'], now })` num `setupFiles` só da verificação.
+
 ## 14. Os 14 design patterns do projeto
 
 ### P01 — Modular Monolith

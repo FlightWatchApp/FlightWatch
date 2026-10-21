@@ -6,6 +6,8 @@ import { Test } from '@nestjs/testing';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { LOCAL_INTERNAL_API_SECRET } from '@flight-watch/config';
+import { CLIENT_IP_HEADER, INTERNAL_SECRET_HEADER } from '@flight-watch/contracts';
 import { type PrismaClient, TEST_PLACES, syncPlacesCatalog } from '@flight-watch/database';
 import { AppModule } from '../app.module.js';
 import { resetAffiliateConfigCache } from '../affiliate/affiliate-links.js';
@@ -1139,5 +1141,25 @@ describe('GET /v1/watches/preview (SPEC-039)', () => {
 
     const anonymous = await request(app.getHttpServer()).get(`/v1/watches/preview?${query}`);
     expect(anonymous.status).toBe(401);
+  });
+
+  // Regressão (achada pela caça a erro 500): o limite `pages` lança SearchError,
+  // e sem o SearchErrorFilter na rota o excesso virava 500 em vez de 429.
+  it('passar do limite de pedidos responde 429 RATE_LIMITED, nunca 500', async () => {
+    const { token } = await createVerifiedUserWithChannel();
+    const statuses = new Set<number>();
+    let limited: request.Response | undefined;
+    for (let attempt = 0; attempt < 80 && !limited; attempt += 1) {
+      const response = await request(app.getHttpServer())
+        .get(`/v1/watches/preview?${query}`)
+        .set(...authHeader(token))
+        .set(INTERNAL_SECRET_HEADER, LOCAL_INTERNAL_API_SECRET)
+        .set(CLIENT_IP_HEADER, '203.0.113.39');
+      statuses.add(response.status);
+      if (response.status !== 200) limited = response;
+    }
+    expect([...statuses]).not.toContain(500);
+    expect(limited?.status).toBe(429);
+    expect(limited?.body).toMatchObject({ code: 'RATE_LIMITED' });
   });
 });
