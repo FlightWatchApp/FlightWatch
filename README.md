@@ -302,7 +302,8 @@ observabilidade, riscos e pendências.
 
 O guia completo está em [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md). As
 regras obrigatórias para agentes e colaboradores estão em [`AGENTS.md`](./AGENTS.md)
-e [`CLAUDE.md`](./CLAUDE.md).
+(o `CLAUDE.md` só o importa); a referência de engenharia está em
+[`docs/ENGINEERING.md`](./docs/ENGINEERING.md).
 
 ## Estado, limites e próximos passos
 

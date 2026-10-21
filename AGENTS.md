@@ -1,188 +1,211 @@
-# AGENTS — Regras para desenvolvimento assistido por IA
+# AGENTS.md — Flight Watch
 
-Estas instruções se aplicam a agentes e pessoas que utilizem agentes neste repositório.
+Regras para agentes de IA (Claude Code, Codex, Orca…) e para quem trabalha com
+eles. É o único arquivo lido em **toda** sessão: curto de propósito. O resto
+está em `docs/` e é lido por seção, quando a tarefa pede (tabela abaixo).
 
-## 1. Fonte de verdade
+Idioma do produto, do código voltado ao usuário e da documentação: **português
+brasileiro**. Horário humano: `America/Campo_Grande`; banco, filas e logs: UTC.
 
-Antes de alterar código:
+## O produto
 
-1. ler a spec aplicável por inteiro (`docs/specs/`);
-2. ler `docs/DOMAIN.md`;
-3. ler ADRs relacionados (`docs/adr/`);
-4. localizar implementação e testes existentes;
-5. declarar lacunas ou conflitos antes de escolher comportamento.
+O Flight Watch observa o preço de passagens aéreas e avisa por e-mail quando
+cai. Fonte de preços: Travelpayouts Data API (cache, um preço por dia e por
+cidade — ADR-008). **Não** vende, reserva nem emite passagem; **não** raspa
+sites; **não** promete "o menor preço do mercado". Acesso por convite pago,
+com cota mensal de monitoramentos (SPEC-043).
 
-Não inventar requisitos. Quando a spec não cobrir uma decisão que afete contrato, dados, segurança, custo ou comportamento do usuário, interromper a implementação e solicitar decisão ou propor uma alteração documental explícita.
+## O que ler antes
 
-## 2. Unidade de trabalho
+| A tarefa toca…                         | Ler                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------- |
+| qualquer funcionalidade                | a spec dela em `docs/specs/` (inteira) e as ADRs citadas                      |
+| regra de negócio, estados, entidades   | `docs/DOMAIN.md`                                                              |
+| banco, filas, cache, processos         | `docs/ARCHITECTURE.md`, `docs/ENGINEERING.md` §6–§9                           |
+| variável de ambiente                   | `packages/config/src/processes.ts`, `.env.example`, `docs/ENGINEERING.md` §10 |
+| tela, componente, CSS, texto do site   | `docs/DESIGN-SYSTEM.md` e a seção "Web" abaixo                                |
+| logs, métricas, health                 | `docs/ENGINEERING.md` §11, ADR-007                                            |
+| deploy, servidor, backup               | `deploy/README.md`, SPEC-042                                                  |
+| estado do projeto, bloqueios, decisões | `docs/ENGINEERING.md` §1                                                      |
+| um erro estranho de build/teste        | `docs/ENGINEERING.md` §13 (H13–H15 são os mais comuns)                        |
 
-- Uma tarefa deve referenciar uma spec e critérios de aceitação.
-- Alterações devem ser pequenas, revisáveis e limitadas ao necessário.
-- Não realizar refatoração ampla junto de feature sem justificativa e cobertura.
-- Não mudar contrato público, schema persistente ou evento sem atualizar spec e testes.
-- Não adicionar dependência sem justificar necessidade, licença, manutenção e impacto.
+Citações antigas a "`CLAUDE.md` §N" (em specs, ADRs e comentários de código)
+valem para **`docs/ENGINEERING.md` §N** — a numeração foi mantida.
 
-## 3. Fluxo obrigatório
+## Mapa do repositório
 
-1. Resumir o comportamento requerido e riscos.
-2. Mapear arquivos permitidos e afetados.
-3. Criar ou ajustar testes que falhem pelo motivo esperado.
-4. Implementar o mínimo necessário.
-5. Executar os gates aplicáveis.
-6. Revisar diff, segurança, observabilidade e migração.
-7. Informar resultados reais; nunca alegar teste não executado.
+```text
+apps/
+  web/                  Next.js 16 (App Router), BFF: fala só com a API, nunca com o provedor
+  api/                  NestJS + Fastify: HTTP, auth, admin (SPEC-043), cotas; src/cli/ = comando `admin`
+  scheduler/            escolhe SearchTargets vencidos, sincroniza catálogos (lugares, companhias)
+  price-worker/         consulta o provedor, grava PriceObservation (imutável)
+  alert-worker/         avalia regras (LOW_PRICE, SPEC-039), cria AlertEvent
+  notification-worker/  entrega e-mail (Resend) com chave idempotente
+  e2e/                  Playwright: pilha completa simulada
+packages/
+  domain/         regras puras (sem dependências de framework, banco ou fila)
+  contracts/      schemas Zod e tipos da API, eventos e jobs
+  database/       Prisma, repositórios, migrações, outbox
+  queue/          filas BullMQ
+  providers/      porta FlightProvider + adapters (simulado, Travelpayouts)
+  notifications/  porta de e-mail + adapters (simulado, Resend) e templates
+  observability/  logger (com redação), métricas, servidor interno
+  config/         leitura e validação de env (fonte de verdade das variáveis)
+deploy/           produção num servidor (SPEC-042): compose, scripts, README
+docs/             specs/, adr/, DOMAIN, ARCHITECTURE, ENGINEERING, DESIGN-SYSTEM, roadmap/
+scripts/design/   pnpm check:design (tokens, contraste, textos, links de compra)
+.local/           rascunho pessoal, fora do git
+```
 
-## 4. Regras de domínio invioláveis
+Testes ficam junto do código: `*.test.ts` (unitário), `*.integration.test.ts`
+(banco real), `*.e2e.spec.ts` (API com Nest), `apps/e2e` (navegador).
 
-- `Watch` e `SearchTarget` são conceitos distintos.
-- Pesquisas equivalentes devem convergir para um SearchTarget.
-- `PriceObservation` é imutável.
-- Dinheiro usa inteiro em unidade mínima e código de moeda.
-- Jobs e efeitos externos são idempotentes.
-- Falha de provedor não apaga último preço válido.
-- Redis não é fonte de verdade de dados de domínio.
-- O domínio não importa SDK de provedor, fila, ORM ou framework web.
-- Nenhum alerta é enviado sem regra persistida, justificativa e chave idempotente.
-- Nenhum log contém token, payload sensível ou contato completo.
+## Regras de ouro
 
-## 5. TDD e evals
+Cada regra diz o que a garante. "Revisão" = nenhuma verificação automática
+ainda; o agente é a garantia.
 
-- Testar comportamento, não detalhes frágeis de implementação.
-- Unitários cobrem regras puras e estados.
-- Integração cobre banco, índices únicos, transações, outbox e filas.
-- Contract tests cobrem adaptadores com fixtures sanitizadas.
-- E2E cobre somente jornadas de alto valor.
-- Todo bug de produção deve gerar teste ou eval de regressão antes da correção.
-- Fixtures externas não podem conter credenciais ou dados pessoais.
+| Regra                                                                                                   | Garantida por                                          |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Dinheiro em inteiro na menor unidade + moeda; nunca float; sem oferta nunca é zero                      | testes de domínio; revisão                             |
+| `Watch` (intenção da pessoa) ≠ `SearchTarget` (busca compartilhada); buscas iguais viram um só target   | `fingerprint @unique` no banco + testes                |
+| `PriceObservation` nunca é alterada; correção é um fato novo                                            | revisão                                                |
+| Todo efeito repetível tem chave idempotente única (execução, alerta, entrega)                           | `@unique` no schema + testes de replay                 |
+| Efeito externo nasce de outbox na mesma transação do dado                                               | revisão + testes de integração                         |
+| `packages/domain` não importa framework, ORM, fila ou SDK                                               | `package.json` do domain sem dependências (pnpm barra) |
+| Configuração só por `packages/config`; toda chave do `.env.example` é lida por um schema                | `env-example.test.ts`                                  |
+| Log e métrica sem e-mail, senha, token, chave de convite ou payload cru                                 | redação no logger (`observability`); revisão           |
+| `/metrics` nunca na porta pública; `/health` sem detalhe interno                                        | revisão                                                |
+| Texto do site: "menor preço observado", nunca "menor preço do mercado"/"garantido"                      | `pnpm check:design` (`check-copy`)                     |
+| Cor só por token; link de compra só pelo `PurchaseButton`                                               | `pnpm check:design`                                    |
+| Instante no banco em UTC; regra humana (cota do mês, cron) em `America/Campo_Grande`; relógio injetável | testes de domínio; revisão                             |
 
-## 6. Alterações no banco
+## Como trabalhar
 
-- Migrações publicadas nunca são editadas.
-- Usar expansão/contração para mudanças incompatíveis.
-- Toda migração tem estratégia de rollback ou roll-forward documentada.
-- Adicionar índice em tabela grande exige avaliação de lock e tempo.
-- Backfill deve ser reiniciável, observável e limitado em lotes.
-- Não usar cascade delete sem decisão explícita do domínio.
+1. `git fetch` e `git status --short`: ver o que é seu e o que é de outro (não
+   mexer no que não é seu).
+2. Ler a spec e o que a tabela "O que ler antes" indica. Não há spec? Escrever
+   ou pedir uma — **não inventar requisito**. Lacuna que afeta contrato, dados,
+   segurança, custo ou o usuário: parar e perguntar.
+3. Branch nova a partir da `main`. Uma spec (ou uma correção) por PR.
+4. Teste que falha pelo motivo certo → menor código que passa → refatorar.
+   Bug sempre ganha teste de regressão.
+5. Mudou tela? Abrir no navegador (desktop e celular) e **olhar**; anexar o
+   print ao PR.
+6. Rodar "Antes de terminar". Revisar o diff inteiro.
+7. Atualizar a spec (evidência de implementação) e, se o mapa, as variáveis ou
+   as regras mudaram, este arquivo ou `docs/ENGINEERING.md`.
 
-## 7. Integrações externas
+## Antes de terminar
 
-- Acesso somente por interfaces em `packages/providers` ou `packages/notifications`.
-- Toda chamada possui timeout, correlação e classificação de erro.
-- Retry respeita idempotência e `Retry-After`.
-- Não registrar corpo integral por padrão.
-- SDK não pode vazar tipos para o domínio.
-- Testes normais não consomem cota real; smoke test real é isolado e controlado.
+```sh
+pnpm format:check && pnpm lint && pnpm typecheck   # sempre
+pnpm test                 # sempre que mexer em código (inclui integração: precisa de Docker)
+pnpm check:design         # se mexer em apps/web
+pnpm build                # se mexer em web, contratos ou config
+pnpm test:e2e             # se mexer em jornada do usuário (cadastro, monitoramento, compra, admin)
+docker build --target web -t fw-web . && docker build --target api -t fw-api .
+                          # se mexer em Dockerfile, deploy/, next.config.ts, turbo.json ou dependências
+```
 
-## 8. Segurança
+- Migração nova: `pnpm --filter @flight-watch/database prisma:migrate`
+  (só aditiva; nunca editar migração publicada).
+- Variável nova: `packages/config` + `.env.example` + `deploy/env.production.example`.
+- Memória curta no Testcontainers: `npx turbo run test --concurrency=1`.
+- Trocou de branch e o build ficou estranho: `docs/ENGINEERING.md` H13.
 
-- Validar dados em toda fronteira.
-- Autorizar por propriedade do recurso, não apenas por autenticação.
-- Não construir SQL, URL ou template com entrada não tratada.
-- Segredos não entram em código, fixtures, commits ou mensagens de erro.
-- Mudança de autenticação, autorização, criptografia ou retenção exige revisão humana.
-- Dependência com vulnerabilidade crítica bloqueia merge, salvo exceção documentada e temporária.
+**Nunca** dizer que um comando passou sem ter rodado. Gate que não deu para
+rodar é informado com o motivo.
 
-## 9. Observabilidade
+## Agentes em paralelo
 
-Toda feature assíncrona deve fornecer:
+Mais de um agente trabalha neste repositório ao mesmo tempo (Claude Code e o
+Orca, por exemplo).
 
-- métrica de início, sucesso, falha e duração;
-- log estruturado com `correlation_id`;
-- código de erro estável;
-- evidência de idempotência;
-- runbook quando introduzir novo modo de falha operacional.
+- Cada agente na sua branch. `git fetch` antes de começar e antes do PR.
+- `git add` **por nome de arquivo**, nunca `git add -A`/`.`; caminho apagado
+  ou renomeado não entra na lista do `add` (aborta o comando). Conferir
+  `git show --stat` antes do push.
+- Não "consertar" arquivo de outro agente que quebrou o build: avisar e esperar.
+- Arquivo compartilhado (`app.module.ts`, `schema.prisma`, `contracts/src/index.ts`,
+  `.env.example`): reler antes de editar; edição pequena e cirúrgica.
+- Decisão só vale registrada no repositório (spec, ADR ou este arquivo), não em
+  conversa.
 
-## 10. Limites de autonomia
+## Web (`apps/web`)
 
-| Nível | Permissão                                                      |
-| ----- | -------------------------------------------------------------- |
-| 0     | analisar e explicar                                            |
-| 1     | propor plano e diff, sem editar                                |
-| 2     | criar/ajustar testes e documentação                            |
-| 3     | implementar uma spec isolada em branch                         |
-| 4     | alterar múltiplos módulos dentro de uma spec aprovada          |
-| 5     | abrir PR e responder a CI, sem merge                           |
-| 6     | corrigir automaticamente falhas classificadas e de baixo risco |
-
-Produção, migrações destrutivas, segredos, billing, políticas de segurança e merge permanecem sob controle humano explícito.
-
-Promoção de autonomia exige histórico mensurável: taxa de gates aprovados, regressões, retrabalho, incidentes e aderência de escopo. Confiança subjetiva não basta.
-
-## 11. Ações proibidas
-
-- desativar teste, lint, typecheck ou gate para obter verde;
-- reduzir asserções sem demonstrar mudança legítima de requisito;
-- capturar erro e seguir como sucesso;
-- adicionar `any`, ignore ou supressão sem justificativa localizada;
-- editar migração já aplicada;
-- acessar diretamente tabela pertencente a outro módulo para contornar contrato;
-- criar alerta ou entrega sem chave idempotente;
-- usar LLM para decisão que já possui regra determinística;
-- declarar conclusão com testes pendentes ou falhos.
-
-## 12. Formato de conclusão da tarefa
-
-Toda entrega deve registrar:
-
-- spec atendida;
-- comportamento implementado;
-- arquivos relevantes alterados;
-- testes e comandos executados com resultado;
-- gates não executados e motivo;
-- riscos, decisões e pendências;
-- migração, rollout e rollback, quando aplicável.
-
-<!-- Adendo do refactor web v2; não substitui nenhuma seção acima. -->
-
-## 13. Refactor web v2 (`docs/design-refactor/`)
-
-O web passa pela experiência v2 aprovada em 2026-09-30: promoções em destaque,
-compra por link de afiliado com aviso de comissão, identidade visual nova e
-animações com significado. Autorizado por SPEC-020 e SPEC-021; detalhado em
-`docs/design-refactor/`.
-
-### Leitura obrigatória por tipo de tarefa
-
-| A tarefa toca…                             | Ler antes                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| qualquer parte do refactor                 | `docs/design-refactor/00-contexto.md`, `PROGRESS.md`, a ficha em `tasks/` |
-| link de compra, afiliado, `/transparencia` | SPEC-020                                                                  |
-| `apps/web/src/styles`, fontes, animação    | `01-spec-design-system.md`                                                |
-| componente em `apps/web/src/components`    | `02-spec-componentes.md`                                                  |
-| página em `apps/web/src/app`               | `03-spec-paginas.md`                                                      |
-| fechamento de tarefa                       | `04-evals.md`, `05-quality-gates.md`, `06-tdd-loop.md`                    |
-
-Não carregar os demais sem necessidade.
-
-### Regras do web (além das seções 1 a 12)
-
-1. Cor só por token de `apps/web/src/styles/tokens.css`.
+1. Cor só por token de `apps/web/src/styles/tokens.css`; componentes de
+   `components/ui`.
 2. Em `*.module.css`, animação é `var(--keyframes-*)` ou `@keyframes` do próprio
-   módulo; nunca o nome global escrito direto (o CSS Modules o renomeia e a
-   animação some sem erro).
-3. Data e hora exibidas no cliente usam fuso fixo (`DISPLAY_TIME_ZONE`); data de
-   viagem usa UTC. Formatar no fuso local quebra a hidratação.
-4. Link de compra só pelo `PurchaseButton` (`rel="noopener noreferrer
-sponsored"`), sempre com `PurchaseNote` na página.
-5. Todo preço com idade (`Freshness`); sem oferta é "—", nunca zero.
-6. Linguagem: "último preço observado", "menor preço observado pelo sistema",
-   "preço desejado". Proibido: "menor preço do mercado", "garantido", "tempo
-   real", "melhor momento para comprar", "desconto", "preço-alvo".
-7. Nenhum texto abaixo de 12 px; alvos ≥ 24 px, controles ≥ 44 px no celular;
-   sem rolagem horizontal em 320 px.
-8. Movimento curto, uma vez, com significado; movimento reduzido termina tudo
-   no estado final.
+   módulo (o nome global some sem erro).
+3. Data e hora no cliente com fuso fixo (`DISPLAY_TIME_ZONE`); data de viagem em
+   UTC — formatar no fuso local quebra a hidratação.
+4. Link de compra só pelo `PurchaseButton`, sempre com `PurchaseNote` na página.
+5. Todo preço mostra a idade (`Freshness`); sem oferta é "—".
+6. Estados distintos: carregando, vazio, erro, desatualizado, sem oferta.
+7. Nenhum texto abaixo de 12 px; alvos ≥ 24 px (≥ 44 px no celular); sem
+   rolagem horizontal em 320 px. Teclado e foco visível funcionam.
+8. Movimento curto e com significado; movimento reduzido termina no estado final.
+9. Variável lida no build vai no `env` do `build` (`turbo.json`) e como `ARG` no
+   `Dockerfile` (H15).
+10. `pnpm check:design` é catraca: baixar o teto que melhorou, nunca subir sem
+    decisão.
 
-### Contrato da sessão
+## Banco, integrações e segurança
 
-- Começar lendo `docs/design-refactor/PROGRESS.md`; terminar atualizando.
-- Uma tarefa por vez, na ordem de `08-backlog.md`, uma branch e um PR por
-  tarefa.
-- Loop Ler → Red → Green → Refactor → Eval → Review → Registrar
-  (`06-tdd-loop.md`).
-- `pnpm check:design` é catraca: baixar o teto que melhorou; nunca subir sem
-  decisão.
-- Decisão pendente em `09-decisoes.md` bloqueia a tarefa que depende dela:
-  perguntar, não decidir.
-- A implementação de referência (`ref/redesign`) é consulta, não atalho: nada de
-  merge ou cherry-pick dela inteira.
+- Migração só aditiva (expandir/contrair para mudança incompatível); backfill em
+  lotes, reiniciável e observável; sem `cascade` sem decisão do domínio.
+- Provedor e e-mail só pelas portas em `packages/providers` e
+  `packages/notifications`; toda chamada com timeout, `correlationId` e erro
+  classificado; retry só em falha temporária, respeitando `Retry-After`; teste
+  nunca gasta cota real.
+- Validar entrada em toda fronteira (HTTP, fila, provedor, template).
+  Autorização por dono do recurso; recurso de outra pessoa responde como
+  inexistente.
+- Segredo nunca em código, fixture, commit, log, print ou mensagem de chat.
+- Dependência nova: justificar necessidade, licença e manutenção.
+
+## Autonomia e aprovação humana
+
+| Nível | O agente pode                                        |
+| ----- | ---------------------------------------------------- |
+| 0     | analisar e explicar                                  |
+| 1     | propor plano e diff, sem editar                      |
+| 2     | criar/ajustar testes e documentação                  |
+| 3     | implementar uma spec isolada em branch               |
+| 4     | alterar vários módulos dentro de uma spec aprovada   |
+| 5     | abrir PR e corrigir CI, sem merge                    |
+| 6     | corrigir sozinho falhas classificadas de baixo risco |
+
+**Sempre** exige aprovação explícita do owner: merge, produção, migração
+destrutiva, segredos, cobrança, autenticação/autorização, provedor real,
+privacidade e retenção, exclusão de dados, mudança contratual. Aprovação vale
+para aquilo que foi aprovado, não para o próximo passo.
+
+## Proibido
+
+- Desligar teste, lint, typecheck ou gate; enfraquecer asserção para ficar verde.
+- Capturar erro e seguir como sucesso; retry infinito.
+- `any`, `@ts-ignore` ou supressão sem justificativa na linha.
+- Editar migração já aplicada; acessar tabela de outro módulo contornando o repositório dele.
+- Alerta ou entrega sem chave idempotente; regra de alerta decidida por LLM.
+- Raspar site, copiar código, texto, marca ou imagem de outro produto
+  (inspiração em comportamento é permitida; asset de terceiro só com licença).
+- Expor `/metrics` publicamente; logar segredo, e-mail completo ou payload cru.
+- Refatoração ampla não pedida junto de uma feature.
+- Apagar ou sobrescrever trabalho local de outra pessoa.
+- Declarar pronto com gate falhando.
+
+## Ao entregar
+
+Dizer, com fatos verificáveis: spec atendida; o que mudou para o usuário;
+arquivos principais; comandos rodados e resultado real; o que não foi rodado e
+por quê; migração, rollout e rollback; riscos e pendências; docs atualizadas.
+
+## Pronto quer dizer
+
+Spec e critérios claros; testes e implementação concordam; invariantes
+preservadas; gates aplicáveis verdes; segurança, idempotência, custo e
+observabilidade avaliados; spec com evidência; rollout e rollback definidos;
+nenhuma pendência crítica escondida.
