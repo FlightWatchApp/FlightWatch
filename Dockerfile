@@ -6,7 +6,7 @@
 # Debian slim (não Alpine): os binários do Prisma e do Argon2 não dependem de
 # musl. Node 24, igual ao .nvmrc.
 
-FROM node:24-bookworm-slim AS base
+FROM node:25-bookworm-slim AS base
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
