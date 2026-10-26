@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, type PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-const flightOfferIdSchema = z.string().uuid();
+const flightOfferIdSchema = z.guid();
 
 @Injectable()
 export class FlightOfferIdValidationPipe implements PipeTransform<unknown, string> {

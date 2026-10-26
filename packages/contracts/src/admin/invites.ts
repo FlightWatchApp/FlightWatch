@@ -15,7 +15,7 @@ export type CreateInviteRequest = z.infer<typeof createInviteRequestSchema>;
 
 /** Nunca carrega a chave nem o hash. `state` é derivado: AVAILABLE vencida vira EXPIRED. */
 export const inviteSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   email: z.string(),
   state: inviteStateSchema,
   createdAt: z.string(),
@@ -43,7 +43,7 @@ export type RevokeInviteResponse = z.infer<typeof revokeInviteResponseSchema>;
 export const listInvitesQuerySchema = z
   .object({
     state: inviteStateSchema.optional(),
-    cursor: z.string().uuid().optional(),
+    cursor: z.guid().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(25),
   })
   .strict();
