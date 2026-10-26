@@ -60,6 +60,6 @@ Só interface; sem migração nem configuração. Rollback: reverter o PR.
 
 ## Evidência de implementação
 
-- Testes: 18 novos de domínio do web (pré-preenchimento 7, contexto 6, parceiro 5) e 2 e2e no navegador; suíte do web 145+, e2e 19/19.
+- Testes: 16 novos de domínio do web (pré-preenchimento 7, contexto 6, parceiro 3) e 2 e2e no navegador; suíte do web 145, e2e 19/19. (A mensagem do commit anterior diz 18: o certo é 16.)
 - Vista nos prints (desktop e celular) de uma busca com preço e outra sem: botão "Ver todos os voos na Decolar", aviso novo, frase de contexto ("34% abaixo da mediana dos 23 preços…") e o bloco de monitorar nos dois casos; formulário aberto com Campo Grande (CGR), Manaus (MAO), ida e volta e as duas datas.
 - Não verificado: o fluxo para quem **não** está logado termina no login (limitação declarada acima).
