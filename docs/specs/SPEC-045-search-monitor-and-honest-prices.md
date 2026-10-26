@@ -1,6 +1,6 @@
 # SPEC-045 — Monitorar qualquer viagem, contexto do preço e textos honestos
 
-Status: implemented — Parte A (busca); Parte B (mensagens para o grupo, admin) em outro PR
+Status: implemented — Parte A (busca) e Parte B (mensagens para o grupo, admin)
 Owner: Web / Pricing
 Dependências: SPEC-014 (busca), SPEC-031 (calendário), SPEC-039 (alerta de preço baixo), SPEC-043 (admin), SPEC-044 / ADR-009 (parceiro de compra)
 Origem: conversa de 2026-10-26. Clientes e o owner viram que o número do nosso site não bate com o da Decolar (a fonte é o cache de outra agência) e que, numa busca sem preço, não havia como monitorar.
@@ -37,9 +37,13 @@ Origem: conversa de 2026-10-26. Clientes e o owner viram que o número do nosso 
 - `PurchaseNote`: "O preço aqui é o que observamos: o site parceiro mostra os voos e valores de agora, que podem ser diferentes. Você finaliza a compra lá. Podemos receber comissão, sem custo extra para você."
 - Página "Como ganhamos dinheiro": nova seção "Por que o valor no site parceiro pode ser diferente do nosso" (o nosso vem de uma fonte de preços observados, geralmente com horas ou dias de idade, sem voo específico).
 
-## Parte B — Mensagens para o grupo de WhatsApp (admin) — próximo PR
+## Parte B — Mensagens para o grupo de WhatsApp (admin)
 
-Em `/admin`, página que monta o texto pronto de um alerta (rota, preço, data, "visto há X h", link do parceiro, aviso) para a pessoa responsável colar no grupo. Só texto copiável; nada é enviado.
+`/admin/mensagens?origin=SAO` (só admin; 404 para os demais, como o resto de `/admin`): lista as 10 melhores promoções de uma cidade de partida (`GET /v1/promotions`, a mesma da home) e, para cada uma, o texto pronto para a pessoa responsável colar no grupo, com o botão "Copiar mensagem". **Nada é enviado.**
+
+Formato (WhatsApp, `*negrito*` e `_itálico_`): rota; "Só ida · 20/11/2026 · Direto"; preço com "NN% abaixo da mediana dos N preços que observamos (R$ X)" só quando há queda; "Visto há N h" (ou dias); o link do parceiro (já validado pela API; sem link, a linha some); e o aviso "o site mostra os voos de agora e o valor pode ser diferente. Confirme o valor antes de comprar". Mesmas regras de linguagem do site: nada de "menor preço do mercado", "garantido", "tempo real", "desconto".
+
+Código de cidade da URL inválido volta para SAO; motor de promoções desligado, orçamento do dia esgotado, feed vazio e erro da consulta têm mensagem própria.
 
 ## Critérios de aceitação
 
@@ -48,6 +52,8 @@ Em `/admin`, página que monta o texto pronto de um alerta (rota, preço, data, 
 - **AC-3** `purchasePartnerName` reconhece só host exato. — `purchase-partner-name.test.ts`
 - **AC-4** Com e sem ofertas, a busca mostra "Monitorar esta viagem", que abre o formulário com a viagem preenchida e dali o monitoramento é criado; parâmetros inválidos não quebram a página. — `search-monitor.spec.ts` (e2e)
 - **AC-5** `pnpm check:design` e `pnpm check:web-js` dentro dos tetos; nenhuma frase proibida.
+- **AC-6** `buildGroupMessage`: só ida e ida e volta, escalas, idade em horas e dias, sem link sai sem a linha do link, sem desconto não afirma "abaixo", nenhuma frase proibida. — `group-message.test.ts`
+- **AC-7** Quem não é admin recebe 404 em `/admin/mensagens`; o admin vê as mensagens com o botão de copiar. — `admin-messages.spec.ts` (e2e)
 
 ## Segurança e privacidade
 
@@ -62,4 +68,5 @@ Só interface; sem migração nem configuração. Rollback: reverter o PR.
 
 - Testes: 16 novos de domínio do web (pré-preenchimento 7, contexto 6, parceiro 3) e 2 e2e no navegador; suíte do web 145, e2e 19/19. (A mensagem do commit anterior diz 18: o certo é 16.)
 - Vista nos prints (desktop e celular) de uma busca com preço e outra sem: botão "Ver todos os voos na Decolar", aviso novo, frase de contexto ("34% abaixo da mediana dos 23 preços…") e o bloco de monitorar nos dois casos; formulário aberto com Campo Grande (CGR), Manaus (MAO), ida e volta e as duas datas.
-- Não verificado: o fluxo para quem **não** está logado termina no login (limitação declarada acima).
+- Parte B: 6 testes de domínio e 1 e2e (admin criado pelo comando do servidor); e2e inteiro 20/20. Vista na tela (desktop e celular) com promoções reais de São Paulo: Joinville, Foz do Iguaçu, Uberlândia, Florianópolis, cada uma com o link da Decolar.
+- Não verificado: o fluxo para quem **não** está logado termina no login (limitação declarada acima). O botão "Copiar mensagem" usa a área de transferência do navegador; o teste confere que ele existe, não o conteúdo copiado.

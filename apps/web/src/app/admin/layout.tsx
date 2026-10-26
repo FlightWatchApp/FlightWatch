@@ -23,6 +23,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <nav aria-label="Administração" className={styles.tabs}>
         <Link href="/admin/convites">Convites</Link>
         <Link href="/admin/pessoas">Pessoas</Link>
+        <Link href="/admin/mensagens">Mensagens</Link>
       </nav>
       {children}
     </div>
