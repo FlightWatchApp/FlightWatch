@@ -6,11 +6,15 @@ import { IconSearch } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { PriceCalendar } from '@/components/search/price-calendar';
 import { PurchaseButton } from '@/components/purchase/purchase-button';
+import buttonStyles from '@/components/ui/button.module.css';
 import type { FlightSearchResult } from '@/lib/api/types';
 import type { CalendarDayInput } from '@/lib/domain/price-calendar';
 import { formatDuration } from '@/lib/domain/flight-format';
 import { formatDate } from '@/lib/domain/freshness';
 import { formatMoney } from '@/lib/domain/money';
+import { allFlightsLabel } from '@/lib/domain/purchase-partner-name';
+import { describePriceContext } from '@/lib/domain/price-context';
+import { buildWatchPrefillHref } from '@/lib/domain/trip-prefill';
 import { OfferCard } from './[id]/offer-card';
 import styles from './search-results.module.css';
 import { routePagesEnabled } from '@/lib/domain/route-flag';
@@ -52,6 +56,17 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
     null,
   );
   const resultCount = `${search.offers.length} ${search.offers.length === 1 ? 'oferta' : 'ofertas'}`;
+  // SPEC-045: onde o menor preço se situa entre os preços observados no mês da busca.
+  const priceContext =
+    cheapest && calendar ? describePriceContext(cheapest.totalAmountMinor, calendar.days) : null;
+  // SPEC-045: monitorar vale para qualquer viagem pesquisada, com ou sem preço.
+  const monitorHref = buildWatchPrefillHref({
+    origin: search.origin,
+    destination: search.destination,
+    tripType: search.tripType,
+    departureDate: search.departureDate,
+    returnDate: search.returnDate,
+  });
 
   return (
     <section
@@ -91,7 +106,7 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
           <PurchaseButton
             href={search.allFlightsUrl}
             status="CURRENT"
-            label="Ver todos os voos no site parceiro"
+            label={allFlightsLabel(search.allFlightsUrl)}
             context={`${search.originName ?? search.origin} para ${search.destinationName ?? search.destination}`}
           />
           <PurchaseNote />
@@ -100,6 +115,10 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
 
       {calendar && calendar.days.length > 0 && (
         <PriceCalendar search={search} month={calendar.month} days={calendar.days} />
+      )}
+
+      {cheapest && priceContext && (
+        <p className={styles.priceContext}>{priceContextText(priceContext, cheapest.currency)}</p>
       )}
 
       {search.offers.length > 0 && (
@@ -152,6 +171,23 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
         />
       )}
 
+      <aside className={styles.monitorCta} aria-labelledby="monitor-trip-title">
+        <div>
+          <h3 id="monitor-trip-title">Monitorar esta viagem</h3>
+          <p>
+            {search.offers.length > 0
+              ? 'Avisamos por e-mail quando observarmos um preço bem abaixo do normal para esta viagem.'
+              : 'Mesmo sem preço hoje, você pode monitorar: avisamos quando aparecer um preço bom. Rotas pouco procuradas têm poucos preços na nossa fonte, e o aviso pode demorar ou não chegar.'}
+          </p>
+        </div>
+        <Link
+          href={monitorHref}
+          className={`${buttonStyles.button} ${buttonStyles.secondary} ${buttonStyles.md}`}
+        >
+          Monitorar esta viagem
+        </Link>
+      </aside>
+
       {search.offers.length > 0 && (
         <div className={styles.offers}>
           {search.offers.some((offer) => offer.availabilityStatus === 'EXPIRED') && (
@@ -173,4 +209,16 @@ export function SearchResults({ search, embedded = false, calendar = null }: Sea
       )}
     </section>
   );
+}
+
+/** SPEC-045: frase de contexto, sempre "do que o sistema observou", nunca "do mercado". */
+function priceContextText(
+  context: NonNullable<ReturnType<typeof describePriceContext>>,
+  currency: string,
+): string {
+  const median = formatMoney({ amountMinor: context.medianMinor, currency });
+  const base = `mediana dos ${context.sampleSize} preços que observamos neste mês: ${median}`;
+  if (context.kind === 'below') return `Este preço está ${context.percent}% abaixo da ${base}.`;
+  if (context.kind === 'above') return `Este preço está ${context.percent}% acima da ${base}.`;
+  return `Este preço está em linha com a ${base}.`;
 }

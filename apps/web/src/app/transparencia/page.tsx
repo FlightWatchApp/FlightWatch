@@ -56,6 +56,18 @@ export default function TransparencyPage() {
         </p>
       </section>
 
+      <section className={styles.section}>
+        <h2>Por que o valor no site parceiro pode ser diferente do nosso</h2>
+        <p>
+          O nosso preço vem de uma fonte de preços observados: para cada rota e dia, o menor valor
+          que ela viu recentemente, geralmente com algumas horas ou dias de idade. Ele não
+          identifica um voo específico. O site parceiro, ao contrário, mostra todos os voos
+          disponíveis agora, com o preço de agora. Por isso podem aparecer mais voos e valores
+          diferentes: o nosso número é uma referência para você decidir quando vale olhar, e o valor
+          final é sempre o do site onde você compra.
+        </p>
+      </section>
+
       <p className={styles.back}>
         <Link href="/opportunities">Ver promoções de hoje →</Link>
       </p>

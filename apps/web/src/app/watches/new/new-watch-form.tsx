@@ -22,9 +22,18 @@ const SUPPORTED_CURRENCIES = ['BRL', 'USD'];
 /** SPEC-040: `initialOrigin` é a cidade de partida da conta, já preenchida. */
 export function NewWatchForm({
   initialOrigin = null,
+  initialDestination = null,
+  initialTripType = 'ONE_WAY',
+  initialDepartureDate = '',
+  initialReturnDate = '',
   quota = null,
 }: {
   initialOrigin?: SelectedPlace | null;
+  /** SPEC-045: viagem vinda da busca ("Monitorar esta viagem"). */
+  initialDestination?: SelectedPlace | null;
+  initialTripType?: TripType;
+  initialDepartureDate?: string;
+  initialReturnDate?: string;
   /** SPEC-043: "3 de 5 neste mês", ou null sem limite. */
   quota?: string | null;
 }) {
@@ -33,10 +42,10 @@ export function NewWatchForm({
   const [formError, setFormError] = useState<string | null>(null);
 
   const [origin, setOrigin] = useState<SelectedPlace | null>(initialOrigin);
-  const [destination, setDestination] = useState<SelectedPlace | null>(null);
-  const [tripType, setTripType] = useState<TripType>('ONE_WAY');
-  const [departureDate, setDepartureDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
+  const [destination, setDestination] = useState<SelectedPlace | null>(initialDestination);
+  const [tripType, setTripType] = useState<TripType>(initialTripType);
+  const [departureDate, setDepartureDate] = useState(initialDepartureDate);
+  const [returnDate, setReturnDate] = useState(initialReturnDate);
   const [currency, setCurrency] = useState(SUPPORTED_CURRENCIES[0] ?? '');
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {

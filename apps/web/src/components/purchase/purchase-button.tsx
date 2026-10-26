@@ -3,6 +3,7 @@
 import { recordPurchaseClickAction } from '@/app/watches/actions';
 import buttonStyles from '@/components/ui/button.module.css';
 import { IconExternalLink } from '@/components/ui/icon';
+import { purchasePartnerName } from '@/lib/domain/purchase-partner-name';
 import styles from './purchase-button.module.css';
 
 export interface PurchaseButtonProps {
@@ -47,7 +48,18 @@ export function PurchaseButton({
   ]
     .filter(Boolean)
     .join(' ');
-  const label = customLabel ?? (current ? 'Comprar passagem' : 'Atualizar preço');
+  // SPEC-045: o destino é uma busca com todos os voos de agora, não "a passagem"
+  // do nosso preço — o botão diz para onde vai quando reconhece o parceiro.
+  const partner = purchasePartnerName(href);
+  const label =
+    customLabel ??
+    (partner
+      ? current
+        ? `Ver voos na ${partner}`
+        : `Ver preço atual na ${partner}`
+      : current
+        ? 'Comprar passagem'
+        : 'Atualizar preço');
 
   return (
     <a
@@ -67,7 +79,8 @@ export function PurchaseButton({
       {label}
       <IconExternalLink size={size === 'sm' ? 14 : 16} />
       <span className="visually-hidden">
-        {context ? `, ${context}` : ''} (abre o site parceiro em nova aba)
+        {context ? `, ${context}` : ''} (abre {partner ? `a ${partner}` : 'o site parceiro'} em nova
+        aba)
       </span>
     </a>
   );
