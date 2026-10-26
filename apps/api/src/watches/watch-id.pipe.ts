@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, type PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-const watchIdSchema = z.string().uuid();
+const watchIdSchema = z.guid();
 
 @Injectable()
 export class WatchIdValidationPipe implements PipeTransform<unknown, string> {
