@@ -18,7 +18,7 @@ export const createWatchRequestSchema = z
     adults: z.literal(1),
     currency: currencyCodeSchema,
     market: marketCodeSchema,
-    notificationChannelId: z.string().uuid(),
+    notificationChannelId: z.guid(),
   })
   // SPEC-039: sem `alertRules` — a API cria sempre a regra de preço baixo. Campo
   // desconhecido (inclusive `alertRules`) é recusado pelo `.strict()`.
@@ -30,7 +30,7 @@ export type CreateWatchRequest = z.infer<typeof createWatchRequestSchema>;
 const watchStatusSchema = z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'EXPIRED', 'CANCELLED']);
 
 export const createWatchResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   status: watchStatusSchema,
   search: z.object({
     origin: z.string(),

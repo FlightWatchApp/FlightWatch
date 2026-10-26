@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /** `GET /v1/admin/users` */
 export const adminUserSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   email: z.string(),
   createdAt: z.string(),
   emailVerified: z.boolean(),
@@ -19,7 +19,7 @@ export type AdminUserView = z.infer<typeof adminUserSchema>;
 
 export const listAdminUsersQuerySchema = z
   .object({
-    cursor: z.string().uuid().optional(),
+    cursor: z.guid().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(25),
   })
   .strict();
