@@ -22,11 +22,12 @@ import {
   OFFER_SELECTION_POLICY_VERSION,
   parseStoredItinerary,
   resolveCurrentOfferStatus,
-  resolvePurchaseUrl,
   storedItineraryAsOffer,
   toStoredItinerary,
   type FareSummary,
   type FlightOffer,
+  type PurchasePartner,
+  type PurchaseTrip,
 } from '@flight-watch/domain';
 import type { FlightSearch, FlightSearchOffer, Prisma } from '@flight-watch/database';
 import {
@@ -39,7 +40,8 @@ import {
   persistPriceObservationSuccess,
 } from '@flight-watch/database';
 import { logEvent } from '@flight-watch/observability';
-import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
+import { resolvePartnerLink } from '../affiliate/purchase-links.js';
+import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { ProviderError, type FlightProvider } from '@flight-watch/providers';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
@@ -63,6 +65,7 @@ export class SearchesService {
     @Inject(FLIGHT_PROVIDER) private readonly provider: FlightProvider,
     private readonly places: PlacesService,
     private readonly calendarCache: PriceCalendarCache,
+    @Inject(API_CONFIG) private readonly config: ApiConfig,
   ) {}
 
   /**
@@ -118,11 +121,13 @@ export class SearchesService {
       currency: search.currency,
       market: search.market,
     });
-    return withAffiliateTracking(
-      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
-      this.provider.strategy,
-      'SEARCH',
-    );
+    return resolvePartnerLink({
+      partner: this.config.PURCHASE_PARTNER,
+      trip: tripOf(search),
+      providerStrategy: this.provider.strategy,
+      providerUrl: raw,
+      surface: 'SEARCH',
+    });
   }
 
   /**
@@ -262,7 +267,7 @@ export class SearchesService {
           `invariant violated: flight search ${flightSearch.id} vanished mid-request`,
         );
       }
-      return toFlightSearchResponse(persisted);
+      return toFlightSearchResponse(persisted, this.config.PURCHASE_PARTNER);
     } catch (error) {
       stopTimer();
       if (error instanceof ProviderError) {
@@ -295,7 +300,7 @@ export class SearchesService {
         // endereçável via GET .../:id; conflar "requisição falhou" com "a
         // busca não achou nada" violaria o próprio critério de aceitação
         // do rascunho.
-        return toFlightSearchResponse(persisted);
+        return toFlightSearchResponse(persisted, this.config.PURCHASE_PARTNER);
       }
       throw error;
     }
@@ -311,7 +316,7 @@ export class SearchesService {
     if (!flightSearch) {
       throw new SearchError('FLIGHT_SEARCH_NOT_FOUND', 'flight search not found');
     }
-    return toFlightSearchResponse(flightSearch);
+    return toFlightSearchResponse(flightSearch, this.config.PURCHASE_PARTNER);
   }
 
   /** SPEC-014 §"Comportamento de domínio": `POST /v1/offers/:id/watch`. */
@@ -509,6 +514,8 @@ function toFlightSearchOfferView(
   row: FlightSearchOffer,
   searchId: string,
   cabin: string,
+  trip: PurchaseTrip,
+  partner: PurchasePartner,
 ): FlightSearchOfferView {
   const itinerary = parseStoredItinerary(row.itinerary);
   const asFlightOffer = storedItineraryAsOffer(itinerary) as FlightOffer;
@@ -526,11 +533,13 @@ function toFlightSearchOfferView(
     connectionsCount: offerConnectionsCount(asFlightOffer),
     observedAt: row.observedAt.toISOString(),
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
-    purchaseUrl: withAffiliateTracking(
-      resolvePurchaseUrl(row.deeplink, row.providerStrategy),
-      row.providerStrategy,
-      'SEARCH',
-    ),
+    purchaseUrl: resolvePartnerLink({
+      partner,
+      trip,
+      providerStrategy: row.providerStrategy,
+      providerUrl: row.deeplink,
+      surface: 'SEARCH',
+    }),
     availabilityStatus: resolveCurrentOfferStatus(row.expiresAt),
     qualityFlags: row.qualityFlags,
   };
@@ -551,17 +560,49 @@ type FlightSearchResponseBase = Omit<
   'originName' | 'destinationName' | 'allFlightsUrl'
 >;
 
+/** A viagem de uma busca, no formato que o parceiro de compra entende (SPEC-044). */
+function tripOf(search: {
+  origin: string;
+  destination: string;
+  tripType: PurchaseTrip['tripType'];
+  departureDate: string;
+  returnDate: string | null;
+  adults: number;
+}): PurchaseTrip {
+  return {
+    originCode: search.origin,
+    destinationCode: search.destination,
+    tripType: search.tripType,
+    departureDate: search.departureDate,
+    returnDate: search.returnDate,
+    adults: search.adults,
+  };
+}
+
 function toFlightSearchResponse(
   flightSearch: FlightSearch & { offers: FlightSearchOffer[] },
+  partner: PurchasePartner,
 ): FlightSearchResponseBase {
+  const departureDate = flightSearch.departureDate.toISOString().slice(0, 10);
+  const returnDate = flightSearch.returnDate
+    ? flightSearch.returnDate.toISOString().slice(0, 10)
+    : null;
+  const trip = tripOf({
+    origin: flightSearch.originIata,
+    destination: flightSearch.destinationIata,
+    tripType: flightSearch.tripType,
+    departureDate,
+    returnDate,
+    adults: 1,
+  });
   return {
     id: flightSearch.id,
     status: flightSearch.status,
     origin: flightSearch.originIata,
     destination: flightSearch.destinationIata,
     tripType: flightSearch.tripType,
-    departureDate: flightSearch.departureDate.toISOString().slice(0, 10),
-    returnDate: flightSearch.returnDate ? flightSearch.returnDate.toISOString().slice(0, 10) : null,
+    departureDate,
+    returnDate,
     cabin: 'ECONOMY',
     adults: 1,
     currency: flightSearch.currency,
@@ -570,7 +611,7 @@ function toFlightSearchResponse(
     createdAt: flightSearch.createdAt.toISOString(),
     expiresAt: flightSearch.expiresAt ? flightSearch.expiresAt.toISOString() : null,
     offers: flightSearch.offers.map((offer) =>
-      toFlightSearchOfferView(offer, flightSearch.id, flightSearch.cabin),
+      toFlightSearchOfferView(offer, flightSearch.id, flightSearch.cabin, trip, partner),
     ),
   };
 }

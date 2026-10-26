@@ -16,7 +16,8 @@
     "check:design": "node scripts/design/check-all.mjs",
     "test:e2e": "pnpm build && pnpm --filter @flight-watch/e2e test:e2e",
     "screenshot": "pnpm --filter @flight-watch/e2e screenshot",
-    "check:web-js": "node scripts/budget/check-web-js.mjs"
+    "check:web-js": "node scripts/budget/check-web-js.mjs",
+    "purchase-links": "node scripts/purchase-links-sample.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

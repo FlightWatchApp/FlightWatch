@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { DealClassification, FlightOffer } from '@flight-watch/domain';
 import {
   classifyDeal,
@@ -6,7 +6,6 @@ import {
   offerDurationMinutes,
   parseStoredItinerary,
   resolveCurrentOfferStatus,
-  resolvePurchaseUrl,
   storedItineraryAsOffer,
 } from '@flight-watch/domain';
 import {
@@ -17,7 +16,8 @@ import {
   type LatestObservationForOpportunity,
   type OpportunityCandidateSearchTarget,
 } from '@flight-watch/database';
-import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
+import { resolvePartnerLink } from '../affiliate/purchase-links.js';
+import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import type {
   ListOpportunitiesQuery,
   ListOpportunitiesResponse,
@@ -88,6 +88,7 @@ export class OpportunitiesService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly places: PlacesService,
+    @Inject(API_CONFIG) private readonly config: ApiConfig,
   ) {}
 
   /** SPEC-015 §"Comportamento de domínio": ver a spec pra o raciocínio completo do scan em 2 passos. */
@@ -222,11 +223,22 @@ export class OpportunitiesService {
       offer: {
         amountMinor: latest.totalAmountMinor,
         currency: latest.currency,
-        purchaseUrl: withAffiliateTracking(
-          resolvePurchaseUrl(latest.deeplink, latest.providerStrategy),
-          latest.providerStrategy,
-          'OPPORTUNITY',
-        ),
+        purchaseUrl: resolvePartnerLink({
+          partner: this.config.PURCHASE_PARTNER,
+          trip: {
+            originCode: candidate.originIata,
+            destinationCode: candidate.destinationIata,
+            tripType: candidate.tripType,
+            departureDate: candidate.departureDate.toISOString().slice(0, 10),
+            returnDate: candidate.returnDate
+              ? candidate.returnDate.toISOString().slice(0, 10)
+              : null,
+            adults: candidate.adults,
+          },
+          providerStrategy: latest.providerStrategy,
+          providerUrl: latest.deeplink,
+          surface: 'OPPORTUNITY',
+        }),
         provider: latest.providerStrategy,
         observedAt: latest.observedAt.toISOString(),
         expiresAt: latest.expiresAt ? latest.expiresAt.toISOString() : null,

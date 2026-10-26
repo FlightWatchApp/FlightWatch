@@ -51,7 +51,7 @@ legislação e contratos externos, está em `ENGINEERING.md` §0.2.
 | `PROJECT-STATUS.md`                          | retrato atual, limites e decisões antes de produção                                                                    |
 | `EVALS.md`, `QUALITY-GATES.md`               | catálogo de evals de domínio e gates de PR/release                                                                     |
 | `BRAND.md`, `DESIGN-SYSTEM.md`               | marca (logo, cores, voz) e regras de interface verificadas por `pnpm check:design`                                     |
-| `adr/`                                       | ADR-001 a ADR-007                                                                                                      |
+| `adr/`                                       | ADR-001 a ADR-009                                                                                                      |
 | `specs/`                                     | specs que entraram no processo (SPEC-001 a SPEC-023, com lacunas na numeração); o status de cada uma está no cabeçalho |
 | `evals/`                                     | evals específicos de uma spec (ex.: EVALS-023 do dashboard)                                                            |
 | `roadmap/`                                   | estado atual, visão das próximas fases, roadmap, backlog de specs e visão pós-MVP                                      |

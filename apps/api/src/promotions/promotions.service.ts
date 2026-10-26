@@ -24,13 +24,12 @@ import {
   promotionFreshness,
   promotionScope,
   referenceMonths,
-  resolvePurchaseUrl,
   selectHighlights,
 } from '@flight-watch/domain';
 import { type SearchableCity, findAirlineNames } from '@flight-watch/database';
 import { logEvent } from '@flight-watch/observability';
 import { type DestinationFare, type FlightProvider, ProviderError } from '@flight-watch/providers';
-import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
+import { resolvePartnerLink } from '../affiliate/purchase-links.js';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
@@ -680,11 +679,20 @@ export class PromotionsService implements OnApplicationBootstrap, OnModuleDestro
       currency: promotion.price.currency,
       market: PROMOTION_MARKET,
     });
-    return withAffiliateTracking(
-      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
-      this.provider.strategy,
-      'OPPORTUNITY',
-    );
+    return resolvePartnerLink({
+      partner: this.config.PURCHASE_PARTNER,
+      trip: {
+        originCode: origin,
+        destinationCode: promotion.destination,
+        tripType: promotion.tripType,
+        departureDate: promotion.departureDate,
+        returnDate: promotion.returnDate,
+        adults: 1,
+      },
+      providerStrategy: this.provider.strategy,
+      providerUrl: raw,
+      surface: 'OPPORTUNITY',
+    });
   }
 
   // --- orçamento e Retry-After -------------------------------------------

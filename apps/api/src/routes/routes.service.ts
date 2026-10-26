@@ -19,11 +19,10 @@ import {
   medianMinor,
   promotionFreshness,
   referenceMonths,
-  resolvePurchaseUrl,
 } from '@flight-watch/domain';
 import { type RouteCity, findAirlineNames } from '@flight-watch/database';
 import { type CalendarDay, type FlightProvider, ProviderError } from '@flight-watch/providers';
-import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
+import { resolvePartnerLink } from '../affiliate/purchase-links.js';
 import { API_CONFIG, type ApiConfig } from '../config/config.module.js';
 import { MetricsService } from '../observability/metrics.service.js';
 import { PlacesService } from '../places/places.service.js';
@@ -339,11 +338,20 @@ export class RoutesService {
       currency: ROUTE_CURRENCY,
       market: ROUTE_MARKET,
     });
-    return withAffiliateTracking(
-      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
-      this.provider.strategy,
-      'ROUTE',
-    );
+    return resolvePartnerLink({
+      partner: this.config.PURCHASE_PARTNER,
+      trip: {
+        originCode: origin,
+        destinationCode: destination,
+        tripType: 'ONE_WAY',
+        departureDate: date,
+        returnDate: null,
+        adults: 1,
+      },
+      providerStrategy: this.provider.strategy,
+      providerUrl: raw,
+      surface: 'ROUTE',
+    });
   }
 
   /** Lugares, distância e tempo estimado: só catálogo, sem fonte de preços nem orçamento. */
@@ -565,11 +573,20 @@ export class RoutesService {
       currency: ROUTE_CURRENCY,
       market: ROUTE_MARKET,
     });
-    return withAffiliateTracking(
-      resolvePurchaseUrl(raw ?? null, this.provider.strategy),
-      this.provider.strategy,
-      'ROUTE',
-    );
+    return resolvePartnerLink({
+      partner: this.config.PURCHASE_PARTNER,
+      trip: {
+        originCode: route.origin.code,
+        destinationCode: route.destination.code,
+        tripType: route.tripType,
+        departureDate,
+        returnDate,
+        adults: 1,
+      },
+      providerStrategy: this.provider.strategy,
+      providerUrl: raw,
+      surface: 'ROUTE',
+    });
   }
 
   private async read(key: string): Promise<StoredRoute | null> {

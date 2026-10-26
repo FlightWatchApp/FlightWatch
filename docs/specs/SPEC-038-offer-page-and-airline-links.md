@@ -22,6 +22,11 @@ mais confiança do que uma agência desconhecida.
   subpágina com os dados da passagem. Referência visual: o mockup "Home
   Logado" (cartão em destaque com rota, preço, quanto está abaixo, gráfico,
   dados da viagem e botões).
+
+> **Atualização (2026-10-26):** o destino do botão de compra passou a ser um
+> parceiro configurável, hoje a Decolar (SPEC-044, ADR-009). D2 e D3 abaixo
+> ficam como registro; o que vale para o destino do botão é a SPEC-044.
+
 - **D2** O botão principal de compra leva ao **site da companhia aérea**, não
   mais à Aviasales. A perda da comissão foi aceita "por enquanto".
 - **D3** Um botão **secundário** "Comparar em agências" continua existindo,

@@ -7,6 +7,7 @@ export * from './airline/airline.js';
 export * from './pricing/flight-offer.js';
 export * from './pricing/observation-key.js';
 export * from './pricing/purchase-link.js';
+export * from './pricing/purchase-partner.js';
 export * from './pricing/affiliate-link.js';
 export * from './scheduling/schedule-window.js';
 export * from './alerting/deduplication-key.js';

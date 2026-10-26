@@ -19,10 +19,10 @@ import {
   computeSearchTargetFingerprintV1,
   resolveCurrentOfferStatus,
   monthWindow,
-  resolvePurchaseUrl,
+  type PurchasePartner,
 } from '@flight-watch/domain';
 import type { Prisma, WatchStatus } from '@flight-watch/database';
-import { withAffiliateTracking } from '../affiliate/affiliate-links.js';
+import { resolvePartnerLink } from '../affiliate/purchase-links.js';
 import {
   type PlaceSummary,
   SearchTargetFingerprintConflictError,
@@ -174,24 +174,41 @@ const EXECUTION_OUTCOME_BY_STATUS: Record<string, ExecutionOutcome> = {
 // SPEC-018: mesma forma de item.latestObservation em packages/database, mas
 // sem depender do tipo interno do Prisma na assinatura pública desta função.
 type LatestObservationForOffer = WatchListItem['latestObservation'];
+type SearchTargetForOffer = WatchListItem['searchTarget'];
 
 /**
  * SPEC-018 §"Comportamento de domínio e invariantes": `null` sempre que não
- * há observação OU o deep link não passa em `resolvePurchaseUrl` — nunca uma
- * URL não validada. Expirado continua sendo projetado (com status EXPIRED),
- * só ausente de fato vira `null`.
+ * há observação OU não há link que passe na allowlist — nunca uma URL não
+ * validada. Expirado continua sendo projetado (com status EXPIRED), só
+ * ausente de fato vira `null`.
+ *
+ * SPEC-044: o link vem do parceiro configurado e é montado pela viagem do
+ * monitoramento (`searchTarget`), não pelo endereço gravado na observação.
  */
 function toCurrentOffer(
-  latestObservation: LatestObservationForOffer,
+  item: { latestObservation: LatestObservationForOffer; searchTarget: SearchTargetForOffer },
+  partner: PurchasePartner,
 ): WatchListItemView['currentOffer'] {
+  const { latestObservation, searchTarget } = item;
   if (!latestObservation) {
     return null;
   }
-  const purchaseUrl = withAffiliateTracking(
-    resolvePurchaseUrl(latestObservation.deeplink, latestObservation.providerStrategy),
-    latestObservation.providerStrategy,
-    'WATCH',
-  );
+  const purchaseUrl = resolvePartnerLink({
+    partner,
+    trip: {
+      originCode: searchTarget.originIata,
+      destinationCode: searchTarget.destinationIata,
+      tripType: searchTarget.tripType,
+      departureDate: searchTarget.departureDate.toISOString().slice(0, 10),
+      returnDate: searchTarget.returnDate
+        ? searchTarget.returnDate.toISOString().slice(0, 10)
+        : null,
+      adults: searchTarget.adults,
+    },
+    providerStrategy: latestObservation.providerStrategy,
+    providerUrl: latestObservation.deeplink,
+    surface: 'WATCH',
+  });
   if (!purchaseUrl) {
     return null;
   }
@@ -210,7 +227,11 @@ function toCurrentOffer(
 type WatchListItemBase = Omit<WatchListItemView, 'originName' | 'destinationName'>;
 type WatchDetailBase = Omit<WatchDetailResponse, 'originName' | 'destinationName'>;
 
-function toWatchListItem(item: WatchListItem, lowPrice: WatchLowPrice | null): WatchListItemBase {
+function toWatchListItem(
+  item: WatchListItem,
+  lowPrice: WatchLowPrice | null,
+  partner: PurchasePartner,
+): WatchListItemBase {
   // A query em listWatchesForUser já filtra SCHEDULED/RUNNING, então o status
   // aqui é sempre uma das 5 chaves conhecidas — mas o índice de Record ainda
   // pode devolver undefined pro TS (noUncheckedIndexedAccess), então trata como
@@ -249,7 +270,7 @@ function toWatchListItem(item: WatchListItem, lowPrice: WatchLowPrice | null): W
         : null,
     createdAt: item.watch.createdAt.toISOString(),
     expiresAt: item.watch.expiresAt ? item.watch.expiresAt.toISOString() : null,
-    currentOffer: toCurrentOffer(item.latestObservation),
+    currentOffer: toCurrentOffer(item, partner),
   };
 }
 
@@ -257,9 +278,10 @@ function toWatchListItem(item: WatchListItem, lowPrice: WatchLowPrice | null): W
 function toWatchDetailResponse(
   item: WatchDetailItem,
   lowPrice: WatchLowPrice | null,
+  partner: PurchasePartner,
 ): WatchDetailBase {
   return {
-    ...toWatchListItem(item, lowPrice),
+    ...toWatchListItem(item, lowPrice, partner),
     priceHistory: item.priceHistory.map((point) => ({
       id: point.id,
       observedAt: point.observedAt.toISOString(),
@@ -292,7 +314,7 @@ export class WatchesService {
 
   private async toListItem(item: WatchListItem): Promise<WatchListItemBase> {
     const [lowPrice] = await this.lowPriceSummaries([item]);
-    return toWatchListItem(item, lowPrice ?? null);
+    return toWatchListItem(item, lowPrice ?? null, this.config.PURCHASE_PARTNER);
   }
 
   // PRODUCT.md §7.3, sem SPEC-00X própria — ver nota em
@@ -304,7 +326,9 @@ export class WatchesService {
     const { items, nextCursor } = await listWatchesForUser(this.prisma.client, userId, query);
     const lowPrices = await this.lowPriceSummaries(items);
     const watches = await this.places.withRouteNames(
-      items.map((item, index) => toWatchListItem(item, lowPrices[index] ?? null)),
+      items.map((item, index) =>
+        toWatchListItem(item, lowPrices[index] ?? null, this.config.PURCHASE_PARTNER),
+      ),
     );
     // SPEC-018 §8: mede cobertura real do CTA de compra — "existe preço" mas
     // "não existe link mostrável" é um dado operacional distinto de "sem
@@ -327,7 +351,7 @@ export class WatchesService {
     if (!item) {
       throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found');
     }
-    const currentOffer = toCurrentOffer(item.latestObservation);
+    const currentOffer = toCurrentOffer(item, this.config.PURCHASE_PARTNER);
     const provider = item.latestObservation?.providerStrategy ?? 'unknown';
     // SPEC-018 §"Observabilidade": status é o valor literal de currentOffer.status
     // (CURRENT/EXPIRED) — 'missing' é um terceiro valor só desta métrica, para o
@@ -354,7 +378,7 @@ export class WatchesService {
     logEvent({ event: 'watch_detail_fetch', watchId, result: 'success', correlationId });
     const [lowPrice] = await this.lowPriceSummaries([item]);
     const [named] = await this.places.withRouteNames([
-      toWatchDetailResponse(item, lowPrice ?? null),
+      toWatchDetailResponse(item, lowPrice ?? null, this.config.PURCHASE_PARTNER),
     ]);
     if (!named) {
       throw new WatchLifecycleError('WATCH_NOT_FOUND', 'watch not found');

@@ -20,6 +20,12 @@ import {
 /** Adapters disponíveis. Um adapter real entra aqui e na factory do pacote dele. */
 export const FLIGHT_PROVIDERS = ['simulated', 'travelpayouts'] as const;
 export const EMAIL_PROVIDERS = ['simulated', 'resend'] as const;
+/**
+ * SPEC-044: para onde o botão de compra leva. `provider` = o link da própria
+ * fonte de preços (como antes); `decolar` = busca na Decolar. A lista tem de
+ * ser igual a `PURCHASE_PARTNERS` do domínio (teste em apps/api confere).
+ */
+export const PURCHASE_PARTNER_VALUES = ['provider', 'decolar'] as const;
 
 const LOCAL_DATABASE_URL = 'postgresql://flight_watch:flight_watch@localhost:5432/flight_watch';
 const LOCAL_REDIS_URL = 'redis://localhost:6379';
@@ -130,6 +136,7 @@ export const apiConfig = {
     ...emailProvider,
     ...promotions,
     ...routePage,
+    PURCHASE_PARTNER: enumField(PURCHASE_PARTNER_VALUES, 'provider'),
     // SPEC-039: quanto abaixo do preço normal dispara o alerta. Fixado na regra ao criar
     // o Watch (só vale para Watches novos); o usuário não escolhe.
     ALERT_LOW_PRICE_DROP_PERCENT: intField({ min: 5, max: 50, default: 15 }),

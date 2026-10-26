@@ -13,6 +13,9 @@
 const ALLOWED_PURCHASE_URL_HOSTS: Record<string, string> = {
   SIMULATED: 'booking.simulated-provider.flightwatch.dev',
   TRAVELPAYOUTS: 'www.aviasales.com',
+  // Não é um provedor de preços: é o parceiro de destino do botão de compra
+  // (SPEC-044, ADR-009), montado por `buildDecolarSearchUrl`.
+  DECOLAR: 'www.decolar.com',
 };
 
 /**

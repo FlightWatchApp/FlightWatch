@@ -666,6 +666,9 @@ Regras transversais:
 - a API usa `REDIS_URL` desde a SPEC-032 (cache de promoções e do calendário,
   orçamento diário do feed); Redis fora é falta de cache, nunca erro. Os e2e
   da API apontam para `redis://127.0.0.1:1` e usam `MemoryKeyValueStore`;
+- SPEC-044 (`VERIFICADO`, só a API): `PURCHASE_PARTNER` (`provider` padrão;
+  `decolar` no modelo de produção) escolhe para onde o botão de compra leva;
+  o link é montado pela viagem, não lido do `deeplink` gravado (ADR-009);
 - SPEC-043 (`VERIFICADO`, só a API): `INVITE_REQUIRED` (padrão `false`; `true`
   no modelo de produção; `false` é o kill switch), `INVITE_TTL_DAYS` (30) e
   `MONTHLY_WATCH_LIMIT` (5). O primeiro admin nasce pelo comando no servidor

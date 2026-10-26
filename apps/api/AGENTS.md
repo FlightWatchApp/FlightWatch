@@ -27,7 +27,8 @@ NestJS 11 + Fastify; um módulo por contexto em `src/<contexto>/`
    (`AdminError`, `CreateWatchError`…) com `{ code, message }` e um
    `@Catch` dela no controller. Recurso de outra pessoa responde 404.
 5. **Módulo** registrado em `app.module.ts`.
-6. **Teste** `*.e2e.spec.ts` com Postgres real (copiar o `beforeAll` de
+6. **Teste** `*.e2e.spec.ts` com Postgres real (todo teste da API termina em
+   `.spec.ts`: a suíte só roda esse padrão — um `.test.ts` aqui é ignorado) (copiar o `beforeAll` de
    `me/me.e2e.spec.ts`): caminho feliz, entrada inválida (400), sem login (401)
    e dono errado (404).
 7. **Caça a erro 500** (`src/route-hunt.e2e.spec.ts`): a rota entra sozinha.
@@ -37,6 +38,11 @@ NestJS 11 + Fastify; um módulo por contexto em `src/<contexto>/`
 8. **Docs**: `docs/API.md` e a spec.
 
 ## Regras
+
+- Link de compra (`purchaseUrl`, `allFlightsUrl`) só por `resolvePartnerLink`
+  (`affiliate/purchase-links.ts`): ele escolhe o parceiro (`PURCHASE_PARTNER`),
+  passa pela allowlist e aplica o afiliado. Nunca ler o `deeplink` gravado
+  direto para a resposta (SPEC-044, ADR-009).
 
 - Respostas de erro sempre `{ code, message }`, com código estável; nunca
   stack, SQL, nome de tabela ou mensagem do Prisma.

@@ -242,6 +242,7 @@ describe('SPEC-024 AC-5 — padrões de desenvolvimento iguais aos de antes', ()
       ROUTE_PAGE_CACHE_TTL_MINUTES: 30,
       ROUTE_PAGE_MONTHS: 3,
       ROUTE_PAGE_RATE_LIMIT_MAX: 60,
+      PURCHASE_PARTNER: 'provider',
       ALERT_LOW_PRICE_DROP_PERCENT: 15,
       INVITE_REQUIRED: false,
       INVITE_TTL_DAYS: 30,
@@ -441,6 +442,13 @@ describe('SPEC-032 — motor de promoções na API', () => {
     ).toBe(true);
     const error = configErrorOf(() => loadConfig(apiConfig, { PROMOTION_ENGINE_ENABLED: 'sim' }));
     expect(keysOf(error)).toEqual(['PROMOTION_ENGINE_ENABLED']);
+  });
+
+  it('PURCHASE_PARTNER aceita provider e decolar e recusa outro destino (SPEC-044)', () => {
+    expect(loadConfig(apiConfig, {}).PURCHASE_PARTNER).toBe('provider');
+    expect(loadConfig(apiConfig, { PURCHASE_PARTNER: 'decolar' }).PURCHASE_PARTNER).toBe('decolar');
+    const error = configErrorOf(() => loadConfig(apiConfig, { PURCHASE_PARTNER: 'kayak' }));
+    expect(keysOf(error)).toEqual(['PURCHASE_PARTNER']);
   });
 
   it('desconto em pontos-base fica entre 1 e 10000', () => {
