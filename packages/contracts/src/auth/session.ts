@@ -13,12 +13,12 @@ const userStatusSchema = z.enum(['PENDING_VERIFICATION', 'ACTIVE', 'BLOCKED', 'D
  * separada. `false` quando não há canal nenhum.
  */
 export const authenticatedUserSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   email: z.string().email(),
   status: userStatusSchema,
   /** SPEC-043: o web mostra o link "Admin" só para ADMIN (o servidor confere de novo). */
   role: z.enum(['USER', 'ADMIN']),
-  notificationChannelId: z.string().uuid().nullable(),
+  notificationChannelId: z.guid().nullable(),
   notificationChannelVerified: z.boolean(),
   /** SPEC-040: cidade de partida da conta; null quando a pessoa não escolheu. */
   homeCity: z.object({ code: z.string(), name: z.string() }).nullable(),

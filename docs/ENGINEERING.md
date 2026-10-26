@@ -250,7 +250,7 @@ Antes de modificar versões ou bibliotecas, conferir `package.json`, `pnpm-lock.
 | API          | NestJS                             | VERIFICADO                  | módulos por contexto                              |
 | HTTP adapter | Fastify                            | VERIFICADO                  | não expor métricas na porta pública               |
 | Contratos    | REST + OpenAPI                     | APROVADO                    | contratos versionados                             |
-| Validação    | Zod                                | APROVADO                    | validar em toda fronteira                         |
+| Validação    | Zod 4                              | VERIFICADO                  | validar em toda fronteira; `z.guid()` para ids    |
 | Banco        | PostgreSQL                         | APROVADO                    | fonte de verdade                                  |
 | ORM          | Prisma                             | VERIFICADO                  | migrações publicadas são imutáveis                |
 | Cache/fila   | Redis + BullMQ                     | APROVADO                    | nenhum estado de domínio apenas no Redis          |
@@ -878,6 +878,14 @@ Campos proibidos ou redigidos: `password`, `passwordHash`, `token`, `tokenHash`,
 **Causa:** dado de teste com datas relativas a "hoje" (`hoje + 12 dias`) colocado num mês fixo (o corrente); perto do fim do mês a data cai no mês seguinte (visto em `routes.e2e.spec.ts`, 2026-10-21).  
 **Solução:** dado falso que segue a data para onde ela cair, ou relógio fixo.  
 **Prevenção:** teste com data relativa roda com o relógio simulado em datas de fronteira (dia 1, 15, 25, 31, 28/12, fevereiro): `vi.useFakeTimers({ toFake: ['Date'], now })` num `setupFiles` só da verificação.
+
+### H18 — Auditoria de dependências quebra sem mudança no código
+
+**Sintoma:** o job `pnpm audit --prod --audit-level=high` falha num PR que não mexeu em dependência (ou na `main` parada).  
+**Causa:** o banco de avisos muda todo dia; uma versão que passava ontem pode ter aviso novo hoje (2026-10-26: Next.js ≤ 16.4.0 e Zod < 4.6.6).  
+**Solução:** PR próprio, a partir da `main`, só com a atualização (não misturar com feature). Confirmar que a versão corrigida existe (`pnpm view <pacote> versions`), atualizar, rodar a suíte inteira, o e2e e o build das imagens Docker. Se não houver correção, exceção temporária com risco, dono, mitigação e prazo, aprovada pelo owner (nunca desligar o gate).  
+**Prevenção:** o Dependabot já abre PRs de atualização; olhar os de segurança primeiro.  
+**Zod 4:** `z.string().uuid()` virou estrito (confere versão e variante): usar `z.guid()` para o comportamento antigo; ids reais (Postgres, `randomUUID`) passam nos dois.
 
 ## 14. Os 14 design patterns do projeto
 
