@@ -52,8 +52,8 @@ const flightSearchOfferSegmentSchema = z.object({
  * momento da leitura, recalculado a cada resposta, nunca cacheado.
  */
 export const flightSearchOfferSchema = z.object({
-  id: z.string().uuid(),
-  searchId: z.string().uuid(),
+  id: z.guid(),
+  searchId: z.guid(),
   provider: z.string(),
   segments: z.array(flightSearchOfferSegmentSchema),
   // SPEC-030: preenchido (e `segments` vazio) quando a oferta é um resumo de tarifa.
@@ -83,7 +83,7 @@ export const flightSearchStatusSchema = z.enum([
 ]);
 
 export const flightSearchResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   status: flightSearchStatusSchema,
   origin: z.string(),
   destination: z.string(),

@@ -8,7 +8,7 @@ import { z } from 'zod';
  */
 export const deriveWatchFromOfferRequestSchema = z
   .object({
-    notificationChannelId: z.string().uuid(),
+    notificationChannelId: z.guid(),
   })
   .strict();
 
