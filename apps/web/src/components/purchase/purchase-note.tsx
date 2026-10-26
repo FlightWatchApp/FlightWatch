@@ -14,8 +14,9 @@ export interface PurchaseNoteProps {
 export function PurchaseNote({ align = 'start' }: PurchaseNoteProps) {
   return (
     <p className={`${styles.note} ${align === 'center' ? styles.center : ''}`}>
-      Você finaliza a compra no site parceiro. Podemos receber comissão, sem custo extra para você.{' '}
-      <Link href="/transparencia">Saiba mais</Link>
+      O preço aqui é o que observamos: o site parceiro mostra os voos e valores de agora, que podem
+      ser diferentes. Você finaliza a compra lá. Podemos receber comissão, sem custo extra para
+      você. <Link href="/transparencia">Saiba mais</Link>
     </p>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { allFlightsLabel } from '@/lib/domain/purchase-partner-name';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import type { GetRouteResponse } from '@flight-watch/contracts';
@@ -120,7 +121,7 @@ export function RoutePrices({ route, renderedAt }: RoutePricesProps) {
           <PurchaseButton
             href={route.allFlightsUrl}
             status="CURRENT"
-            label="Ver todos os voos no site parceiro"
+            label={allFlightsLabel(route.allFlightsUrl)}
             context={`${route.origin.name} para ${route.destination.name}`}
           />
         )}
