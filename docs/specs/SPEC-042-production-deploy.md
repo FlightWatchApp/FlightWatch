@@ -145,9 +145,15 @@ Decisão do intervalo de polling para o beta (CLAUDE.md §1.3 — continua
 ## Rollout e rollback
 
 - Primeiro deploy: seguir o `deploy/README.md`.
-- Atualização: `bin/update.sh` (migrações só aditivas; se a nova versão
-  falhar no healthcheck, `bin/update.sh <commit anterior>` volta).
-- Banco: backup diário; restauração documentada no README.
+- Atualização: a produção publica a branch **`release`**, nunca a `main`
+  (2026-10-26). A `main` recebe todo merge; a `release` só avança por
+  `pnpm release` (`scripts/release.sh`: CI da `main` verde, só fast-forward,
+  tag opcional). `bin/update.sh` faz backup do banco antes de trocar a
+  versão, recusa a `main` e, se a nova versão falhar no healthcheck, informa
+  o commit anterior para `bin/update.sh <commit anterior>` voltar (migrações
+  só aditivas). Ver `deploy/README.md` › "Publicar uma versão".
+- Banco: backup diário e antes de cada atualização; restauração documentada
+  no README.
 
 ## Evidência de implementação
 

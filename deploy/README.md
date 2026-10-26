@@ -147,15 +147,58 @@ suspensão das pessoas em `/admin/pessoas`). `admin.sh demote --email …` tira 
 papel. Para subir **sem** exigir chave, ponha `INVITE_REQUIRED=false` e
 reinicie a `api` (nada é apagado).
 
+## Publicar uma versão (main → release → servidor)
+
+Duas branches, dois papéis:
+
+| Branch    | O que é                                                    | Quem mexe                         |
+| --------- | ---------------------------------------------------------- | --------------------------------- |
+| `main`    | tudo o que passou no CI e foi mergeado; **não** é produção | todo PR                           |
+| `release` | exatamente o que está (ou vai para) a produção             | só o `pnpm release`, de propósito |
+
+Fluxo:
+
+1. PRs entram na `main` com o CI verde (proteção da `main`: ver abaixo).
+2. Teste o que importa no seu PC (`bash .local/up.sh`) ou no preview do
+   servidor (`PREVIEW=1 deploy/bin/update.sh <commit>`).
+3. **No PC**, promova: `pnpm release` (opcional `--tag v0.2.0` para marcar a
+   versão). O script confere que o CI da `main` está verde, mostra os commits
+   que vão subir e só então avança a `release` (sem `--force`: só em linha
+   reta). `pnpm release --dry-run` mostra sem publicar.
+4. **No servidor**: `deploy/bin/update.sh`. Ele faz backup do banco, vai para
+   a `release`, constrói, roda as migrações e confere a saúde do site.
+5. Deu errado? `deploy/bin/update.sh <versão anterior>` (a saída do `update.sh`
+   mostra o commit). O código volta; migrações são só aditivas, então não
+   precisam voltar. Se o **dado** foi afetado, restaure o backup feito
+   antes da atualização (`/var/backups/flightwatch`, seção "Quando algo dá errado" › restaurar o banco).
+
+O `update.sh` **recusa** a `main`. `SKIP_BACKUP=1` pula o backup (por sua conta).
+
+### Proteções no GitHub (uma vez, pelo owner)
+
+_Settings → Rules → Rulesets → New branch ruleset_, para **`main`** e **`release`**:
+
+- **Restrict deletions** e **Block force pushes** (as duas);
+- **Require a pull request before merging** só na `main` (a `release` recebe
+  push do `pnpm release`; deixe só o dono do repositório autorizado a empurrar
+  nela — _Restrict updates_ com você na lista de exceção);
+- **Require status checks to pass** na `main`, marcando `gates`, `e2e` e
+  `docker`;
+- **Require branches to be up to date before merging**, se quiser PRs
+  sempre testados sobre a `main` mais nova.
+
+Sem isso a regra é só convenção; com isso, quebrar a `main` ou a produção por
+engano deixa de ser possível.
+
 ## Dia a dia
 
-| Quero…                         | Comando                                                                 |
-| ------------------------------ | ----------------------------------------------------------------------- |
-| publicar a versão nova da main | `deploy/bin/update.sh`                                                  |
-| voltar para a versão anterior  | `git log --oneline -5` e `deploy/bin/update.sh <commit>`                |
-| ver o estado                   | `docker compose -p flightwatch ps`                                      |
-| ver logs                       | `docker compose -p flightwatch logs -f --tail 100 api web price-worker` |
-| reiniciar um processo          | `docker compose -p flightwatch restart price-worker`                    |
+| Quero…                        | Comando                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| publicar a versão nova        | no PC `pnpm release`; no servidor `deploy/bin/update.sh` (ver abaixo)   |
+| voltar para a versão anterior | `deploy/bin/update.sh <tag ou commit>` (o `update.sh` mostra qual)      |
+| ver o estado                  | `docker compose -p flightwatch ps`                                      |
+| ver logs                      | `docker compose -p flightwatch logs -f --tail 100 api web price-worker` |
+| reiniciar um processo         | `docker compose -p flightwatch restart price-worker`                    |
 
 ## Quando algo dá errado
 

@@ -25,7 +25,7 @@ com cota mensal de monitoramentos (SPEC-043).
 | variável de ambiente                   | `packages/config/src/processes.ts`, `.env.example`, `docs/ENGINEERING.md` §10 |
 | tela, componente, CSS, texto do site   | `apps/web/AGENTS.md` e `docs/DESIGN-SYSTEM.md`                                |
 | logs, métricas, health                 | `docs/ENGINEERING.md` §11, ADR-007                                            |
-| deploy, servidor, backup               | `deploy/README.md`, SPEC-042                                                  |
+| deploy, release, servidor, backup      | `deploy/README.md`, SPEC-042                                                  |
 | estado do projeto, bloqueios, decisões | `docs/ENGINEERING.md` §1                                                      |
 | um erro estranho de build/teste        | `docs/ENGINEERING.md` §13 (H13–H15 são os mais comuns)                        |
 
@@ -92,7 +92,10 @@ ainda; o agente é a garantia.
 2. Ler a spec e o que a tabela "O que ler antes" indica. Não há spec? Escrever
    ou pedir uma — **não inventar requisito**. Lacuna que afeta contrato, dados,
    segurança, custo ou o usuário: parar e perguntar.
-3. Branch nova a partir da `main`. Uma spec (ou uma correção) por PR.
+3. Branch nova a partir da `main`. Uma spec (ou uma correção) por PR. Agente
+   nunca empurra para a `main` nem para a `release`: só abre PR.
+   A produção publica a branch `release`, promovida da `main` pelo owner com
+   `pnpm release` (`deploy/README.md` › "Publicar uma versão").
 4. Teste que falha pelo motivo certo → menor código que passa → refatorar.
    Bug sempre ganha teste de regressão.
 5. Mudou tela? `pnpm screenshot /rota [/outra]` (com `--login` e
