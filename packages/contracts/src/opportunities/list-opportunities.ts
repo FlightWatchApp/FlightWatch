@@ -50,7 +50,7 @@ export const dealSchema = z.object({
 });
 
 export const opportunityItemSchema = z.object({
-  searchTargetId: z.string().uuid(),
+  searchTargetId: z.guid(),
   origin: z.string(),
   destination: z.string(),
   // SPEC-029: nome da cidade no catálogo; null quando o código não tem cadastro.

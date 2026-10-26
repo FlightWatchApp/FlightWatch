@@ -36,7 +36,7 @@ export const watchLowPriceSchema = z.object({
 });
 
 export const watchListItemSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'EXPIRED', 'CANCELLED']),
   origin: z.string(),
   destination: z.string(),
@@ -88,7 +88,7 @@ export type ListWatchesResponse = z.infer<typeof listWatchesResponseSchema>;
 
 /** SPEC-009 §7. */
 export const pricePointSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   observedAt: z.string(),
   amountMinor: z.number().int(),
   currency: z.string(),
